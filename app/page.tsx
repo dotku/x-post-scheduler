@@ -21,11 +21,12 @@ async function getPosts() {
   }
 
   try {
-    const existingTweetIds = new Set(
+    const existingTweetIds = new Set<string>(
       dbPosts
         .map((post: DbPost) => post.tweetId)
-        .filter((tweetId: DbPost["tweetId"]): tweetId is string =>
-          Boolean(tweetId)
+        .filter(
+          (tweetId: DbPost["tweetId"]): tweetId is string =>
+            typeof tweetId === "string" && tweetId.length > 0
         )
     );
     const remaining = MAX_POSTS - dbPosts.length;
