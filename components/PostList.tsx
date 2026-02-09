@@ -13,6 +13,7 @@ interface Post {
   tweetId: string | null;
   error: string | null;
   createdAt: Date;
+  source?: "db" | "x";
 }
 
 interface PostListProps {
@@ -23,6 +24,21 @@ export default function PostList({ initialPosts }: PostListProps) {
   const router = useRouter();
   const [posts, setPosts] = useState(initialPosts);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const decodeHtml = (value: string) => {
+    if (!value) return value;
+    if (typeof window === "undefined" || typeof DOMParser === "undefined") {
+      return value
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+    }
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(value, "text/html");
+    return doc.documentElement.textContent ?? value;
+  };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this post?")) return;
@@ -99,7 +115,7 @@ export default function PostList({ initialPosts }: PostListProps) {
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div className="flex-1 min-w-0">
               <p className="text-gray-900 dark:text-white whitespace-pre-wrap break-words">
-                {post.content}
+                {decodeHtml(post.content)}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                 <span
@@ -135,7 +151,7 @@ export default function PostList({ initialPosts }: PostListProps) {
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {post.status === "scheduled" && (
+              {post.status === "scheduled" && post.source !== "x" && (
                 <button
                   onClick={() => handlePostNow(post.id)}
                   className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
@@ -143,13 +159,15 @@ export default function PostList({ initialPosts }: PostListProps) {
                   Post Now
                 </button>
               )}
-              <button
-                onClick={() => handleDelete(post.id)}
-                disabled={deletingId === post.id}
-                className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-50"
-              >
-                {deletingId === post.id ? "Deleting..." : "Delete"}
-              </button>
+              {post.source !== "x" && (
+                <button
+                  onClick={() => handleDelete(post.id)}
+                  disabled={deletingId === post.id}
+                  className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors disabled:opacity-50"
+                >
+                  {deletingId === post.id ? "Deleting..." : "Delete"}
+                </button>
+              )}
             </div>
           </div>
         </div>

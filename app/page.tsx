@@ -1,16 +1,47 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { getRecentTweets } from "@/lib/x-client";
 import { format } from "date-fns";
 import PostList from "@/components/PostList";
 import UserMenu from "@/components/UserMenu";
 
 export const dynamic = "force-dynamic";
 
+const MAX_POSTS = 100;
+
 async function getPosts() {
-  const posts = await prisma.post.findMany({
+  const dbPosts = await prisma.post.findMany({
     orderBy: { createdAt: "desc" },
+    take: MAX_POSTS,
   });
-  return posts;
+
+  if (dbPosts.length >= MAX_POSTS) {
+    return { dbPosts, mergedPosts: dbPosts };
+  }
+
+  try {
+    const existingTweetIds = new Set(
+      dbPosts.map((post) => post.tweetId).filter(Boolean) as string[]
+    );
+    const remaining = MAX_POSTS - dbPosts.length;
+    const recentTweets = await getRecentTweets(remaining, existingTweetIds);
+    const apiPosts = recentTweets.map((tweet) => ({
+      id: `x-${tweet.id}`,
+      content: tweet.text,
+      status: "posted",
+      scheduledAt: null,
+      postedAt: tweet.createdAt,
+      tweetId: tweet.id,
+      error: null,
+      createdAt: tweet.createdAt ?? new Date(0),
+      source: "x" as const,
+    }));
+
+    return { dbPosts, mergedPosts: [...dbPosts, ...apiPosts] };
+  } catch (error) {
+    console.error("Failed to load recent tweets:", error);
+    return { dbPosts, mergedPosts: dbPosts };
+  }
 }
 
 async function getRecurringSchedules() {
@@ -22,12 +53,12 @@ async function getRecurringSchedules() {
 }
 
 export default async function Dashboard() {
-  const posts = await getPosts();
+  const { dbPosts, mergedPosts } = await getPosts();
   const schedules = await getRecurringSchedules();
 
-  const scheduledCount = posts.filter((p) => p.status === "scheduled").length;
-  const postedCount = posts.filter((p) => p.status === "posted").length;
-  const failedCount = posts.filter((p) => p.status === "failed").length;
+  const scheduledCount = dbPosts.filter((p) => p.status === "scheduled").length;
+  const postedCount = dbPosts.filter((p) => p.status === "posted").length;
+  const failedCount = dbPosts.filter((p) => p.status === "failed").length;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -247,7 +278,7 @@ export default async function Dashboard() {
               All Posts
             </h2>
           </div>
-          <PostList initialPosts={posts} />
+          <PostList initialPosts={mergedPosts} />
         </div>
       </main>
     </div>

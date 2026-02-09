@@ -19,7 +19,7 @@ export default function LoginPage() {
 
           <div className="space-y-4">
             <Link
-              href="/api/auth/login"
+              href="/auth/login"
               className="w-full flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >
               <svg

@@ -29,7 +29,7 @@ export default function UserMenu() {
   if (!user) {
     return (
       <Link
-        href="/api/auth/login"
+        href="/auth/login"
         className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
       >
         Sign In
@@ -85,7 +85,7 @@ export default function UserMenu() {
             </p>
           </div>
           <a
-            href="/api/auth/logout"
+            href="/auth/logout"
             className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
           >
             Sign Out

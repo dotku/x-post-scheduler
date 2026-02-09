@@ -27,6 +27,12 @@ export interface PostResult {
   error?: string;
 }
 
+export interface TimelineTweet {
+  id: string;
+  text: string;
+  createdAt: Date | null;
+}
+
 // Post a tweet to X
 export async function postTweet(content: string): Promise<PostResult> {
   try {
@@ -46,6 +52,39 @@ export async function postTweet(content: string): Promise<PostResult> {
       error: error instanceof Error ? error.message : "Unknown error occurred",
     };
   }
+}
+
+// Fetch recent tweets from the authenticated user's timeline
+export async function getRecentTweets(
+  limit: number,
+  excludeTweetIds: Set<string> = new Set()
+): Promise<TimelineTweet[]> {
+  if (limit <= 0) return [];
+
+  const client = getXClient();
+  const me = await client.v2.me();
+  const maxResults = Math.min(100, Math.max(5, limit));
+
+  const paginator = await client.v2.userTimeline(me.data.id, {
+    max_results: maxResults,
+    exclude: ["replies", "retweets"],
+    "tweet.fields": ["created_at"],
+  });
+
+  const tweets = paginator.tweets ?? [];
+  const results: TimelineTweet[] = [];
+
+  for (const tweet of tweets) {
+    if (excludeTweetIds.has(tweet.id)) continue;
+    results.push({
+      id: tweet.id,
+      text: tweet.text ?? "",
+      createdAt: tweet.created_at ? new Date(tweet.created_at) : null,
+    });
+    if (results.length >= limit) break;
+  }
+
+  return results;
 }
 
 // Verify credentials are valid
