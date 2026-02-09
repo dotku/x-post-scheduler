@@ -4,6 +4,7 @@ import { getRecentTweets } from "@/lib/x-client";
 import { format } from "date-fns";
 import PostList from "@/components/PostList";
 import UserMenu from "@/components/UserMenu";
+import type { Post } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -62,9 +63,11 @@ export default async function Dashboard() {
   const { dbPosts, mergedPosts } = await getPosts();
   const schedules = await getRecurringSchedules();
 
-  const scheduledCount = dbPosts.filter((p) => p.status === "scheduled").length;
-  const postedCount = dbPosts.filter((p) => p.status === "posted").length;
-  const failedCount = dbPosts.filter((p) => p.status === "failed").length;
+  const scheduledCount = dbPosts.filter(
+    (p: Post) => p.status === "scheduled"
+  ).length;
+  const postedCount = dbPosts.filter((p: Post) => p.status === "posted").length;
+  const failedCount = dbPosts.filter((p: Post) => p.status === "failed").length;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
