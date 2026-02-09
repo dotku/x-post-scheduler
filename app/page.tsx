@@ -24,7 +24,9 @@ async function getPosts() {
     const existingTweetIds = new Set(
       dbPosts
         .map((post: DbPost) => post.tweetId)
-        .filter((tweetId): tweetId is string => Boolean(tweetId))
+        .filter((tweetId: DbPost["tweetId"]): tweetId is string =>
+          Boolean(tweetId)
+        )
     );
     const remaining = MAX_POSTS - dbPosts.length;
     const recentTweets = await getRecentTweets(remaining, existingTweetIds);
