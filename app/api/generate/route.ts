@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateTweet, generateTweetSuggestions } from "@/lib/openai";
+import type { KnowledgeSource } from "@prisma/client";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
 
   // Combine knowledge from all sources (truncate to prevent token limits)
   const knowledgeContext = sources
-    .map((source) => {
+    .map((source: KnowledgeSource) => {
       const truncatedContent =
         source.content.length > 2000
           ? source.content.substring(0, 2000) + "..."
