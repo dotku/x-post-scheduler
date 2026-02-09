@@ -14,6 +14,7 @@ async function getPosts() {
     orderBy: { createdAt: "desc" },
     take: MAX_POSTS,
   });
+  type DbPost = (typeof dbPosts)[number];
 
   if (dbPosts.length >= MAX_POSTS) {
     return { dbPosts, mergedPosts: dbPosts };
@@ -21,7 +22,9 @@ async function getPosts() {
 
   try {
     const existingTweetIds = new Set(
-      dbPosts.map((post) => post.tweetId).filter(Boolean) as string[]
+      dbPosts
+        .map((post: DbPost) => post.tweetId)
+        .filter((tweetId): tweetId is string => Boolean(tweetId))
     );
     const remaining = MAX_POSTS - dbPosts.length;
     const recentTweets = await getRecentTweets(remaining, existingTweetIds);
