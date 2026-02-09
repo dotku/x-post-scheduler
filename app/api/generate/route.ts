@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateTweet, generateTweetSuggestions } from "@/lib/openai";
-import type { KnowledgeSource } from "@prisma/client";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -11,6 +10,7 @@ export async function POST(request: NextRequest) {
   const sources = await prisma.knowledgeSource.findMany({
     where: { isActive: true },
   });
+  type KnowledgeSource = (typeof sources)[number];
 
   if (sources.length === 0) {
     return NextResponse.json(
