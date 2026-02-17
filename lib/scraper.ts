@@ -5,13 +5,20 @@ export interface ScrapeResult {
   content?: string;
   title?: string;
   pagesScraped?: number;
+  images?: ScrapedImage[];
   error?: string;
+}
+
+export interface ScrapedImage {
+  url: string;
+  altText?: string;
 }
 
 interface PageContent {
   url: string;
   title: string;
   content: string;
+  images: ScrapedImage[];
 }
 
 // Get base URL from a full URL
@@ -36,10 +43,27 @@ function isInternalLink(link: string, baseUrl: string): boolean {
 
 // Normalize URL to absolute
 function normalizeUrl(link: string, baseUrl: string): string {
+  if (link.startsWith("//")) {
+    const base = new URL(baseUrl);
+    return `${base.protocol}${link}`;
+  }
   if (link.startsWith("/")) {
     return `${getBaseUrl(baseUrl)}${link}`;
   }
   return link;
+}
+
+function looksLikeImageUrl(url: string): boolean {
+  return /\.(jpg|jpeg|png|gif|webp|bmp|svg|avif)(\?|#|$)/i.test(url);
+}
+
+function extractImageUrlFromSrcset(srcset: string | undefined): string | null {
+  if (!srcset) return null;
+  const first = srcset
+    .split(",")
+    .map((item) => item.trim().split(/\s+/)[0])
+    .find(Boolean);
+  return first || null;
 }
 
 // Scrape a single page
@@ -96,7 +120,29 @@ async function scrapeSinglePage(url: string): Promise<PageContent | null> {
     const minContentLength = containsCJK(content) ? 30 : 100;
     if (content.length < minContentLength) return null; // Skip pages with too little content
 
-    return { url, title, content };
+    const imagesMap = new Map<string, ScrapedImage>();
+    $("img").each((_, element) => {
+      const img = $(element);
+      const src =
+        img.attr("src") ||
+        img.attr("data-src") ||
+        extractImageUrlFromSrcset(img.attr("srcset"));
+      if (!src) return;
+
+      const normalized = normalizeUrl(src.trim(), url);
+      if (!/^https?:\/\//i.test(normalized)) return;
+      if (!looksLikeImageUrl(normalized)) return;
+
+      if (!imagesMap.has(normalized)) {
+        const alt = img.attr("alt")?.trim();
+        imagesMap.set(normalized, {
+          url: normalized,
+          altText: alt && alt.length > 0 ? alt : undefined,
+        });
+      }
+    });
+
+    return { url, title, content, images: Array.from(imagesMap.values()) };
   } catch {
     return null;
   }
@@ -202,11 +248,21 @@ export async function scrapeWebsite(
         ? combinedContent.substring(0, 50000) + "\n\n... (truncated)"
         : combinedContent;
 
+    const imageMap = new Map<string, ScrapedImage>();
+    for (const page of allContent) {
+      for (const image of page.images) {
+        if (!imageMap.has(image.url)) {
+          imageMap.set(image.url, image);
+        }
+      }
+    }
+
     return {
       success: true,
       content: finalContent,
       title: allContent[0]?.title || "Website",
       pagesScraped: allContent.length,
+      images: Array.from(imageMap.values()),
     };
   } catch (error) {
     return {

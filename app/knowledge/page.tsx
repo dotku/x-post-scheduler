@@ -13,6 +13,8 @@ interface KnowledgeSource {
   lastScraped: string | null;
   isActive: boolean;
   createdAt: string;
+  images?: { id: string; blobUrl: string; altText: string | null }[];
+  _count?: { images: number };
 }
 
 export default function KnowledgePage() {
@@ -235,8 +237,22 @@ export default function KnowledgePage() {
                               "PPp"
                             )}`
                           : "Never scraped"}{" "}
-                        | {source.pagesScraped} page{source.pagesScraped !== 1 ? "s" : ""} | {source.content.length.toLocaleString()} chars
+                        | {source.pagesScraped} page{source.pagesScraped !== 1 ? "s" : ""} | {source.content.length.toLocaleString()} chars |{" "}
+                        {source._count?.images ?? source.images?.length ?? 0} images
                       </p>
+                      {source.images && source.images.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {source.images.slice(0, 4).map((img) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={img.id}
+                              src={img.blobUrl}
+                              alt={img.altText || source.name}
+                              className="h-12 w-12 rounded border border-gray-200 dark:border-gray-700 object-cover"
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button

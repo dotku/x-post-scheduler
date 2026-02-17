@@ -29,6 +29,7 @@ model User {
   mediaAssets        MediaAsset[]
   xAccounts          XAccount[]
   usageEvents        UsageEvent[]
+  knowledgeImages    KnowledgeImage[]
 }
 
 model Post {
@@ -82,8 +83,27 @@ model KnowledgeSource {
 
   userId       String?
   user         User?     @relation(fields: [userId], references: [id])
+  images       KnowledgeImage[]
 
   @@unique([url, userId])
+}
+
+model KnowledgeImage {
+  id                String          @id @default(cuid())
+  sourceUrl         String
+  blobUrl           String
+  mimeType          String?
+  altText           String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  userId            String?
+  user              User?           @relation(fields: [userId], references: [id])
+  knowledgeSourceId String
+  knowledgeSource   KnowledgeSource @relation(fields: [knowledgeSourceId], references: [id], onDelete: Cascade)
+
+  @@unique([knowledgeSourceId, sourceUrl])
+  @@index([userId, knowledgeSourceId])
 }
 
 model MediaAsset {

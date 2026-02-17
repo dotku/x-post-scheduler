@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { scrapeUrl } from "@/lib/scraper";
+import { syncKnowledgeSourceImages } from "@/lib/knowledge-images";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 
 export async function GET() {
@@ -13,6 +14,14 @@ export async function GET() {
 
   const sources = await prisma.knowledgeSource.findMany({
     where: { userId: user.id },
+    include: {
+      images: {
+        select: { id: true, blobUrl: true, altText: true },
+        orderBy: { createdAt: "desc" },
+        take: 8,
+      },
+      _count: { select: { images: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(sources);
@@ -68,5 +77,35 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return NextResponse.json(source);
+  const imagesResult = await syncKnowledgeSourceImages({
+    userId: user.id,
+    knowledgeSourceId: source.id,
+    images: scrapeResult.images || [],
+  });
+
+  const sourceWithImages = await prisma.knowledgeSource.findUnique({
+    where: { id: source.id },
+    include: {
+      images: {
+        select: { id: true, blobUrl: true, altText: true },
+        orderBy: { createdAt: "desc" },
+        take: 8,
+      },
+      _count: { select: { images: true } },
+    },
+  });
+
+  if (!sourceWithImages) {
+    return NextResponse.json({
+      ...source,
+      images: [],
+      _count: { images: 0 },
+      imageSync: imagesResult,
+    });
+  }
+
+  return NextResponse.json({
+    ...sourceWithImages,
+    imageSync: imagesResult,
+  });
 }

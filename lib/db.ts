@@ -10,6 +10,7 @@ const hasExpectedDelegates = (client: PrismaClient | undefined) =>
   "post" in client &&
   "recurringSchedule" in client &&
   "knowledgeSource" in client &&
+  "knowledgeImage" in client &&
   "mediaAsset" in client &&
   "xAccount" in client &&
   "usageEvent" in client;

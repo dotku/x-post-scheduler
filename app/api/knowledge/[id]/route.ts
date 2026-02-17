@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { scrapeUrl } from "@/lib/scraper";
+import { syncKnowledgeSourceImages } from "@/lib/knowledge-images";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 
 export async function GET(
@@ -18,6 +19,14 @@ export async function GET(
 
   const source = await prisma.knowledgeSource.findFirst({
     where: { id, userId: user.id },
+    include: {
+      images: {
+        select: { id: true, blobUrl: true, altText: true },
+        orderBy: { createdAt: "desc" },
+        take: 8,
+      },
+      _count: { select: { images: true } },
+    },
   });
 
   if (!source) {
@@ -93,7 +102,30 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json(updated);
+    const imagesResult = await syncKnowledgeSourceImages({
+      userId: user.id,
+      knowledgeSourceId: id,
+      images: scrapeResult.images || [],
+    });
+
+    const withImages = await prisma.knowledgeSource.findUnique({
+      where: { id },
+      include: {
+        images: {
+          select: { id: true, blobUrl: true, altText: true },
+          orderBy: { createdAt: "desc" },
+          take: 8,
+        },
+        _count: { select: { images: true } },
+      },
+    });
+
+    return NextResponse.json({
+      ...updated,
+      images: withImages?.images || [],
+      _count: withImages?._count || { images: 0 },
+      imageSync: imagesResult,
+    });
   }
 
   const updated = await prisma.knowledgeSource.update({
