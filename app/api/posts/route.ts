@@ -28,7 +28,8 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { content, scheduledAt, postImmediately } = body;
+  const { content, scheduledAt, postImmediately, mediaAssetId, xAccountId } =
+    body;
 
   if (!content || content.length === 0) {
     return NextResponse.json(
@@ -45,15 +46,15 @@ export async function POST(request: NextRequest) {
   }
 
   if (postImmediately) {
-    const credentials = await getUserXCredentials(user.id);
-    if (!credentials) {
+    const resolved = await getUserXCredentials(user.id, xAccountId);
+    if (!resolved) {
       return NextResponse.json(
         { error: "X API credentials not configured. Please go to Settings." },
         { status: 400 }
       );
     }
 
-    const result = await postTweet(content, credentials);
+    const result = await postTweet(content, resolved.credentials);
 
     const post = await prisma.post.create({
       data: {
@@ -62,6 +63,8 @@ export async function POST(request: NextRequest) {
         postedAt: result.success ? new Date() : null,
         tweetId: result.tweetId || null,
         error: result.error || null,
+        mediaAssetId: typeof mediaAssetId === "string" ? mediaAssetId : null,
+        xAccountId: resolved.accountId,
         userId: user.id,
       },
     });
@@ -69,11 +72,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(post);
   }
 
+  const resolvedForSchedule = await getUserXCredentials(user.id, xAccountId);
+  if (!resolvedForSchedule) {
+    return NextResponse.json(
+      { error: "Please select a valid connected X account." },
+      { status: 400 }
+    );
+  }
+
   const post = await prisma.post.create({
     data: {
       content,
       status: "scheduled",
       scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
+      mediaAssetId: typeof mediaAssetId === "string" ? mediaAssetId : null,
+      xAccountId: resolvedForSchedule.accountId,
       userId: user.id,
     },
   });

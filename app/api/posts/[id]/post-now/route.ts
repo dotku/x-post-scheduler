@@ -32,15 +32,15 @@ export async function POST(
     );
   }
 
-  const credentials = await getUserXCredentials(user.id);
-  if (!credentials) {
+  const resolved = await getUserXCredentials(user.id, post.xAccountId);
+  if (!resolved) {
     return NextResponse.json(
       { error: "X API credentials not configured. Please go to Settings." },
       { status: 400 }
     );
   }
 
-  const result = await postTweet(post.content, credentials);
+  const result = await postTweet(post.content, resolved.credentials);
 
   const updatedPost = await prisma.post.update({
     where: { id },

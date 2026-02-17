@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   // Find all users with active knowledge sources and X credentials configured
   const users = await prisma.user.findMany({
     where: {
-      xApiKey: { not: null },
+      OR: [{ xApiKey: { not: null } }, { xAccounts: { some: {} } }],
       knowledgeSources: {
         some: { isActive: true },
       },

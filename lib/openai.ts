@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import type { TokenUsage } from "./usage-tracking";
 
 function getOpenAIClient() {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -16,6 +17,8 @@ export interface GenerateResult {
   success: boolean;
   content?: string;
   error?: string;
+  usage?: TokenUsage;
+  model?: string;
 }
 
 // Generate a tweet based on knowledge context and optional prompt
@@ -65,11 +68,20 @@ Generate tweets that are relevant to this knowledge base content.`;
     });
 
     const content = response.choices[0]?.message?.content?.trim();
+    const usage: TokenUsage | undefined = response.usage
+      ? {
+          promptTokens: response.usage.prompt_tokens ?? 0,
+          completionTokens: response.usage.completion_tokens ?? 0,
+          totalTokens: response.usage.total_tokens ?? 0,
+        }
+      : undefined;
 
     if (!content) {
       return {
         success: false,
         error: "No content generated",
+        usage,
+        model: response.model,
       };
     }
 
@@ -80,6 +92,8 @@ Generate tweets that are relevant to this knowledge base content.`;
     return {
       success: true,
       content: finalContent,
+      usage,
+      model: response.model,
     };
   } catch (error) {
     console.error("Error generating tweet:", error);
@@ -96,7 +110,13 @@ export async function generateTweetSuggestions(
   prompt?: string,
   count: number = 3,
   language?: string
-): Promise<{ success: boolean; suggestions?: string[]; error?: string }> {
+): Promise<{
+  success: boolean;
+  suggestions?: string[];
+  error?: string;
+  usage?: TokenUsage;
+  model?: string;
+}> {
   try {
     const client = getOpenAIClient();
 
@@ -138,11 +158,20 @@ Generate ${count} different tweet options, each on a new line. Just the tweet te
     });
 
     const content = response.choices[0]?.message?.content?.trim();
+    const usage: TokenUsage | undefined = response.usage
+      ? {
+          promptTokens: response.usage.prompt_tokens ?? 0,
+          completionTokens: response.usage.completion_tokens ?? 0,
+          totalTokens: response.usage.total_tokens ?? 0,
+        }
+      : undefined;
 
     if (!content) {
       return {
         success: false,
         error: "No content generated",
+        usage,
+        model: response.model,
       };
     }
 
@@ -156,6 +185,8 @@ Generate ${count} different tweet options, each on a new line. Just the tweet te
     return {
       success: true,
       suggestions,
+      usage,
+      model: response.model,
     };
   } catch (error) {
     console.error("Error generating suggestions:", error);

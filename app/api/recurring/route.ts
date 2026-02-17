@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { addDays, addWeeks, addMonths } from "date-fns";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
+import { getUserXCredentials } from "@/lib/user-credentials";
 
 function calculateNextRun(frequency: string, cronExpr: string): Date {
   const now = new Date();
@@ -52,7 +53,8 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { content, frequency, cronExpr, useAi, aiPrompt, aiLanguage } = body;
+  const { content, frequency, cronExpr, useAi, aiPrompt, aiLanguage, xAccountId } =
+    body;
   const isAiMode = Boolean(useAi);
   const normalizedContent = typeof content === "string" ? content.trim() : "";
   const normalizedPrompt =
@@ -96,6 +98,13 @@ export async function POST(request: NextRequest) {
   }
 
   const nextRunAt = calculateNextRun(frequency, cronExpr);
+  const resolvedAccount = await getUserXCredentials(user.id, xAccountId);
+  if (!resolvedAccount) {
+    return NextResponse.json(
+      { error: "Please select a valid connected X account." },
+      { status: 400 }
+    );
+  }
 
   const schedule = await prisma.recurringSchedule.create({
     data: {
@@ -107,6 +116,7 @@ export async function POST(request: NextRequest) {
       cronExpr,
       nextRunAt,
       isActive: true,
+      xAccountId: resolvedAccount.accountId,
       userId: user.id,
     },
   });

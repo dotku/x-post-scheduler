@@ -11,6 +11,7 @@ interface RecurringSchedule {
   useAi: boolean;
   aiPrompt: string | null;
   aiLanguage: string | null;
+  xAccountId: string | null;
   frequency: string;
   cronExpr: string;
   nextRunAt: string;
@@ -21,6 +22,9 @@ interface RecurringSchedule {
 export default function RecurringPage() {
   const router = useRouter();
   const [schedules, setSchedules] = useState<RecurringSchedule[]>([]);
+  const [accounts, setAccounts] = useState<
+    { id: string; label: string | null; username: string | null; isDefault: boolean }[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Form state
@@ -28,19 +32,40 @@ export default function RecurringPage() {
   const [useAi, setUseAi] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLanguage, setAiLanguage] = useState("");
+  const [selectedAccountId, setSelectedAccountId] = useState("");
   const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">(
     "daily"
   );
   const [time, setTime] = useState("09:00");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingSample, setIsGeneratingSample] = useState(false);
+  const [sampleContent, setSampleContent] = useState("");
+  const [testingScheduleId, setTestingScheduleId] = useState<string | null>(null);
+  const [scheduleTestResults, setScheduleTestResults] = useState<
+    Record<string, { content?: string; error?: string }>
+  >({});
   const [error, setError] = useState("");
 
   const charCount = content.length;
   const charRemaining = 280 - charCount;
 
   useEffect(() => {
-    fetchSchedules();
+    void fetchSchedules();
+    void fetchAccounts();
   }, []);
+
+  const fetchAccounts = async () => {
+    const res = await fetch("/api/settings");
+    if (!res.ok) return;
+    const data = await res.json();
+    const list = Array.isArray(data.accounts) ? data.accounts : [];
+    setAccounts(list);
+    if (list.length > 0) {
+      const defaultAccount =
+        list.find((a: { isDefault: boolean }) => a.isDefault) ?? list[0];
+      setSelectedAccountId((prev) => prev || defaultAccount.id);
+    }
+  };
 
   const fetchSchedules = async () => {
     const res = await fetch("/api/recurring");
@@ -68,6 +93,11 @@ export default function RecurringPage() {
       return;
     }
 
+    if (!selectedAccountId) {
+      setError("Please select an X account");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -79,6 +109,7 @@ export default function RecurringPage() {
           useAi,
           aiPrompt: aiPrompt || undefined,
           aiLanguage: aiLanguage || undefined,
+          xAccountId: selectedAccountId,
           frequency,
           cronExpr: time,
         }),
@@ -95,12 +126,50 @@ export default function RecurringPage() {
       setAiLanguage("");
       setFrequency("daily");
       setTime("09:00");
+      void fetchAccounts();
       fetchSchedules();
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleGenerateSample = async () => {
+    setError("");
+    setSampleContent("");
+
+    if (!useAi) {
+      if (!content.trim()) {
+        setError("Please enter recurring content first");
+        return;
+      }
+      setSampleContent(content.trim());
+      return;
+    }
+
+    setIsGeneratingSample(true);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: aiPrompt || undefined,
+          language: aiLanguage || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to generate sample");
+      }
+
+      setSampleContent(data.content || "");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate sample");
+    } finally {
+      setIsGeneratingSample(false);
     }
   };
 
@@ -118,6 +187,34 @@ export default function RecurringPage() {
 
     await fetch(`/api/recurring/${id}`, { method: "DELETE" });
     fetchSchedules();
+  };
+
+  const handleTestSchedule = async (id: string) => {
+    setTestingScheduleId(id);
+    setScheduleTestResults((prev) => ({ ...prev, [id]: {} }));
+
+    try {
+      const res = await fetch(`/api/recurring/${id}/test`, { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to test this schedule");
+      }
+
+      setScheduleTestResults((prev) => ({
+        ...prev,
+        [id]: { content: data.content || "" },
+      }));
+    } catch (err) {
+      setScheduleTestResults((prev) => ({
+        ...prev,
+        [id]: {
+          error: err instanceof Error ? err.message : "Failed to test schedule",
+        },
+      }));
+    } finally {
+      setTestingScheduleId(null);
+    }
   };
 
   return (
@@ -147,6 +244,29 @@ export default function RecurringPage() {
             </h2>
           </div>
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <div>
+              <label
+                htmlFor="xAccountId"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+              >
+                X Account
+              </label>
+              <select
+                id="xAccountId"
+                value={selectedAccountId}
+                onChange={(e) => setSelectedAccountId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              >
+                {accounts.length === 0 && <option value="">No account connected</option>}
+                {accounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {(account.label || account.username || "Unnamed account") +
+                      (account.isDefault ? " (Default)" : "")}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Content Mode
@@ -287,13 +407,35 @@ export default function RecurringPage() {
               </div>
             )}
 
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+              <button
+                type="button"
+                onClick={handleGenerateSample}
+                disabled={isGeneratingSample}
+                className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50"
+              >
+                {isGeneratingSample ? "Generating sample..." : "Generate Sample"}
+              </button>
+            </div>
+
+            {sampleContent && (
+              <div className="bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">
+                  Sample Content
+                </p>
+                <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
+                  {sampleContent}
+                </p>
+              </div>
+            )}
+
             <div className="flex justify-end">
               <button
                 type="submit"
                 disabled={isSubmitting || (!useAi && charCount > 280)}
                 className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {isSubmitting ? "Creating..." : "Create Schedule"}
+                {isSubmitting ? "Saving..." : "Save Task"}
               </button>
             </div>
           </form>
@@ -340,8 +482,30 @@ export default function RecurringPage() {
                         Next: {format(new Date(schedule.nextRunAt), "PPp")}
                       </span>
                     </div>
+                    {scheduleTestResults[schedule.id]?.content && (
+                      <div className="mt-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg p-3">
+                        <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+                          Test Output
+                        </p>
+                        <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">
+                          {scheduleTestResults[schedule.id].content}
+                        </p>
+                      </div>
+                    )}
+                    {scheduleTestResults[schedule.id]?.error && (
+                      <p className="mt-2 text-sm text-red-600 dark:text-red-400">
+                        {scheduleTestResults[schedule.id].error}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
+                    <button
+                      onClick={() => handleTestSchedule(schedule.id)}
+                      disabled={testingScheduleId === schedule.id}
+                      className="px-3 py-1.5 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50"
+                    >
+                      {testingScheduleId === schedule.id ? "Testing..." : "Test"}
+                    </button>
                     <button
                       onClick={() => handleToggle(schedule.id, schedule.isActive)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${

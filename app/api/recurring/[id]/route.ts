@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
+import { getUserXCredentials } from "@/lib/user-credentials";
 
 export async function DELETE(
   request: NextRequest,
@@ -46,6 +47,7 @@ export async function PATCH(
     useAi?: boolean;
     aiPrompt?: string | null;
     aiLanguage?: string | null;
+    xAccountId?: string | null;
   } = {};
 
   if ("isActive" in body) {
@@ -89,6 +91,19 @@ export async function PATCH(
     const aiLanguage =
       typeof body.aiLanguage === "string" ? body.aiLanguage.trim() : "";
     updateData.aiLanguage = aiLanguage || null;
+  }
+
+  if ("xAccountId" in body) {
+    const requestedAccountId =
+      typeof body.xAccountId === "string" ? body.xAccountId : null;
+    const resolved = await getUserXCredentials(user.id, requestedAccountId);
+    if (!resolved) {
+      return NextResponse.json(
+        { error: "Invalid X account selection" },
+        { status: 400 }
+      );
+    }
+    updateData.xAccountId = resolved.accountId;
   }
 
   const existing = await prisma.recurringSchedule.findFirst({

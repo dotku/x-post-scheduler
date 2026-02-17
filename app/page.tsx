@@ -42,7 +42,7 @@ async function getPosts(userId: string) {
     const recentTweets = await getRecentTweets(
       remaining,
       existingTweetIds,
-      credentials
+      credentials.credentials
     );
     const apiPosts = recentTweets.map((tweet) => ({
       id: `x-${tweet.id}`,

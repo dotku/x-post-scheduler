@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { generateTweet, generateTweetSuggestions } from "@/lib/openai";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
+import { trackTokenUsage } from "@/lib/usage-tracking";
 import {
   generateWithAgents,
   isAgentServiceConfigured,
@@ -85,6 +86,20 @@ export async function POST(request: NextRequest) {
       language
     );
 
+    if (result.usage) {
+      try {
+        await trackTokenUsage({
+          userId: user.id,
+          source: "generate_api_suggestions",
+          usage: result.usage,
+          model: result.model,
+          metadata: { multiple: true },
+        });
+      } catch (error) {
+        console.error("Failed to track usage (suggestions):", error);
+      }
+    }
+
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 500 });
     }
@@ -92,6 +107,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ suggestions: result.suggestions });
   } else {
     const result = await generateTweet(knowledgeContext, prompt, language);
+
+    if (result.usage) {
+      try {
+        await trackTokenUsage({
+          userId: user.id,
+          source: "generate_api_single",
+          usage: result.usage,
+          model: result.model,
+          metadata: { multiple: false },
+        });
+      } catch (error) {
+        console.error("Failed to track usage (single):", error);
+      }
+    }
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 500 });

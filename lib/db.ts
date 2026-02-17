@@ -10,7 +10,9 @@ const hasExpectedDelegates = (client: PrismaClient | undefined) =>
   "post" in client &&
   "recurringSchedule" in client &&
   "knowledgeSource" in client &&
-  "mediaAsset" in client;
+  "mediaAsset" in client &&
+  "xAccount" in client &&
+  "usageEvent" in client;
 
 const cachedClient = globalForPrisma.prisma;
 const prismaClient = hasExpectedDelegates(cachedClient)

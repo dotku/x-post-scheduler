@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { postTweet, postTweetWithMedia } from "./x-client";
 import { getUserXCredentials } from "./user-credentials";
 import { generateTweet } from "./openai";
+import { trackTokenUsage } from "./usage-tracking";
 import { addDays, addWeeks, addMonths } from "date-fns";
 
 export async function processScheduledPosts() {
@@ -20,8 +21,8 @@ export async function processScheduledPosts() {
   for (const post of duePosts) {
     console.log(`Processing post ${post.id}: ${post.content.substring(0, 50)}...`);
 
-    const credentials = await getUserXCredentials(post.userId!);
-    if (!credentials) {
+    const resolved = await getUserXCredentials(post.userId!, post.xAccountId);
+    if (!resolved) {
       await prisma.post.update({
         where: { id: post.id },
         data: {
@@ -45,13 +46,13 @@ export async function processScheduledPosts() {
           post.content,
           Buffer.from(media.data),
           media.mimeType,
-          credentials
+          resolved.credentials
         );
       } else {
-        result = await postTweet(post.content, credentials);
+        result = await postTweet(post.content, resolved.credentials);
       }
     } else {
-      result = await postTweet(post.content, credentials);
+      result = await postTweet(post.content, resolved.credentials);
     }
 
     await prisma.post.update({
@@ -88,8 +89,11 @@ export async function processRecurringSchedules() {
   for (const schedule of dueSchedules) {
     console.log(`Processing recurring schedule ${schedule.id}`);
 
-    const credentials = await getUserXCredentials(schedule.userId!);
-    if (!credentials) {
+    const resolved = await getUserXCredentials(
+      schedule.userId!,
+      schedule.xAccountId
+    );
+    if (!resolved) {
       console.log(`Schedule ${schedule.id} skipped: no credentials`);
       continue;
     }
@@ -122,6 +126,20 @@ export async function processRecurringSchedules() {
           schedule.aiLanguage || undefined
         );
 
+        if (generated.usage) {
+          try {
+            await trackTokenUsage({
+              userId: schedule.userId!,
+              source: "recurring_scheduler_ai",
+              usage: generated.usage,
+              model: generated.model,
+              metadata: { scheduleId: schedule.id },
+            });
+          } catch (error) {
+            console.error("Failed to track recurring AI usage:", error);
+          }
+        }
+
         if (!generated.success || !generated.content) {
           generationError = generated.error || "Failed to generate AI content";
         } else {
@@ -132,7 +150,7 @@ export async function processRecurringSchedules() {
 
     const result = generationError
       ? { success: false as const, error: generationError, tweetId: null }
-      : await postTweet(contentToPost, credentials);
+      : await postTweet(contentToPost, resolved.credentials);
 
     await prisma.post.create({
       data: {
@@ -141,6 +159,7 @@ export async function processRecurringSchedules() {
         postedAt: result.success ? new Date() : null,
         tweetId: result.tweetId || null,
         error: result.error || null,
+        xAccountId: resolved.accountId,
         userId: schedule.userId,
       },
     });

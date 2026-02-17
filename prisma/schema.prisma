@@ -27,6 +27,8 @@ model User {
   recurringSchedules RecurringSchedule[]
   knowledgeSources   KnowledgeSource[]
   mediaAssets        MediaAsset[]
+  xAccounts          XAccount[]
+  usageEvents        UsageEvent[]
 }
 
 model Post {
@@ -43,7 +45,9 @@ model Post {
 
   mediaAssetId String?
   userId       String?
+  xAccountId   String?
   user         User?     @relation(fields: [userId], references: [id])
+  xAccount     XAccount? @relation(fields: [xAccountId], references: [id])
 }
 
 model RecurringSchedule {
@@ -60,7 +64,9 @@ model RecurringSchedule {
   updatedAt   DateTime @updatedAt
 
   userId      String?
+  xAccountId  String?
   user        User?    @relation(fields: [userId], references: [id])
+  xAccount    XAccount? @relation(fields: [xAccountId], references: [id])
 }
 
 model KnowledgeSource {
@@ -96,4 +102,42 @@ model MediaAsset {
   user        User?    @relation(fields: [userId], references: [id])
 
   @@unique([sourceUrl, userId])
+}
+
+model XAccount {
+  id                 String   @id @default(cuid())
+  label              String?
+  username           String?
+  isDefault          Boolean  @default(false)
+  xApiKey            String
+  xApiSecret         String
+  xAccessToken       String
+  xAccessTokenSecret String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts              Post[]
+  recurringSchedules RecurringSchedule[]
+
+  @@index([userId, isDefault])
+}
+
+model UsageEvent {
+  id                String   @id @default(cuid())
+  provider          String   @default("openai")
+  source            String
+  model             String?
+  promptTokens      Int      @default(0)
+  completionTokens  Int      @default(0)
+  totalTokens       Int      @default(0)
+  metadata          String?
+  createdAt         DateTime @default(now())
+
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, source, createdAt])
 }

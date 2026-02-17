@@ -8,6 +8,10 @@ import { format } from "date-fns";
 function ScheduleForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [accounts, setAccounts] = useState<
+    { id: string; label: string | null; username: string | null; isDefault: boolean }[]
+  >([]);
+  const [selectedAccountId, setSelectedAccountId] = useState("");
   const [content, setContent] = useState("");
   const [scheduleType, setScheduleType] = useState<"now" | "later">("now");
   const [scheduledDate, setScheduledDate] = useState("");
@@ -21,7 +25,27 @@ function ScheduleForm() {
     if (prefillContent) {
       setContent(prefillContent);
     }
+    const prefillAccount = searchParams.get("xAccountId");
+    if (prefillAccount) {
+      setSelectedAccountId(prefillAccount);
+    }
   }, [searchParams]);
+
+  useEffect(() => {
+    async function fetchAccounts() {
+      const res = await fetch("/api/settings");
+      if (!res.ok) return;
+      const data = await res.json();
+      const list = Array.isArray(data.accounts) ? data.accounts : [];
+      setAccounts(list);
+      if (list.length > 0) {
+        const defaultAccount =
+          list.find((a: { isDefault: boolean }) => a.isDefault) ?? list[0];
+        setSelectedAccountId((prev) => prev || defaultAccount.id);
+      }
+    }
+    void fetchAccounts();
+  }, []);
 
   const charCount = content.length;
   const charRemaining = 280 - charCount;
@@ -45,6 +69,11 @@ function ScheduleForm() {
       return;
     }
 
+    if (!selectedAccountId) {
+      setError("Please select an X account");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -60,6 +89,7 @@ function ScheduleForm() {
           content,
           postImmediately: scheduleType === "now",
           scheduledAt,
+          xAccountId: selectedAccountId,
         }),
       });
 
@@ -118,6 +148,29 @@ function ScheduleForm() {
 
         {/* Schedule Options */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <div className="mb-4">
+            <label
+              htmlFor="xAccount"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              X Account
+            </label>
+            <select
+              id="xAccount"
+              value={selectedAccountId}
+              onChange={(e) => setSelectedAccountId(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+            >
+              {accounts.length === 0 && <option value="">No account connected</option>}
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {(account.label || account.username || "Unnamed account") +
+                    (account.isDefault ? " (Default)" : "")}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
             When to post
           </label>

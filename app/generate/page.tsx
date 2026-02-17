@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function GeneratePage() {
   const router = useRouter();
+  const [accounts, setAccounts] = useState<
+    { id: string; label: string | null; username: string | null; isDefault: boolean }[]
+  >([]);
+  const [selectedAccountId, setSelectedAccountId] = useState("");
   const [prompt, setPrompt] = useState("");
   const [generatedContent, setGeneratedContent] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -21,6 +25,21 @@ export default function GeneratePage() {
 
   const charCount = generatedContent.length;
   const charRemaining = 280 - charCount;
+
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch("/api/settings");
+      if (!res.ok) return;
+      const data = await res.json();
+      const list = Array.isArray(data.accounts) ? data.accounts : [];
+      setAccounts(list);
+      if (list.length > 0) {
+        const defaultAccount =
+          list.find((a: { isDefault: boolean }) => a.isDefault) ?? list[0];
+        setSelectedAccountId(defaultAccount.id);
+      }
+    })();
+  }, []);
 
   const handleGenerate = async (multiple: boolean = false) => {
     setError("");
@@ -77,6 +96,10 @@ export default function GeneratePage() {
       setError("No content to post");
       return;
     }
+    if (!selectedAccountId) {
+      setError("Please select an X account");
+      return;
+    }
 
     setIsPosting(true);
     setError("");
@@ -88,6 +111,7 @@ export default function GeneratePage() {
         body: JSON.stringify({
           content: generatedContent,
           postImmediately: true,
+          xAccountId: selectedAccountId,
           mediaAssetId: mediaAssetId || undefined,
         }),
       });
@@ -116,8 +140,13 @@ export default function GeneratePage() {
 
   const handleSchedule = () => {
     if (!generatedContent.trim()) return;
+    if (!selectedAccountId) {
+      setError("Please select an X account");
+      return;
+    }
     const params = new URLSearchParams({
       content: generatedContent,
+      xAccountId: selectedAccountId,
     });
     if (mediaAssetId) {
       params.set("mediaAssetId", mediaAssetId);
@@ -156,7 +185,29 @@ export default function GeneratePage() {
           </div>
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-1">
+                <label
+                  htmlFor="xAccount"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                >
+                  X Account
+                </label>
+                <select
+                  id="xAccount"
+                  value={selectedAccountId}
+                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                >
+                  {accounts.length === 0 && <option value="">No account connected</option>}
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {(account.label || account.username || "Unnamed account") +
+                        (account.isDefault ? " (Default)" : "")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-1">
                 <label
                   htmlFor="prompt"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
@@ -172,7 +223,7 @@ export default function GeneratePage() {
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 />
               </div>
-              <div>
+              <div className="sm:col-span-1">
                 <label
                   htmlFor="language"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
