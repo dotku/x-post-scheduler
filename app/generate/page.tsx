@@ -14,6 +14,10 @@ export default function GeneratePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [language, setLanguage] = useState("auto");
+  const [mediaAssetId, setMediaAssetId] = useState<string | null>(null);
+  const [pipelineLog, setPipelineLog] = useState<Record<string, string> | null>(
+    null
+  );
 
   const charCount = generatedContent.length;
   const charRemaining = 280 - charCount;
@@ -22,6 +26,8 @@ export default function GeneratePage() {
     setError("");
     setSuccess("");
     setIsGenerating(true);
+    setMediaAssetId(null);
+    setPipelineLog(null);
 
     try {
       const res = await fetch("/api/generate", {
@@ -38,6 +44,13 @@ export default function GeneratePage() {
 
       if (!res.ok) {
         throw new Error(data.error || "Failed to generate content");
+      }
+
+      if (data.media_asset_id) {
+        setMediaAssetId(data.media_asset_id);
+      }
+      if (data.pipeline_log) {
+        setPipelineLog(data.pipeline_log);
       }
 
       if (multiple && data.suggestions) {
@@ -75,6 +88,7 @@ export default function GeneratePage() {
         body: JSON.stringify({
           content: generatedContent,
           postImmediately: true,
+          mediaAssetId: mediaAssetId || undefined,
         }),
       });
 
@@ -87,6 +101,8 @@ export default function GeneratePage() {
       if (data.status === "posted") {
         setSuccess("Posted successfully!");
         setGeneratedContent("");
+        setMediaAssetId(null);
+        setPipelineLog(null);
         setTimeout(() => router.push("/"), 1500);
       } else {
         throw new Error(data.error || "Post failed");
@@ -100,8 +116,13 @@ export default function GeneratePage() {
 
   const handleSchedule = () => {
     if (!generatedContent.trim()) return;
-    // Navigate to schedule page with content pre-filled
-    router.push(`/schedule?content=${encodeURIComponent(generatedContent)}`);
+    const params = new URLSearchParams({
+      content: generatedContent,
+    });
+    if (mediaAssetId) {
+      params.set("mediaAssetId", mediaAssetId);
+    }
+    router.push(`/schedule?${params.toString()}`);
   };
 
   return (
@@ -194,6 +215,108 @@ export default function GeneratePage() {
             </div>
           </div>
         </div>
+
+        {/* Pipeline Status */}
+        {pipelineLog && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Agent Pipeline
+              </h2>
+            </div>
+            <div className="p-6">
+              <div className="flex items-center gap-2 mb-4">
+                {["database_manager", "author", "editor"].map((stage, i) => (
+                  <div key={stage} className="flex items-center gap-2">
+                    <div
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
+                        pipelineLog[stage]
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
+                      }`}
+                    >
+                      {pipelineLog[stage] && (
+                        <svg
+                          className="w-3 h-3"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      )}
+                      {stage === "database_manager"
+                        ? "DB Manager"
+                        : stage.charAt(0).toUpperCase() + stage.slice(1)}
+                    </div>
+                    {i < 2 && (
+                      <svg
+                        className="w-4 h-4 text-gray-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <details className="text-sm">
+                <summary className="cursor-pointer text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+                  View pipeline details
+                </summary>
+                <div className="mt-3 space-y-2">
+                  {Object.entries(pipelineLog).map(([stage, log]) => (
+                    <div key={stage}>
+                      <p className="font-medium text-gray-700 dark:text-gray-300 capitalize">
+                        {stage.replace("_", " ")}
+                      </p>
+                      <p className="text-gray-500 dark:text-gray-400 text-xs whitespace-pre-wrap">
+                        {log}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            </div>
+          </div>
+        )}
+
+        {/* Image Preview */}
+        {mediaAssetId && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Attached Image
+                </h2>
+                <button
+                  onClick={() => setMediaAssetId(null)}
+                  className="text-sm text-red-500 hover:text-red-700"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/media/${mediaAssetId}`}
+                alt="Selected product image"
+                className="max-w-full max-h-64 rounded-lg border border-gray-200 dark:border-gray-700 object-contain mx-auto"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Suggestions */}
         {suggestions.length > 0 && (

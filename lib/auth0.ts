@@ -1,19 +1,46 @@
-import { Auth0Client } from "@auth0/nextjs-auth0/server";
+import { NextResponse } from "next/server";
+import { auth0 } from "./auth0-client";
 
-const sanitize = (value?: string) => value?.split("#")[0].trim();
+export interface AuthenticatedUser {
+  id: string;
+  auth0Sub: string;
+  email: string | null;
+  name: string | null;
+  picture: string | null;
+}
 
-const appBaseUrl =
-  sanitize(process.env.APP_BASE_URL) ?? sanitize(process.env.AUTH0_BASE_URL);
+export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
+  const session = await auth0.getSession();
+  if (!session?.user) {
+    return null;
+  }
 
-const issuerBaseUrl =
-  sanitize(process.env.AUTH0_ISSUER_BASE_URL) ??
-  sanitize(process.env.AUTH0_ISSUER);
+  const { sub, email, name, picture } = session.user;
+  const { prisma } = await import("./db");
 
-const domain =
-  sanitize(process.env.AUTH0_DOMAIN) ??
-  (issuerBaseUrl ? issuerBaseUrl.replace(/^https?:\/\//, "") : undefined);
+  const user = await prisma.user.upsert({
+    where: { auth0Sub: sub },
+    update: { email, name, picture },
+    create: { auth0Sub: sub, email, name, picture },
+  });
 
-export const auth0 = new Auth0Client({
-  appBaseUrl,
-  domain,
-});
+  return {
+    id: user.id,
+    auth0Sub: user.auth0Sub,
+    email: user.email,
+    name: user.name,
+    picture: user.picture,
+  };
+}
+
+export async function requireAuth(): Promise<AuthenticatedUser> {
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    throw new Error("UNAUTHORIZED");
+  }
+  return user;
+}
+
+export function unauthorizedResponse() {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}

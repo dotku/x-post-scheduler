@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { scrapeUrl } from "@/lib/scraper";
+import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let user;
+  try {
+    user = await requireAuth();
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const { id } = await params;
 
-  const source = await prisma.knowledgeSource.findUnique({
-    where: { id },
+  const source = await prisma.knowledgeSource.findFirst({
+    where: { id, userId: user.id },
   });
 
   if (!source) {
@@ -23,35 +31,50 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let user;
+  try {
+    user = await requireAuth();
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const { id } = await params;
 
-  try {
-    await prisma.knowledgeSource.delete({
-      where: { id },
-    });
-    return NextResponse.json({ success: true });
-  } catch {
+  const source = await prisma.knowledgeSource.findFirst({
+    where: { id, userId: user.id },
+  });
+
+  if (!source) {
     return NextResponse.json({ error: "Source not found" }, { status: 404 });
   }
+
+  await prisma.knowledgeSource.delete({ where: { id } });
+  return NextResponse.json({ success: true });
 }
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let user;
+  try {
+    user = await requireAuth();
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const { id } = await params;
   const body = await request.json();
 
-  // If rescrape is requested
+  const source = await prisma.knowledgeSource.findFirst({
+    where: { id, userId: user.id },
+  });
+
+  if (!source) {
+    return NextResponse.json({ error: "Source not found" }, { status: 404 });
+  }
+
   if (body.rescrape) {
-    const source = await prisma.knowledgeSource.findUnique({
-      where: { id },
-    });
-
-    if (!source) {
-      return NextResponse.json({ error: "Source not found" }, { status: 404 });
-    }
-
     const scrapeResult = await scrapeUrl(source.url);
 
     if (!scrapeResult.success) {
@@ -73,14 +96,9 @@ export async function PATCH(
     return NextResponse.json(updated);
   }
 
-  // Regular update (toggle active, update name, etc.)
-  try {
-    const source = await prisma.knowledgeSource.update({
-      where: { id },
-      data: body,
-    });
-    return NextResponse.json(source);
-  } catch {
-    return NextResponse.json({ error: "Source not found" }, { status: 404 });
-  }
+  const updated = await prisma.knowledgeSource.update({
+    where: { id },
+    data: body,
+  });
+  return NextResponse.json(updated);
 }

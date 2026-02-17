@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { addDays, addWeeks, addMonths } from "date-fns";
+import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 
 function calculateNextRun(frequency: string, cronExpr: string): Date {
   const now = new Date();
 
-  // Parse time from cron expression (simple format: "HH:MM")
   const [hours, minutes] = cronExpr.split(":").map(Number);
 
   let nextRun = new Date(now);
   nextRun.setHours(hours, minutes, 0, 0);
 
-  // If the time has passed today, move to next occurrence
   if (nextRun <= now) {
     switch (frequency) {
       case "daily":
@@ -30,26 +29,54 @@ function calculateNextRun(frequency: string, cronExpr: string): Date {
 }
 
 export async function GET() {
+  let user;
+  try {
+    user = await requireAuth();
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const schedules = await prisma.recurringSchedule.findMany({
+    where: { userId: user.id },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(schedules);
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { content, frequency, cronExpr } = body;
-
-  if (!content || content.length === 0) {
-    return NextResponse.json(
-      { error: "Content is required" },
-      { status: 400 }
-    );
+  let user;
+  try {
+    user = await requireAuth();
+  } catch {
+    return unauthorizedResponse();
   }
 
-  if (content.length > 280) {
+  const body = await request.json();
+  const { content, frequency, cronExpr, useAi, aiPrompt, aiLanguage } = body;
+  const isAiMode = Boolean(useAi);
+  const normalizedContent = typeof content === "string" ? content.trim() : "";
+  const normalizedPrompt =
+    typeof aiPrompt === "string" ? aiPrompt.trim() : undefined;
+  const normalizedLanguage =
+    typeof aiLanguage === "string" ? aiLanguage.trim() : undefined;
+
+  if (!isAiMode) {
+    if (!normalizedContent) {
+      return NextResponse.json(
+        { error: "Content is required" },
+        { status: 400 }
+      );
+    }
+
+    if (normalizedContent.length > 280) {
+      return NextResponse.json(
+        { error: "Content exceeds 280 characters" },
+        { status: 400 }
+      );
+    }
+  } else if (normalizedPrompt && normalizedPrompt.length > 500) {
     return NextResponse.json(
-      { error: "Content exceeds 280 characters" },
+      { error: "AI prompt exceeds 500 characters" },
       { status: 400 }
     );
   }
@@ -72,11 +99,15 @@ export async function POST(request: NextRequest) {
 
   const schedule = await prisma.recurringSchedule.create({
     data: {
-      content,
+      content: isAiMode ? "" : normalizedContent,
+      useAi: isAiMode,
+      aiPrompt: isAiMode ? normalizedPrompt : null,
+      aiLanguage: isAiMode ? normalizedLanguage : null,
       frequency,
       cronExpr,
       nextRunAt,
       isActive: true,
+      userId: user.id,
     },
   });
 

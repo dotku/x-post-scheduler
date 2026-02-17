@@ -1,23 +1,18 @@
 import { TwitterApi } from "twitter-api-v2";
 
-// Create the X API client with OAuth 1.0a credentials
-function getXClient() {
-  const apiKey = process.env.X_API_KEY;
-  const apiSecret = process.env.X_API_SECRET;
-  const accessToken = process.env.X_ACCESS_TOKEN;
-  const accessTokenSecret = process.env.X_ACCESS_TOKEN_SECRET;
+export interface XCredentials {
+  apiKey: string;
+  apiSecret: string;
+  accessToken: string;
+  accessTokenSecret: string;
+}
 
-  if (!apiKey || !apiSecret || !accessToken || !accessTokenSecret) {
-    throw new Error(
-      "Missing X API credentials. Please set X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, and X_ACCESS_TOKEN_SECRET in .env.local"
-    );
-  }
-
+function createXClient(credentials: XCredentials) {
   return new TwitterApi({
-    appKey: apiKey,
-    appSecret: apiSecret,
-    accessToken: accessToken,
-    accessSecret: accessTokenSecret,
+    appKey: credentials.apiKey,
+    appSecret: credentials.apiSecret,
+    accessToken: credentials.accessToken,
+    accessSecret: credentials.accessTokenSecret,
   });
 }
 
@@ -31,12 +26,15 @@ export interface TimelineTweet {
   id: string;
   text: string;
   createdAt: Date | null;
+  impressionCount: number | null;
 }
 
-// Post a tweet to X
-export async function postTweet(content: string): Promise<PostResult> {
+export async function postTweet(
+  content: string,
+  credentials: XCredentials
+): Promise<PostResult> {
   try {
-    const client = getXClient();
+    const client = createXClient(credentials);
     const rwClient = client.readWrite;
 
     const result = await rwClient.v2.tweet(content);
@@ -54,21 +52,21 @@ export async function postTweet(content: string): Promise<PostResult> {
   }
 }
 
-// Fetch recent tweets from the authenticated user's timeline
 export async function getRecentTweets(
   limit: number,
-  excludeTweetIds: Set<string> = new Set()
+  excludeTweetIds: Set<string>,
+  credentials: XCredentials
 ): Promise<TimelineTweet[]> {
   if (limit <= 0) return [];
 
-  const client = getXClient();
+  const client = createXClient(credentials);
   const me = await client.v2.me();
   const maxResults = Math.min(100, Math.max(5, limit));
 
   const paginator = await client.v2.userTimeline(me.data.id, {
     max_results: maxResults,
     exclude: ["replies", "retweets"],
-    "tweet.fields": ["created_at"],
+    "tweet.fields": ["created_at", "public_metrics"],
   });
 
   const tweets = paginator.tweets ?? [];
@@ -80,6 +78,7 @@ export async function getRecentTweets(
       id: tweet.id,
       text: tweet.text ?? "",
       createdAt: tweet.created_at ? new Date(tweet.created_at) : null,
+      impressionCount: tweet.public_metrics?.impression_count ?? null,
     });
     if (results.length >= limit) break;
   }
@@ -87,14 +86,47 @@ export async function getRecentTweets(
   return results;
 }
 
-// Verify credentials are valid
-export async function verifyCredentials(): Promise<{
+export async function postTweetWithMedia(
+  content: string,
+  imageBuffer: Buffer,
+  mimeType: string,
+  credentials: XCredentials
+): Promise<PostResult> {
+  try {
+    const client = createXClient(credentials);
+    const rwClient = client.readWrite;
+
+    // Upload media via v1 endpoint
+    const mediaId = await rwClient.v1.uploadMedia(imageBuffer, {
+      mimeType: mimeType as "image/jpeg" | "image/png" | "image/webp",
+    });
+
+    // Post tweet with media
+    const result = await rwClient.v2.tweet({
+      text: content,
+      media: { media_ids: [mediaId] },
+    });
+
+    return {
+      success: true,
+      tweetId: result.data.id,
+    };
+  } catch (error) {
+    console.error("Error posting tweet with media:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
+export async function verifyCredentials(credentials: XCredentials): Promise<{
   valid: boolean;
   username?: string;
   error?: string;
 }> {
   try {
-    const client = getXClient();
+    const client = createXClient(credentials);
     const me = await client.v2.me();
 
     return {

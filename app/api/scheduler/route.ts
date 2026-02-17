@@ -1,18 +1,28 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { runScheduler } from "@/lib/scheduler";
 
-// This endpoint can be triggered by:
-// 1. A cron job (e.g., Vercel Cron, external cron service)
-// 2. Manual trigger from the UI
-// 3. A background worker process
+export async function POST(request: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const authHeader = request.headers.get("authorization");
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
 
-export async function POST() {
   const result = await runScheduler();
   return NextResponse.json(result);
 }
 
-// Also support GET for easy testing
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const authHeader = request.headers.get("authorization");
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
   const result = await runScheduler();
   return NextResponse.json(result);
 }

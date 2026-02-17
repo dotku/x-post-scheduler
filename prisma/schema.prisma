@@ -6,8 +6,27 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  auth0Sub           String    @unique
+  email              String?
+  name               String?
+  picture            String?
+  xApiKey            String?
+  xApiSecret         String?
+  xAccessToken       String?
+  xAccessTokenSecret String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  posts              Post[]
+  recurringSchedules RecurringSchedule[]
+  knowledgeSources   KnowledgeSource[]
+  mediaAssets        MediaAsset[]
 }
 
 model Post {
@@ -21,22 +40,32 @@ model Post {
   error       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  mediaAssetId String?
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id])
 }
 
 model RecurringSchedule {
   id          String   @id @default(cuid())
   content     String
+  useAi       Boolean  @default(false)
+  aiPrompt    String?
+  aiLanguage  String?
   frequency   String   // daily, weekly, monthly
   cronExpr    String   // cron expression
   nextRunAt   DateTime
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
 }
 
 model KnowledgeSource {
   id           String    @id @default(cuid())
-  url          String    @unique
+  url          String
   name         String
   content      String    @default("") // Scraped text content
   pagesScraped Int       @default(1)  // Number of pages scraped
@@ -44,4 +73,27 @@ model KnowledgeSource {
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  userId       String?
+  user         User?     @relation(fields: [userId], references: [id])
+
+  @@unique([url, userId])
+}
+
+model MediaAsset {
+  id          String   @id @default(cuid())
+  sourceUrl   String
+  data        Bytes
+  mimeType    String   @default("image/jpeg")
+  width       Int?
+  height      Int?
+  altText     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@unique([sourceUrl, userId])
 }

@@ -84,6 +84,12 @@ export default function UserMenu() {
               {user.email}
             </p>
           </div>
+          <Link
+            href="/settings"
+            className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            Settings
+          </Link>
           <a
             href="/auth/logout"
             className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"

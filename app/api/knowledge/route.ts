@@ -1,15 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { scrapeUrl } from "@/lib/scraper";
+import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 
 export async function GET() {
+  let user;
+  try {
+    user = await requireAuth();
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const sources = await prisma.knowledgeSource.findMany({
+    where: { userId: user.id },
     orderBy: { createdAt: "desc" },
   });
   return NextResponse.json(sources);
 }
 
 export async function POST(request: NextRequest) {
+  let user;
+  try {
+    user = await requireAuth();
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const body = await request.json();
   const { url, name } = body;
 
@@ -20,9 +36,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Check if URL already exists
-  const existing = await prisma.knowledgeSource.findUnique({
-    where: { url },
+  // Check if URL already exists for this user
+  const existing = await prisma.knowledgeSource.findFirst({
+    where: { url, userId: user.id },
   });
 
   if (existing) {
@@ -32,7 +48,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Scrape the URL
   const scrapeResult = await scrapeUrl(url);
 
   if (!scrapeResult.success) {
@@ -42,7 +57,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Create the knowledge source
   const source = await prisma.knowledgeSource.create({
     data: {
       url,
@@ -50,6 +64,7 @@ export async function POST(request: NextRequest) {
       content: scrapeResult.content || "",
       pagesScraped: scrapeResult.pagesScraped || 1,
       lastScraped: new Date(),
+      userId: user.id,
     },
   });
 

@@ -8,6 +8,9 @@ import { format } from "date-fns";
 interface RecurringSchedule {
   id: string;
   content: string;
+  useAi: boolean;
+  aiPrompt: string | null;
+  aiLanguage: string | null;
   frequency: string;
   cronExpr: string;
   nextRunAt: string;
@@ -22,6 +25,9 @@ export default function RecurringPage() {
 
   // Form state
   const [content, setContent] = useState("");
+  const [useAi, setUseAi] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiLanguage, setAiLanguage] = useState("");
   const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">(
     "daily"
   );
@@ -47,13 +53,18 @@ export default function RecurringPage() {
     e.preventDefault();
     setError("");
 
-    if (!content.trim()) {
-      setError("Please enter some content");
-      return;
-    }
+    if (!useAi) {
+      if (!content.trim()) {
+        setError("Please enter some content");
+        return;
+      }
 
-    if (charCount > 280) {
-      setError("Content exceeds 280 characters");
+      if (charCount > 280) {
+        setError("Content exceeds 280 characters");
+        return;
+      }
+    } else if (aiPrompt.length > 500) {
+      setError("AI prompt exceeds 500 characters");
       return;
     }
 
@@ -65,6 +76,9 @@ export default function RecurringPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content,
+          useAi,
+          aiPrompt: aiPrompt || undefined,
+          aiLanguage: aiLanguage || undefined,
           frequency,
           cronExpr: time,
         }),
@@ -76,6 +90,9 @@ export default function RecurringPage() {
       }
 
       setContent("");
+      setUseAi(false);
+      setAiPrompt("");
+      setAiLanguage("");
       setFrequency("daily");
       setTime("09:00");
       fetchSchedules();
@@ -131,32 +148,100 @@ export default function RecurringPage() {
           </div>
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             <div>
-              <label
-                htmlFor="content"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-              >
-                Post Content
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Content Mode
               </label>
-              <textarea
-                id="content"
-                rows={3}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-none"
-                placeholder="What's happening?"
-              />
-              <p
-                className={`mt-1 text-sm ${
-                  charRemaining < 0
-                    ? "text-red-500"
-                    : charRemaining < 20
-                    ? "text-yellow-500"
-                    : "text-gray-500 dark:text-gray-400"
-                }`}
-              >
-                {charRemaining} characters remaining
-              </p>
+              <div className="flex flex-wrap gap-4">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="radio"
+                    name="contentMode"
+                    checked={!useAi}
+                    onChange={() => setUseAi(false)}
+                    className="h-4 w-4 text-blue-600 border-gray-300"
+                  />
+                  Fixed content
+                </label>
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="radio"
+                    name="contentMode"
+                    checked={useAi}
+                    onChange={() => setUseAi(true)}
+                    className="h-4 w-4 text-blue-600 border-gray-300"
+                  />
+                  AI-generated content
+                </label>
+              </div>
             </div>
+
+            {!useAi ? (
+              <div>
+                <label
+                  htmlFor="content"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                >
+                  Post Content
+                </label>
+                <textarea
+                  id="content"
+                  rows={3}
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-none"
+                  placeholder="What's happening?"
+                />
+                <p
+                  className={`mt-1 text-sm ${
+                    charRemaining < 0
+                      ? "text-red-500"
+                      : charRemaining < 20
+                      ? "text-yellow-500"
+                      : "text-gray-500 dark:text-gray-400"
+                  }`}
+                >
+                  {charRemaining} characters remaining
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="aiPrompt"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
+                    AI Prompt (Optional)
+                  </label>
+                  <textarea
+                    id="aiPrompt"
+                    rows={3}
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-none"
+                    placeholder="Example: Promote today's top menu item with one hashtag."
+                  />
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    Leave empty to let AI choose the topic from your knowledge base.
+                  </p>
+                </div>
+                <div>
+                  <label
+                    htmlFor="aiLanguage"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
+                    Language (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    id="aiLanguage"
+                    value={aiLanguage}
+                    onChange={(e) => setAiLanguage(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    placeholder="Example: English or Chinese"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -205,7 +290,7 @@ export default function RecurringPage() {
             <div className="flex justify-end">
               <button
                 type="submit"
-                disabled={isSubmitting || charCount > 280}
+                disabled={isSubmitting || (!useAi && charCount > 280)}
                 className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSubmitting ? "Creating..." : "Create Schedule"}
@@ -241,9 +326,14 @@ export default function RecurringPage() {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-gray-900 dark:text-white line-clamp-2">
-                      {schedule.content}
+                      {schedule.useAi
+                        ? `AI generated${schedule.aiPrompt ? `: ${schedule.aiPrompt}` : ""}`
+                        : schedule.content}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                      <span>
+                        {schedule.useAi ? "AI" : "Fixed"}
+                      </span>
                       <span className="capitalize">{schedule.frequency}</span>
                       <span>at {schedule.cronExpr}</span>
                       <span>

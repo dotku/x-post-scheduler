@@ -3,6 +3,10 @@
     {
       "path": "/api/scheduler",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/daily-generate",
+      "schedule": "0 0 * * *"
     }
   ]
 }

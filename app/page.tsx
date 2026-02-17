@@ -1,23 +1,31 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getRecentTweets } from "@/lib/x-client";
+import { getAuthenticatedUser } from "@/lib/auth0";
+import { getUserXCredentials } from "@/lib/user-credentials";
 import { format } from "date-fns";
 import PostList from "@/components/PostList";
 import UserMenu from "@/components/UserMenu";
-import type { Post } from "@prisma/client";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 const MAX_POSTS = 100;
 
-async function getPosts() {
+async function getPosts(userId: string) {
   const dbPosts = await prisma.post.findMany({
+    where: { userId },
     orderBy: { createdAt: "desc" },
     take: MAX_POSTS,
   });
   type DbPost = (typeof dbPosts)[number];
 
   if (dbPosts.length >= MAX_POSTS) {
+    return { dbPosts, mergedPosts: dbPosts };
+  }
+
+  const credentials = await getUserXCredentials(userId);
+  if (!credentials) {
     return { dbPosts, mergedPosts: dbPosts };
   }
 
@@ -31,7 +39,11 @@ async function getPosts() {
         )
     );
     const remaining = MAX_POSTS - dbPosts.length;
-    const recentTweets = await getRecentTweets(remaining, existingTweetIds);
+    const recentTweets = await getRecentTweets(
+      remaining,
+      existingTweetIds,
+      credentials
+    );
     const apiPosts = recentTweets.map((tweet) => ({
       id: `x-${tweet.id}`,
       content: tweet.text,
@@ -42,6 +54,7 @@ async function getPosts() {
       error: null,
       createdAt: tweet.createdAt ?? new Date(0),
       source: "x" as const,
+      impressionCount: tweet.impressionCount,
     }));
 
     return { dbPosts, mergedPosts: [...dbPosts, ...apiPosts] };
@@ -51,23 +64,33 @@ async function getPosts() {
   }
 }
 
-async function getRecurringSchedules() {
+async function getRecurringSchedules(userId: string) {
   const schedules = await prisma.recurringSchedule.findMany({
-    where: { isActive: true },
+    where: { isActive: true, userId },
     orderBy: { nextRunAt: "asc" },
   });
   return schedules;
 }
 
 export default async function Dashboard() {
-  const { dbPosts, mergedPosts } = await getPosts();
-  const schedules = await getRecurringSchedules();
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    redirect("/auth/login");
+  }
 
+  const { dbPosts, mergedPosts } = await getPosts(user.id);
+  const schedules = await getRecurringSchedules(user.id);
+
+  type DbPost = (typeof dbPosts)[number];
   const scheduledCount = dbPosts.filter(
-    (p: Post) => p.status === "scheduled"
+    (p: DbPost) => p.status === "scheduled"
   ).length;
-  const postedCount = dbPosts.filter((p: Post) => p.status === "posted").length;
-  const failedCount = dbPosts.filter((p: Post) => p.status === "failed").length;
+  const postedCount = dbPosts.filter(
+    (p: DbPost) => p.status === "posted"
+  ).length;
+  const failedCount = dbPosts.filter(
+    (p: DbPost) => p.status === "failed"
+  ).length;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -264,7 +287,9 @@ export default async function Dashboard() {
                 >
                   <div>
                     <p className="text-gray-900 dark:text-white line-clamp-1">
-                      {schedule.content}
+                      {schedule.useAi
+                        ? `AI generated${schedule.aiPrompt ? `: ${schedule.aiPrompt}` : ""}`
+                        : schedule.content}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {schedule.frequency} - Next:{" "}

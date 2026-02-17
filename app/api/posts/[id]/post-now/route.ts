@@ -1,15 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { postTweet } from "@/lib/x-client";
+import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
+import { getUserXCredentials } from "@/lib/user-credentials";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let user;
+  try {
+    user = await requireAuth();
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const { id } = await params;
 
-  const post = await prisma.post.findUnique({
-    where: { id },
+  const post = await prisma.post.findFirst({
+    where: { id, userId: user.id },
   });
 
   if (!post) {
@@ -23,7 +32,15 @@ export async function POST(
     );
   }
 
-  const result = await postTweet(post.content);
+  const credentials = await getUserXCredentials(user.id);
+  if (!credentials) {
+    return NextResponse.json(
+      { error: "X API credentials not configured. Please go to Settings." },
+      { status: 400 }
+    );
+  }
+
+  const result = await postTweet(post.content, credentials);
 
   const updatedPost = await prisma.post.update({
     where: { id },
