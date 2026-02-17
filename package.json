@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "scheduler": "npx tsx scripts/scheduler.ts"
+    "scheduler": "npx tsx scripts/scheduler.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.14.1",
