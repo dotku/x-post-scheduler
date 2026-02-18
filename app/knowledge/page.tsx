@@ -254,7 +254,7 @@ export default function KnowledgePage() {
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
                       <button
                         onClick={() => handleToggle(source.id, source.isActive)}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${

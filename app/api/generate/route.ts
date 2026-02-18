@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { generateTweet, generateTweetSuggestions } from "@/lib/openai";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { trackTokenUsage } from "@/lib/usage-tracking";
+import { hasCredits, deductCredits, deductFlatFee, AGENT_FLAT_FEE_CENTS } from "@/lib/credits";
 import {
   generateWithAgents,
   isAgentServiceConfigured,
@@ -14,6 +15,13 @@ export async function POST(request: NextRequest) {
     user = await requireAuth();
   } catch {
     return unauthorizedResponse();
+  }
+
+  if (!(await hasCredits(user.id))) {
+    return NextResponse.json(
+      { error: "Insufficient credits. Please add credits in Settings to continue using AI generation." },
+      { status: 402 }
+    );
   }
 
   const body = await request.json();
@@ -31,6 +39,13 @@ export async function POST(request: NextRequest) {
 
       if (!result.success) {
         return NextResponse.json({ error: result.error }, { status: 500 });
+      }
+
+      // Deduct flat fee for agent calls
+      try {
+        await deductFlatFee({ userId: user.id, feeCents: AGENT_FLAT_FEE_CENTS, source: "agent_generate" });
+      } catch (error) {
+        console.error("Failed to deduct credits (agent):", error);
       }
 
       if (multiple) {
@@ -95,8 +110,9 @@ export async function POST(request: NextRequest) {
           model: result.model,
           metadata: { multiple: true },
         });
+        await deductCredits({ userId: user.id, usage: result.usage, model: result.model, source: "generate_api_suggestions" });
       } catch (error) {
-        console.error("Failed to track usage (suggestions):", error);
+        console.error("Failed to track usage/deduct credits (suggestions):", error);
       }
     }
 
@@ -117,8 +133,9 @@ export async function POST(request: NextRequest) {
           model: result.model,
           metadata: { multiple: false },
         });
+        await deductCredits({ userId: user.id, usage: result.usage, model: result.model, source: "generate_api_single" });
       } catch (error) {
-        console.error("Failed to track usage (single):", error);
+        console.error("Failed to track usage/deduct credits (single):", error);
       }
     }
 

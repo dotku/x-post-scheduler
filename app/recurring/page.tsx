@@ -19,9 +19,23 @@ interface RecurringSchedule {
   createdAt: string;
 }
 
+interface RecurringUsageSummary {
+  requests: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 export default function RecurringPage() {
   const router = useRouter();
   const [schedules, setSchedules] = useState<RecurringSchedule[]>([]);
+  const [balanceCents, setBalanceCents] = useState(0);
+  const [recurringUsage, setRecurringUsage] = useState<RecurringUsageSummary>({
+    requests: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+  });
   const [accounts, setAccounts] = useState<
     { id: string; label: string | null; username: string | null; isDefault: boolean }[]
   >([]);
@@ -69,8 +83,30 @@ export default function RecurringPage() {
 
   const fetchSchedules = async () => {
     const res = await fetch("/api/recurring");
+    if (!res.ok) {
+      setIsLoading(false);
+      return;
+    }
     const data = await res.json();
-    setSchedules(data);
+    if (Array.isArray(data)) {
+      setSchedules(data);
+      setBalanceCents(0);
+      setRecurringUsage({
+        requests: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+      });
+    } else {
+      setSchedules(Array.isArray(data.schedules) ? data.schedules : []);
+      setBalanceCents(Number(data.balanceCents ?? 0));
+      setRecurringUsage({
+        requests: Number(data.usage?.requests ?? 0),
+        promptTokens: Number(data.usage?.promptTokens ?? 0),
+        completionTokens: Number(data.usage?.completionTokens ?? 0),
+        totalTokens: Number(data.usage?.totalTokens ?? 0),
+      });
+    }
     setIsLoading(false);
   };
 
@@ -236,6 +272,32 @@ export default function RecurringPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Current Balance
+            </p>
+            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white break-all">
+              ${(balanceCents / 100).toFixed(2)}
+            </p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              Recurring Token Usage
+            </p>
+            <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+              {recurringUsage.totalTokens.toLocaleString()} tokens
+            </p>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {recurringUsage.requests.toLocaleString()} requests
+              {" · "}
+              In: {recurringUsage.promptTokens.toLocaleString()}
+              {" · "}
+              Out: {recurringUsage.completionTokens.toLocaleString()}
+            </p>
+          </div>
+        </div>
+
         {/* Create New Schedule */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -498,7 +560,7 @@ export default function RecurringPage() {
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
+                  <div className="flex flex-wrap items-center gap-3 shrink-0">
                     <button
                       onClick={() => handleTestSchedule(schedule.id)}
                       disabled={testingScheduleId === schedule.id}

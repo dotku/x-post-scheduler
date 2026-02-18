@@ -105,9 +105,10 @@ export async function syncKnowledgeSourceImages(params: {
     };
   }
 
+  const maxImages = Number.parseInt(process.env.SCRAPER_MAX_IMAGES || "120", 10);
   const uniqueImages = Array.from(
     new Map(params.images.map((image) => [image.url, image])).values()
-  );
+  ).slice(0, Number.isFinite(maxImages) && maxImages > 0 ? maxImages : 120);
 
   const errors: string[] = [];
   let uploaded = 0;

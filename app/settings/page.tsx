@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import Link from "next/link";
+import { format } from "date-fns";
 
 interface XAccount {
   id: string;
@@ -28,12 +29,26 @@ interface UsageSummary {
   };
 }
 
+interface CreditData {
+  balanceCents: number;
+  transactions: {
+    id: string;
+    type: string;
+    amountCents: number;
+    balanceAfter: number;
+    description: string | null;
+    createdAt: string;
+  }[];
+}
+
 export default function SettingsPage() {
   const { user, isLoading: authLoading } = useUser();
   const [accounts, setAccounts] = useState<XAccount[]>([]);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [credits, setCredits] = useState<CreditData>({ balanceCents: 0, transactions: [] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [topupLoading, setTopupLoading] = useState<number | null>(null);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -48,15 +63,77 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      void fetchAccounts();
+      void fetchData();
     }
   }, [authLoading, user]);
 
-  async function fetchAccounts() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const topup = params.get("topup");
+    const sessionId = params.get("session_id");
+
+    if (topup !== "success") {
+      if (topup === "cancelled") {
+        setMessage({ type: "error", text: "Checkout cancelled." });
+        window.history.replaceState({}, "", "/settings");
+      }
+      return;
+    }
+
+    const fulfillTopup = async () => {
+      try {
+        if (!sessionId) {
+          setMessage({
+            type: "error",
+            text: "Missing Stripe session id. Credits may still be applied via webhook.",
+          });
+          return;
+        }
+
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const res = await fetch("/api/stripe/fulfill", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionId }),
+          });
+
+          const data = await res.json().catch(() => ({}));
+          if (res.ok) {
+            await fetchData();
+            setMessage({ type: "success", text: "Credits added successfully!" });
+            return;
+          }
+
+          if (data.retryable && attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            continue;
+          }
+
+          setMessage({
+            type: "error",
+            text: data.error || "Payment succeeded, but credit fulfillment failed.",
+          });
+          return;
+        }
+      } catch {
+        setMessage({
+          type: "error",
+          text: "Payment succeeded, but credit fulfillment failed.",
+        });
+      } finally {
+        window.history.replaceState({}, "", "/settings");
+      }
+    };
+
+    void fulfillTopup();
+  }, []);
+
+  async function fetchData() {
     try {
-      const [settingsRes, usageRes] = await Promise.all([
+      const [settingsRes, usageRes, creditsRes] = await Promise.all([
         fetch("/api/settings"),
         fetch("/api/usage?days=30"),
+        fetch("/api/credits"),
       ]);
       if (!settingsRes.ok) return;
       const data = await settingsRes.json();
@@ -67,8 +144,33 @@ export default function SettingsPage() {
       if (usageRes.ok) {
         setUsage(await usageRes.json());
       }
+      if (creditsRes.ok) {
+        setCredits(await creditsRes.json());
+      }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleTopup(amountCents: number) {
+    setTopupLoading(amountCents);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amountCents }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setMessage({ type: "error", text: data.error || "Failed to start checkout" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to start checkout" });
+    } finally {
+      setTopupLoading(null);
     }
   }
 
@@ -104,7 +206,7 @@ export default function SettingsPage() {
         setXAccessToken("");
         setXAccessTokenSecret("");
         setSetAsDefault(false);
-        await fetchAccounts();
+        await fetchData();
       } else {
         setMessage({ type: "error", text: data.error || "Failed to connect" });
       }
@@ -123,7 +225,7 @@ export default function SettingsPage() {
       body: JSON.stringify({ accountId }),
     });
     if (res.ok) {
-      await fetchAccounts();
+      await fetchData();
       setMessage({ type: "success", text: "Default account updated" });
     }
   }
@@ -136,7 +238,7 @@ export default function SettingsPage() {
       { method: "DELETE" }
     );
     if (res.ok) {
-      await fetchAccounts();
+      await fetchData();
       setMessage({ type: "success", text: "Account removed" });
     }
   }
@@ -187,7 +289,7 @@ export default function SettingsPage() {
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Connected X Accounts
@@ -196,7 +298,7 @@ export default function SettingsPage() {
                 Connect multiple X accounts and choose one per post/schedule.
               </p>
             </div>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+            <span className="inline-flex items-center self-start px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
               {accounts.length} connected
             </span>
           </div>
@@ -210,10 +312,10 @@ export default function SettingsPage() {
               {accounts.map((account) => (
                 <div
                   key={account.id}
-                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex items-center justify-between gap-4"
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
                 >
-                  <div>
-                    <p className="font-medium text-gray-900 dark:text-white">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900 dark:text-white truncate">
                       {account.label || account.username || "Unnamed account"}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -221,7 +323,7 @@ export default function SettingsPage() {
                       {account.isDefault ? " • Default" : ""}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     {!account.isDefault && (
                       <button
                         onClick={() => handleSetDefault(account.id)}
@@ -242,6 +344,56 @@ export default function SettingsPage() {
             </div>
           )}
         </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Credits & Billing
+            </h2>
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Current Balance</p>
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                  ${(credits.balanceCents / 100).toFixed(2)}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {([500, 1000, 2500] as const).map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => handleTopup(amount)}
+                    disabled={topupLoading !== null}
+                    className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    {topupLoading === amount ? "Loading..." : `Add $${(amount / 100).toFixed(2)}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {credits.transactions.length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Recent Transactions
+                </p>
+                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  {credits.transactions.map((tx) => (
+                    <div key={tx.id} className="flex items-center justify-between text-sm py-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`font-mono font-medium shrink-0 ${tx.amountCents >= 0 ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}>
+                          {tx.amountCents >= 0 ? "+" : ""}${(tx.amountCents / 100).toFixed(2)}
+                        </span>
+                        <span className="text-gray-600 dark:text-gray-400 truncate">
+                          {tx.description || tx.type}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 ml-2">
+                        {format(new Date(tx.createdAt), "MMM d, h:mm a")}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
         {usage && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">

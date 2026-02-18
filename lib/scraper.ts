@@ -30,12 +30,15 @@ function getBaseUrl(url: string): string {
 // Check if a URL is internal (same domain)
 function isInternalLink(link: string, baseUrl: string): boolean {
   try {
-    if (link.startsWith("/")) return true;
     if (link.startsWith("#")) return false;
+    if (link.startsWith("javascript:")) return false;
     if (link.startsWith("mailto:") || link.startsWith("tel:")) return false;
-    const linkUrl = new URL(link);
+    const linkUrl = new URL(link, baseUrl);
     const baseUrlObj = new URL(baseUrl);
-    return linkUrl.host === baseUrlObj.host;
+    return (
+      (linkUrl.protocol === "http:" || linkUrl.protocol === "https:") &&
+      linkUrl.host === baseUrlObj.host
+    );
   } catch {
     return false;
   }
@@ -43,18 +46,13 @@ function isInternalLink(link: string, baseUrl: string): boolean {
 
 // Normalize URL to absolute
 function normalizeUrl(link: string, baseUrl: string): string {
-  if (link.startsWith("//")) {
-    const base = new URL(baseUrl);
-    return `${base.protocol}${link}`;
+  try {
+    const normalized = new URL(link, baseUrl);
+    normalized.hash = "";
+    return normalized.toString();
+  } catch {
+    return link;
   }
-  if (link.startsWith("/")) {
-    return `${getBaseUrl(baseUrl)}${link}`;
-  }
-  return link;
-}
-
-function looksLikeImageUrl(url: string): boolean {
-  return /\.(jpg|jpeg|png|gif|webp|bmp|svg|avif)(\?|#|$)/i.test(url);
 }
 
 function extractImageUrlFromSrcset(srcset: string | undefined): string | null {
@@ -114,33 +112,38 @@ async function scrapeSinglePage(url: string): Promise<PageContent | null> {
       }
     }
 
+    const imagesMap = new Map<string, ScrapedImage>();
+    $("img").each((_, element) => {
+      const img = $(element);
+      const candidates = [
+        img.attr("src"),
+        img.attr("data-src"),
+        img.attr("data-original"),
+        extractImageUrlFromSrcset(img.attr("srcset")),
+        extractImageUrlFromSrcset(img.attr("data-srcset")),
+      ].filter(Boolean) as string[];
+
+      for (const candidate of candidates) {
+        const normalized = normalizeUrl(candidate.trim(), url);
+        if (!/^https?:\/\//i.test(normalized)) continue;
+
+        if (!imagesMap.has(normalized)) {
+          const alt = img.attr("alt")?.trim();
+          imagesMap.set(normalized, {
+            url: normalized,
+            altText: alt && alt.length > 0 ? alt : undefined,
+          });
+        }
+      }
+    });
+
     content = cleanText(content);
 
     // For CJK languages, use lower threshold since each character carries more meaning
     const minContentLength = containsCJK(content) ? 30 : 100;
-    if (content.length < minContentLength) return null; // Skip pages with too little content
-
-    const imagesMap = new Map<string, ScrapedImage>();
-    $("img").each((_, element) => {
-      const img = $(element);
-      const src =
-        img.attr("src") ||
-        img.attr("data-src") ||
-        extractImageUrlFromSrcset(img.attr("srcset"));
-      if (!src) return;
-
-      const normalized = normalizeUrl(src.trim(), url);
-      if (!/^https?:\/\//i.test(normalized)) return;
-      if (!looksLikeImageUrl(normalized)) return;
-
-      if (!imagesMap.has(normalized)) {
-        const alt = img.attr("alt")?.trim();
-        imagesMap.set(normalized, {
-          url: normalized,
-          altText: alt && alt.length > 0 ? alt : undefined,
-        });
-      }
-    });
+    if (content.length < minContentLength && imagesMap.size === 0) {
+      return null; // Skip pages that have neither enough text nor images
+    }
 
     return { url, title, content, images: Array.from(imagesMap.values()) };
   } catch {
@@ -191,17 +194,18 @@ async function extractInternalLinks(
 // Scrape website including child pages
 export async function scrapeWebsite(
   url: string,
-  maxPages: number = 20
+  maxPages: number = 10
 ): Promise<ScrapeResult> {
   try {
     const baseUrl = getBaseUrl(url);
+    const boundedMaxPages = Math.max(1, Math.min(maxPages, 500));
     const visitedUrls: Set<string> = new Set();
-    const pagesToVisit: string[] = [url];
+    const pagesToVisit: string[] = [normalizeUrl(url, url)];
     const allContent: PageContent[] = [];
 
-    console.log(`Starting scrape of ${url} (max ${maxPages} pages)`);
+    console.log(`Starting scrape of ${url} (max ${boundedMaxPages} pages)`);
 
-    while (pagesToVisit.length > 0 && visitedUrls.size < maxPages) {
+    while (pagesToVisit.length > 0 && visitedUrls.size < boundedMaxPages) {
       const currentUrl = pagesToVisit.shift()!;
 
       // Skip if already visited
@@ -216,13 +220,10 @@ export async function scrapeWebsite(
         allContent.push(pageContent);
       }
 
-      // Only extract links from the first few pages to avoid explosion
-      if (visitedUrls.size <= 5) {
-        const links = await extractInternalLinks(currentUrl, baseUrl);
-        for (const link of links) {
-          if (!visitedUrls.has(link) && !pagesToVisit.includes(link)) {
-            pagesToVisit.push(link);
-          }
+      const links = await extractInternalLinks(currentUrl, baseUrl);
+      for (const link of links) {
+        if (!visitedUrls.has(link) && !pagesToVisit.includes(link)) {
+          pagesToVisit.push(link);
         }
       }
 
@@ -238,7 +239,8 @@ export async function scrapeWebsite(
     }
 
     // Combine all content
-    const combinedContent = allContent
+    const contentPages = allContent.filter((page) => page.content.length > 0);
+    const combinedContent = contentPages
       .map((page) => `## ${page.title}\nSource: ${page.url}\n\n${page.content}`)
       .join("\n\n---\n\n");
 
@@ -261,7 +263,7 @@ export async function scrapeWebsite(
       success: true,
       content: finalContent,
       title: allContent[0]?.title || "Website",
-      pagesScraped: allContent.length,
+      pagesScraped: visitedUrls.size,
       images: Array.from(imageMap.values()),
     };
   } catch (error) {
@@ -274,7 +276,11 @@ export async function scrapeWebsite(
 
 // Simple single-page scrape (kept for backwards compatibility)
 export async function scrapeUrl(url: string): Promise<ScrapeResult> {
-  return scrapeWebsite(url, 20);
+  const configuredMaxPages = Number.parseInt(
+    process.env.SCRAPER_MAX_PAGES || "10",
+    10
+  );
+  return scrapeWebsite(url, configuredMaxPages);
 }
 
 // Detect if text contains significant non-ASCII characters (like Chinese, Japanese, Korean)

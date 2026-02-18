@@ -276,11 +276,11 @@ export default function GeneratePage() {
               </h2>
             </div>
             <div className="p-6">
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex flex-wrap items-center gap-2 mb-4">
                 {["database_manager", "author", "editor"].map((stage, i) => (
                   <div key={stage} className="flex items-center gap-2">
                     <div
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${
                         pipelineLog[stage]
                           ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
                           : "bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400"

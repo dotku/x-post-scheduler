@@ -20,6 +20,7 @@ model User {
   xApiSecret         String?
   xAccessToken       String?
   xAccessTokenSecret String?
+  creditBalanceCents Int       @default(500) // $5.00 initial free credit
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -30,6 +31,7 @@ model User {
   xAccounts          XAccount[]
   usageEvents        UsageEvent[]
   knowledgeImages    KnowledgeImage[]
+  creditTransactions CreditTransaction[]
 }
 
 model Post {
@@ -160,4 +162,21 @@ model UsageEvent {
 
   @@index([userId, createdAt])
   @@index([userId, source, createdAt])
+}
+
+model CreditTransaction {
+  id              String   @id @default(cuid())
+  type            String   // "deduction" | "topup" | "initial"
+  amountCents     Int      // positive for top-ups, negative for deductions
+  balanceAfter    Int
+  description     String?
+  stripeSessionId String?
+  metadata        String?
+  createdAt       DateTime @default(now())
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([stripeSessionId])
 }

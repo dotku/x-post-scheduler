@@ -101,13 +101,14 @@ export default async function Dashboard() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               X Post Scheduler
             </h1>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <Link
                 href="/generate"
-                className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                className="inline-flex items-center px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                title="AI Generate"
               >
                 <svg
-                  className="w-5 h-5 mr-2"
+                  className="w-5 h-5 sm:mr-2"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -119,14 +120,15 @@ export default async function Dashboard() {
                     d="M13 10V3L4 14h7v7l9-11h-7z"
                   />
                 </svg>
-                AI Generate
+                <span className="hidden sm:inline">AI Generate</span>
               </Link>
               <Link
                 href="/schedule"
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                title="New Post"
               >
                 <svg
-                  className="w-5 h-5 mr-2"
+                  className="w-5 h-5 sm:mr-2"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -138,14 +140,15 @@ export default async function Dashboard() {
                     d="M12 4v16m8-8H4"
                   />
                 </svg>
-                New Post
+                <span className="hidden sm:inline">New Post</span>
               </Link>
               <Link
                 href="/recurring"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="inline-flex items-center px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="Recurring"
               >
                 <svg
-                  className="w-5 h-5 mr-2"
+                  className="w-5 h-5 sm:mr-2"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -157,14 +160,15 @@ export default async function Dashboard() {
                     d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                   />
                 </svg>
-                Recurring
+                <span className="hidden sm:inline">Recurring</span>
               </Link>
               <Link
                 href="/knowledge"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className="inline-flex items-center px-3 sm:px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title="Knowledge"
               >
                 <svg
-                  className="w-5 h-5 mr-2"
+                  className="w-5 h-5 sm:mr-2"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -176,9 +180,9 @@ export default async function Dashboard() {
                     d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
                   />
                 </svg>
-                Knowledge
+                <span className="hidden sm:inline">Knowledge</span>
               </Link>
-              <div className="border-l border-gray-300 dark:border-gray-600 h-6 mx-2 hidden sm:block" />
+              <div className="border-l border-gray-300 dark:border-gray-600 h-6 mx-1 hidden sm:block" />
               <UserMenu />
             </div>
           </div>

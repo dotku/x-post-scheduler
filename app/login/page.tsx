@@ -1,8 +1,40 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 
+function detectInAppBrowser(userAgent: string) {
+  const ua = userAgent.toLowerCase();
+  const isWeChat = ua.includes("micromessenger");
+  const isInAppBrowser =
+    isWeChat ||
+    ua.includes("webview") ||
+    ua.includes("; wv)") ||
+    ua.includes("instagram") ||
+    ua.includes("fban") ||
+    ua.includes("fbav");
+
+  return { isWeChat, isInAppBrowser };
+}
+
 export default function LoginPage() {
+  const [userAgent] = useState(() =>
+    typeof window === "undefined" ? "" : window.navigator.userAgent || ""
+  );
+  const [copied, setCopied] = useState(false);
+
+  const browserEnv = useMemo(() => detectInAppBrowser(userAgent), [userAgent]);
+
+  async function handleCopyLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4">
       <div className="max-w-md w-full">
@@ -18,6 +50,28 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-4">
+            {browserEnv.isInAppBrowser && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 text-amber-900 p-4 text-sm">
+                <p className="font-semibold">Use system browser to sign in</p>
+                <p className="mt-1">
+                  Google may block sign-in in embedded browsers.
+                  {browserEnv.isWeChat
+                    ? " WeChat detected: tap top-right menu and choose Open in Safari/Browser."
+                    : " Please open this page in Safari or Chrome first."}
+                </p>
+                <p className="mt-2 text-amber-800">
+                  微信环境下请先用右上角菜单在系统浏览器打开，再登录。
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleCopyLink()}
+                  className="mt-3 inline-flex items-center justify-center px-3 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors"
+                >
+                  {copied ? "Link copied" : "Copy this page link"}
+                </button>
+              </div>
+            )}
+
             <Link
               href="/auth/login"
               className="w-full flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"

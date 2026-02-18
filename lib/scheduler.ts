@@ -3,6 +3,7 @@ import { postTweet, postTweetWithMedia } from "./x-client";
 import { getUserXCredentials } from "./user-credentials";
 import { generateTweet } from "./openai";
 import { trackTokenUsage } from "./usage-tracking";
+import { hasCredits, deductCredits } from "./credits";
 import { addDays, addWeeks, addMonths } from "date-fns";
 
 export async function processScheduledPosts() {
@@ -102,48 +103,59 @@ export async function processRecurringSchedules() {
     let generationError: string | null = null;
 
     if (schedule.useAi) {
-      const sources = await prisma.knowledgeSource.findMany({
-        where: { isActive: true, userId: schedule.userId },
-      });
-
-      if (sources.length === 0) {
-        generationError =
-          "No knowledge sources found for AI recurring generation";
+      const userHasCredits = await hasCredits(schedule.userId!);
+      if (!userHasCredits) {
+        generationError = "Insufficient credits for AI generation";
       } else {
-        const knowledgeContext = sources
-          .map((source) => {
-            const truncatedContent =
-              source.content.length > 2000
-                ? source.content.substring(0, 2000) + "..."
-                : source.content;
-            return `Source: ${source.name} (${source.url})\n${truncatedContent}`;
-          })
-          .join("\n\n---\n\n");
+        const sources = await prisma.knowledgeSource.findMany({
+          where: { isActive: true, userId: schedule.userId },
+        });
 
-        const generated = await generateTweet(
-          knowledgeContext,
-          schedule.aiPrompt || undefined,
-          schedule.aiLanguage || undefined
-        );
-
-        if (generated.usage) {
-          try {
-            await trackTokenUsage({
-              userId: schedule.userId!,
-              source: "recurring_scheduler_ai",
-              usage: generated.usage,
-              model: generated.model,
-              metadata: { scheduleId: schedule.id },
-            });
-          } catch (error) {
-            console.error("Failed to track recurring AI usage:", error);
-          }
-        }
-
-        if (!generated.success || !generated.content) {
-          generationError = generated.error || "Failed to generate AI content";
+        if (sources.length === 0) {
+          generationError =
+            "No knowledge sources found for AI recurring generation";
         } else {
-          contentToPost = generated.content;
+          const knowledgeContext = sources
+            .map((source) => {
+              const truncatedContent =
+                source.content.length > 2000
+                  ? source.content.substring(0, 2000) + "..."
+                  : source.content;
+              return `Source: ${source.name} (${source.url})\n${truncatedContent}`;
+            })
+            .join("\n\n---\n\n");
+
+          const generated = await generateTweet(
+            knowledgeContext,
+            schedule.aiPrompt || undefined,
+            schedule.aiLanguage || undefined
+          );
+
+          if (generated.usage) {
+            try {
+              await trackTokenUsage({
+                userId: schedule.userId!,
+                source: "recurring_scheduler_ai",
+                usage: generated.usage,
+                model: generated.model,
+                metadata: { scheduleId: schedule.id },
+              });
+              await deductCredits({
+                userId: schedule.userId!,
+                usage: generated.usage,
+                model: generated.model,
+                source: "recurring_scheduler_ai",
+              });
+            } catch (error) {
+              console.error("Failed to track/deduct recurring AI usage:", error);
+            }
+          }
+
+          if (!generated.success || !generated.content) {
+            generationError = generated.error || "Failed to generate AI content";
+          } else {
+            contentToPost = generated.content;
+          }
         }
       }
     }

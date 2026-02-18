@@ -37,11 +37,35 @@ export async function GET() {
     return unauthorizedResponse();
   }
 
-  const schedules = await prisma.recurringSchedule.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
+  const [schedules, recurringUsage, dbUser] = await Promise.all([
+    prisma.recurringSchedule.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.usageEvent.aggregate({
+      where: {
+        userId: user.id,
+        source: { startsWith: "recurring_" },
+      },
+      _sum: { promptTokens: true, completionTokens: true, totalTokens: true },
+      _count: { _all: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: { creditBalanceCents: true },
+    }),
+  ]);
+
+  return NextResponse.json({
+    balanceCents: dbUser?.creditBalanceCents ?? 0,
+    usage: {
+      requests: recurringUsage._count._all,
+      promptTokens: recurringUsage._sum.promptTokens ?? 0,
+      completionTokens: recurringUsage._sum.completionTokens ?? 0,
+      totalTokens: recurringUsage._sum.totalTokens ?? 0,
+    },
+    schedules,
   });
-  return NextResponse.json(schedules);
 }
 
 export async function POST(request: NextRequest) {

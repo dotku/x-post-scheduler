@@ -4,6 +4,7 @@ import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { getUserXCredentials } from "@/lib/user-credentials";
 import { generateTweet } from "@/lib/openai";
 import { trackTokenUsage } from "@/lib/usage-tracking";
+import { hasCredits, deductCredits } from "@/lib/credits";
 
 export async function POST(
   request: NextRequest,
@@ -31,6 +32,13 @@ export async function POST(
     return NextResponse.json(
       { error: "X API credentials not configured for this schedule account." },
       { status: 400 }
+    );
+  }
+
+  if (schedule.useAi && !(await hasCredits(user.id))) {
+    return NextResponse.json(
+      { error: "Insufficient credits. Please add credits in Settings to continue using AI generation." },
+      { status: 402 }
     );
   }
 
@@ -78,8 +86,14 @@ export async function POST(
         model: generated.model,
         metadata: { scheduleId: schedule.id },
       });
+      await deductCredits({
+        userId: user.id,
+        usage: generated.usage,
+        model: generated.model,
+        source: "recurring_item_test",
+      });
     } catch (error) {
-      console.error("Failed to track recurring item test usage:", error);
+      console.error("Failed to track/deduct recurring item test usage:", error);
     }
   }
 
