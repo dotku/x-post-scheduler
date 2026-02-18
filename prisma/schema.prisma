@@ -34,6 +34,24 @@ model User {
   creditTransactions CreditTransaction[]
 }
 
+model CronRunEvent {
+  id          String   @id @default(cuid())
+  jobName     String
+  endpoint    String
+  method      String   @default("POST")
+  success     Boolean
+  statusCode  Int?
+  durationMs  Int?
+  triggeredBy String?  // cloudflare | vercel | manual | unknown
+  error       String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+
+  @@index([jobName, createdAt])
+  @@index([success, createdAt])
+  @@index([endpoint, createdAt])
+}
+
 model Post {
   id          String    @id @default(cuid())
   content     String

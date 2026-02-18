@@ -20,6 +20,57 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Cloudflare Cron Setup
+
+This project can use Cloudflare Workers Cron Triggers to invoke backend automation routes:
+
+- Every minute: `POST /api/scheduler`
+- Daily at `00:00` UTC: `POST /api/daily-generate`
+
+Configuration files:
+
+- `cloudflare-cron/wrangler.toml`
+- `cloudflare-cron/src/index.ts`
+
+### 1. Install Wrangler
+
+```bash
+npm install -g wrangler
+```
+
+### 2. Authenticate
+
+```bash
+wrangler login
+```
+
+### 3. Configure Worker secrets/vars
+
+Run these in `cloudflare-cron/`:
+
+```bash
+wrangler secret put APP_BASE_URL
+wrangler secret put CRON_SECRET
+```
+
+Use your production app URL for `APP_BASE_URL` (for example, `https://your-app.vercel.app`) and the same `CRON_SECRET` value configured in your app environment.
+
+### 4. Deploy the cron worker
+
+```bash
+cd cloudflare-cron
+wrangler deploy
+```
+
+### 5. Verify
+
+- In Cloudflare dashboard, check the Worker Cron Triggers for:
+  - `* * * * *`
+  - `0 0 * * *`
+- Confirm your app logs show authorized calls to:
+  - `/api/scheduler`
+  - `/api/daily-generate`
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

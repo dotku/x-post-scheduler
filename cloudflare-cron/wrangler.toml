@@ -1,0 +1,22 @@
+name = "x-post-scheduler-cron"
+main = "src/index.ts"
+compatibility_date = "2026-02-18"
+
+[observability.logs]
+enabled = true
+
+# ── Production (default) ──
+# Deploy: npx wrangler deploy
+# Secrets: npx wrangler secret put APP_BASE_URL / CRON_SECRET
+[triggers]
+crons = ["* * * * *", "0 0 * * *"]
+
+# ── Dev environment ──
+# Deploy: npx wrangler deploy --env dev
+# Secrets: npx wrangler secret put APP_BASE_URL --env dev
+#          npx wrangler secret put CRON_SECRET --env dev
+[env.dev]
+name = "x-post-scheduler-cron-dev"
+
+[env.dev.triggers]
+crons = ["*/5 * * * *"]
