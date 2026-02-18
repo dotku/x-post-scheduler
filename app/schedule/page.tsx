@@ -98,7 +98,7 @@ function ScheduleForm() {
         throw new Error(data.error || "Failed to create post");
       }
 
-      router.push("/");
+      router.push("/dashboard");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -277,7 +277,7 @@ export default function SchedulePage() {
               Create Post
             </h1>
             <Link
-              href="/"
+              href="/dashboard"
               className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
             >
               Cancel

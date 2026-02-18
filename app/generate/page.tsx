@@ -127,7 +127,7 @@ export default function GeneratePage() {
         setGeneratedContent("");
         setMediaAssetId(null);
         setPipelineLog(null);
-        setTimeout(() => router.push("/"), 1500);
+        setTimeout(() => router.push("/dashboard"), 1500);
       } else {
         throw new Error(data.error || "Post failed");
       }
@@ -163,7 +163,7 @@ export default function GeneratePage() {
               AI Content Generator
             </h1>
             <Link
-              href="/"
+              href="/dashboard"
               className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
             >
               Back to Dashboard

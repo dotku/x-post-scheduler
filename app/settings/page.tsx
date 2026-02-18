@@ -278,7 +278,7 @@ export default function SettingsPage() {
               Settings
             </h1>
             <Link
-              href="/"
+              href="/dashboard"
               className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             >
               Back to Dashboard

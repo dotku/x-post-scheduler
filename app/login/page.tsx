@@ -50,47 +50,50 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-4">
-            {browserEnv.isInAppBrowser && (
+            {browserEnv.isInAppBrowser ? (
               <div className="rounded-lg border border-amber-300 bg-amber-50 text-amber-900 p-4 text-sm">
-                <p className="font-semibold">Use system browser to sign in</p>
-                <p className="mt-1">
-                  Google may block sign-in in embedded browsers.
+                <p className="font-semibold text-base">
+                  {browserEnv.isWeChat ? "检测到微信浏览器" : "Embedded browser detected"}
+                </p>
+                <p className="mt-2">
                   {browserEnv.isWeChat
-                    ? " WeChat detected: tap top-right menu and choose Open in Safari/Browser."
-                    : " Please open this page in Safari or Chrome first."}
+                    ? "微信内置浏览器不支持登录，请点击右上角「...」菜单，选择「在默认浏览器中打开」。"
+                    : "Sign-in is not supported in embedded browsers. Please open this page in Safari or Chrome."}
                 </p>
-                <p className="mt-2 text-amber-800">
-                  微信环境下请先用右上角菜单在系统浏览器打开，再登录。
-                </p>
+                {browserEnv.isWeChat && (
+                  <p className="mt-2 text-amber-800">
+                    Sign-in requires a system browser. Tap the &quot;...&quot; menu (top-right) and choose &quot;Open in Browser&quot;.
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={() => void handleCopyLink()}
-                  className="mt-3 inline-flex items-center justify-center px-3 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors"
+                  className="mt-3 w-full inline-flex items-center justify-center px-3 py-2.5 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors font-medium"
                 >
-                  {copied ? "Link copied" : "Copy this page link"}
+                  {copied ? "Link copied! / 已复制!" : "Copy link / 复制链接"}
                 </button>
               </div>
-            )}
-
-            <Link
-              href="/auth/login"
-              className="w-full flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <svg
-                className="w-5 h-5 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            ) : (
+              <Link
+                href="/auth/login"
+                className="w-full flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
-                />
-              </svg>
-              Sign In / Sign Up
-            </Link>
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
+                  />
+                </svg>
+                Sign In / Sign Up
+              </Link>
+            )}
           </div>
 
           <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">

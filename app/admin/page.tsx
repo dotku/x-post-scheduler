@@ -13,7 +13,7 @@ export default async function AdminPage() {
     if (error instanceof Error && error.message === "UNAUTHORIZED") {
       redirect("/auth/login");
     }
-    redirect("/");
+    redirect("/dashboard");
   }
 
   const now = Date.now();
@@ -79,7 +79,7 @@ export default async function AdminPage() {
             Admin Dashboard
           </h1>
           <Link
-            href="/"
+            href="/dashboard"
             className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
           >
             Back
