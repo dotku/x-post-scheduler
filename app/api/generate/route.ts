@@ -68,9 +68,18 @@ export async function POST(request: NextRequest) {
   }
 
   // Fallback: direct OpenAI generation
-  const sources = await prisma.knowledgeSource.findMany({
-    where: { isActive: true, userId: user.id },
-  });
+  const [sources, recentPostsRows] = await Promise.all([
+    prisma.knowledgeSource.findMany({
+      where: { isActive: true, userId: user.id },
+    }),
+    prisma.post.findMany({
+      where: { userId: user.id, status: "posted" },
+      orderBy: { postedAt: "desc" },
+      take: 5,
+      select: { content: true },
+    }),
+  ]);
+  const recentPosts = recentPostsRows.map((p) => p.content);
   type KnowledgeSource = (typeof sources)[number];
 
   if (sources.length === 0) {
@@ -98,7 +107,8 @@ export async function POST(request: NextRequest) {
       knowledgeContext,
       prompt,
       3,
-      language
+      language,
+      recentPosts
     );
 
     if (result.usage) {
@@ -122,7 +132,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ suggestions: result.suggestions });
   } else {
-    const result = await generateTweet(knowledgeContext, prompt, language);
+    const result = await generateTweet(knowledgeContext, prompt, language, recentPosts);
 
     if (result.usage) {
       try {

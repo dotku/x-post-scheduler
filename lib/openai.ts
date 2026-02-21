@@ -21,11 +21,23 @@ export interface GenerateResult {
   model?: string;
 }
 
+const INFLUENCER_STRATEGY = `
+## Influencer Content Strategy (apply these principles):
+- **Hook first**: Open with a bold statement, surprising fact, or direct question — the first line must stop the scroll.
+- **Vary content type**: Rotate between formats — tips/how-to, personal opinion, data/insight, behind-the-scenes, question to audience, hot take, story/anecdote.
+- **Avoid repetition**: Do NOT repeat recent post topics, angles, or opening styles. Each post must feel fresh.
+- **Conversational tone**: Write like a knowledgeable human, not a press release. Short sentences. Direct.
+- **Value density**: Pack one clear idea per tweet. No filler.
+- **Soft CTA when natural**: End with a question or invitation to engage (reply, share, follow) only if it flows naturally.
+- **No clichés**: Avoid "I'm excited to share", "Game changer", "In today's world", "Let's dive in".
+`;
+
 // Generate a tweet based on knowledge context and optional prompt
 export async function generateTweet(
   knowledgeContext: string,
   prompt?: string,
-  language?: string
+  language?: string,
+  recentPosts?: string[]
 ): Promise<GenerateResult> {
   try {
     const client = getOpenAIClient();
@@ -34,9 +46,15 @@ export async function generateTweet(
       ? `IMPORTANT: Generate the tweet in ${language}.`
       : `IMPORTANT: Detect the language of the knowledge base content and generate the tweet in the SAME language. If the content is in Chinese, respond in Chinese. If in English, respond in English. Match the language of the source content.`;
 
+    const recentPostsSection = recentPosts && recentPosts.length > 0
+      ? `\n## Recent posts (DO NOT repeat these topics, angles, or opening styles):\n${recentPosts.map((p, i) => `${i + 1}. ${p}`).join("\n")}\n`
+      : "";
+
     const systemPrompt = `You are a social media expert who creates engaging tweets for X (formerly Twitter).
 
 ${languageInstruction}
+
+${INFLUENCER_STRATEGY}
 
 Rules:
 - Keep tweets under 280 characters (STRICT LIMIT)
@@ -46,9 +64,8 @@ Rules:
 - Make the content feel natural, not robotic
 - Focus on providing value to the reader
 - ALWAYS match the language of the knowledge base content
-
-You have access to the following knowledge base content to inform your tweets:
-
+${recentPostsSection}
+## Knowledge base content:
 ${knowledgeContext}
 
 Generate tweets that are relevant to this knowledge base content.`;
@@ -109,7 +126,8 @@ export async function generateTweetSuggestions(
   knowledgeContext: string,
   prompt?: string,
   count: number = 3,
-  language?: string
+  language?: string,
+  recentPosts?: string[]
 ): Promise<{
   success: boolean;
   suggestions?: string[];
@@ -124,9 +142,15 @@ export async function generateTweetSuggestions(
       ? `IMPORTANT: Generate all tweets in ${language}.`
       : `IMPORTANT: Detect the language of the knowledge base content and generate all tweets in the SAME language. If the content is in Chinese, respond in Chinese. If in English, respond in English. Match the language of the source content.`;
 
+    const recentPostsSection = recentPosts && recentPosts.length > 0
+      ? `\n## Recent posts (DO NOT repeat these topics, angles, or opening styles):\n${recentPosts.map((p, i) => `${i + 1}. ${p}`).join("\n")}\n`
+      : "";
+
     const systemPrompt = `You are a social media expert who creates engaging tweets for X (formerly Twitter).
 
 ${languageInstruction}
+
+${INFLUENCER_STRATEGY}
 
 Rules:
 - Keep each tweet under 280 characters (STRICT LIMIT)
@@ -134,11 +158,10 @@ Rules:
 - Use relevant hashtags sparingly (1-2 max per tweet)
 - Don't use excessive emojis (1-2 max if appropriate)
 - Make the content feel natural, not robotic
-- Each tweet should have a different angle or focus
+- Each tweet should have a DIFFERENT angle, format, and opening style
 - ALWAYS match the language of the knowledge base content
-
-You have access to the following knowledge base content:
-
+${recentPostsSection}
+## Knowledge base content:
 ${knowledgeContext}
 
 Generate ${count} different tweet options, each on a new line. Just the tweet text, no numbering or labels.`;

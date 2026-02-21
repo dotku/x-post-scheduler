@@ -13,6 +13,17 @@ interface XAccount {
   createdAt: string;
 }
 
+type VerifyStatus = "idle" | "checking" | "ok" | "error";
+
+interface EditState {
+  accountId: string;
+  xApiKey: string;
+  xApiSecret: string;
+  xAccessToken: string;
+  xAccessTokenSecret: string;
+  label: string;
+}
+
 interface UsageSummary {
   rangeDays: number;
   window: {
@@ -49,6 +60,10 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [topupLoading, setTopupLoading] = useState<number | null>(null);
+  const [verifyStatus, setVerifyStatus] = useState<Record<string, VerifyStatus>>({});
+  const [verifyError, setVerifyError] = useState<Record<string, string>>({});
+  const [editState, setEditState] = useState<EditState | null>(null);
+  const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -171,6 +186,70 @@ export default function SettingsPage() {
       setMessage({ type: "error", text: "Failed to start checkout" });
     } finally {
       setTopupLoading(null);
+    }
+  }
+
+  async function handleVerify(accountId: string) {
+    setVerifyStatus((s) => ({ ...s, [accountId]: "checking" }));
+    setVerifyError((e) => ({ ...e, [accountId]: "" }));
+    try {
+      const res = await fetch(`/api/settings/verify?accountId=${encodeURIComponent(accountId)}`);
+      const data = await res.json();
+      if (data.valid) {
+        setVerifyStatus((s) => ({ ...s, [accountId]: "ok" }));
+      } else {
+        setVerifyStatus((s) => ({ ...s, [accountId]: "error" }));
+        setVerifyError((e) => ({ ...e, [accountId]: data.error || "Verification failed" }));
+      }
+    } catch {
+      setVerifyStatus((s) => ({ ...s, [accountId]: "error" }));
+      setVerifyError((e) => ({ ...e, [accountId]: "Network error" }));
+    }
+  }
+
+  function handleStartEdit(account: XAccount) {
+    setEditState({
+      accountId: account.id,
+      label: account.label || "",
+      xApiKey: "",
+      xApiSecret: "",
+      xAccessToken: "",
+      xAccessTokenSecret: "",
+    });
+  }
+
+  async function handleUpdateKeys(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editState) return;
+    setUpdating(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountId: editState.accountId,
+          label: editState.label || undefined,
+          xApiKey: editState.xApiKey,
+          xApiSecret: editState.xApiSecret,
+          xAccessToken: editState.xAccessToken,
+          xAccessTokenSecret: editState.xAccessTokenSecret,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setMessage({ type: "success", text: `Keys updated — connected as @${data.username || "unknown"}` });
+        setEditState(null);
+        // Reset verify status so it shows fresh
+        setVerifyStatus((s) => ({ ...s, [editState.accountId]: "idle" }));
+        await fetchData();
+      } else {
+        setMessage({ type: "error", text: data.error || "Failed to update keys" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to update keys" });
+    } finally {
+      setUpdating(false);
     }
   }
 
@@ -309,38 +388,170 @@ export default function SettingsPage() {
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              {accounts.map((account) => (
-                <div
-                  key={account.id}
-                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-white truncate">
-                      {account.label || account.username || "Unnamed account"}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {account.username ? `@${account.username}` : "No username"}
-                      {account.isDefault ? " • Default" : ""}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {!account.isDefault && (
-                      <button
-                        onClick={() => handleSetDefault(account.id)}
-                        className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+              {accounts.map((account) => {
+                const status = verifyStatus[account.id] ?? "idle";
+                const isEditing = editState?.accountId === account.id;
+                return (
+                  <div
+                    key={account.id}
+                    className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+                  >
+                    {/* Account row */}
+                    <div className="p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="min-w-0 flex items-center gap-2">
+                        {/* Status dot */}
+                        {status === "ok" && (
+                          <span className="shrink-0 w-2 h-2 rounded-full bg-green-500" title="Connected" />
+                        )}
+                        {status === "error" && (
+                          <span className="shrink-0 w-2 h-2 rounded-full bg-red-500" title="Connection error" />
+                        )}
+                        {status === "checking" && (
+                          <span className="shrink-0 w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Checking..." />
+                        )}
+                        {status === "idle" && (
+                          <span className="shrink-0 w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600" title="Not verified" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900 dark:text-white truncate">
+                            {account.label || account.username || "Unnamed account"}
+                          </p>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            {account.username ? `@${account.username}` : "No username"}
+                            {account.isDefault ? " • Default" : ""}
+                          </p>
+                          {status === "error" && verifyError[account.id] && (
+                            <p className="text-xs text-red-500 mt-0.5">{verifyError[account.id]}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleVerify(account.id)}
+                          disabled={status === "checking"}
+                          className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                        >
+                          {status === "checking" ? "Checking..." : "Verify"}
+                        </button>
+                        <button
+                          onClick={() => isEditing ? setEditState(null) : handleStartEdit(account)}
+                          className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+                        >
+                          {isEditing ? "Cancel" : "Update keys"}
+                        </button>
+                        {!account.isDefault && (
+                          <button
+                            onClick={() => handleSetDefault(account.id)}
+                            className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+                          >
+                            Set default
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleRemove(account.id)}
+                          className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Inline edit form */}
+                    {isEditing && editState && (
+                      <form
+                        onSubmit={handleUpdateKeys}
+                        className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4 space-y-3"
                       >
-                        Set default
-                      </button>
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Update API keys for this account
+                        </p>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                            Label (optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={editState.label}
+                            onChange={(e) => setEditState({ ...editState, label: e.target.value })}
+                            placeholder="e.g. Brand Main, Personal"
+                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                              API Key
+                            </label>
+                            <input
+                              type="password"
+                              value={editState.xApiKey}
+                              onChange={(e) => setEditState({ ...editState, xApiKey: e.target.value })}
+                              required
+                              placeholder="Paste new API Key"
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                              API Secret
+                            </label>
+                            <input
+                              type="password"
+                              value={editState.xApiSecret}
+                              onChange={(e) => setEditState({ ...editState, xApiSecret: e.target.value })}
+                              required
+                              placeholder="Paste new API Secret"
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                              Access Token
+                            </label>
+                            <input
+                              type="password"
+                              value={editState.xAccessToken}
+                              onChange={(e) => setEditState({ ...editState, xAccessToken: e.target.value })}
+                              required
+                              placeholder="Paste new Access Token"
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                              Access Token Secret
+                            </label>
+                            <input
+                              type="password"
+                              value={editState.xAccessTokenSecret}
+                              onChange={(e) => setEditState({ ...editState, xAccessTokenSecret: e.target.value })}
+                              required
+                              placeholder="Paste new Access Token Secret"
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            type="submit"
+                            disabled={updating}
+                            className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                          >
+                            {updating ? "Verifying & Saving..." : "Save New Keys"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditState(null)}
+                            className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </form>
                     )}
-                    <button
-                      onClick={() => handleRemove(account.id)}
-                      className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                    >
-                      Remove
-                    </button>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -449,9 +660,17 @@ export default function SettingsPage() {
         )}
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Add X Account
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Add X Account
+            </h2>
+            <Link
+              href="/docs"
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              How to get API keys?
+            </Link>
+          </div>
           <form onSubmit={handleSave} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

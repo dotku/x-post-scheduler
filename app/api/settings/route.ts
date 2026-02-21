@@ -145,13 +145,53 @@ export async function PATCH(request: NextRequest) {
 
   const existing = await prisma.xAccount.findFirst({
     where: { id: accountId, userId: user.id },
-    select: { id: true },
+    select: { id: true, isDefault: true },
   });
 
   if (!existing) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
 
+  // If credentials are provided, update them
+  const { xApiKey, xApiSecret, xAccessToken, xAccessTokenSecret, label } = body;
+  if (xApiKey || xApiSecret || xAccessToken || xAccessTokenSecret) {
+    if (!xApiKey || !xApiSecret || !xAccessToken || !xAccessTokenSecret) {
+      return NextResponse.json(
+        { error: "All four credential fields are required to update keys" },
+        { status: 400 }
+      );
+    }
+
+    const verification = await verifyCredentials({
+      apiKey: xApiKey,
+      apiSecret: xApiSecret,
+      accessToken: xAccessToken,
+      accessTokenSecret: xAccessTokenSecret,
+    });
+
+    if (!verification.valid) {
+      return NextResponse.json(
+        { error: `Invalid credentials: ${verification.error}` },
+        { status: 400 }
+      );
+    }
+
+    await prisma.xAccount.update({
+      where: { id: accountId },
+      data: {
+        xApiKey: encrypt(xApiKey),
+        xApiSecret: encrypt(xApiSecret),
+        xAccessToken: encrypt(xAccessToken),
+        xAccessTokenSecret: encrypt(xAccessTokenSecret),
+        username: verification.username ?? undefined,
+        ...(typeof label === "string" ? { label: label.trim() || null } : {}),
+      },
+    });
+
+    return NextResponse.json({ success: true, username: verification.username });
+  }
+
+  // Otherwise just set as default
   await prisma.$transaction([
     prisma.xAccount.updateMany({
       where: { userId: user.id, isDefault: true },

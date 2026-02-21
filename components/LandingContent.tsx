@@ -122,14 +122,22 @@ export default function LandingContent() {
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">
             X Post Scheduler
           </h1>
-          {!browserEnv.isInAppBrowser && (
+          <div className="flex items-center gap-2">
             <Link
-              href="/login"
-              className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+              href="/docs"
+              className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
-              Sign In
+              Docs
             </Link>
-          )}
+            {!browserEnv.isInAppBrowser && (
+              <Link
+                href="/login"
+                className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+              >
+                Sign In
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 

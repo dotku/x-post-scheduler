@@ -107,9 +107,18 @@ export async function processRecurringSchedules() {
       if (!userHasCredits) {
         generationError = "Insufficient credits for AI generation";
       } else {
-        const sources = await prisma.knowledgeSource.findMany({
-          where: { isActive: true, userId: schedule.userId },
-        });
+        const [sources, recentPostsRows] = await Promise.all([
+          prisma.knowledgeSource.findMany({
+            where: { isActive: true, userId: schedule.userId },
+          }),
+          prisma.post.findMany({
+            where: { userId: schedule.userId!, status: "posted" },
+            orderBy: { postedAt: "desc" },
+            take: 5,
+            select: { content: true },
+          }),
+        ]);
+        const recentPosts = recentPostsRows.map((p) => p.content);
 
         if (sources.length === 0) {
           generationError =
@@ -128,7 +137,8 @@ export async function processRecurringSchedules() {
           const generated = await generateTweet(
             knowledgeContext,
             schedule.aiPrompt || undefined,
-            schedule.aiLanguage || undefined
+            schedule.aiLanguage || undefined,
+            recentPosts
           );
 
           if (generated.usage) {

@@ -25,6 +25,7 @@ export default function PostList({ initialPosts }: PostListProps) {
   const router = useRouter();
   const [posts, setPosts] = useState(initialPosts);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const decodeHtml = (value: string) => {
     if (!value) return value;
@@ -65,6 +66,20 @@ export default function PostList({ initialPosts }: PostListProps) {
       }
     } catch (error) {
       console.error("Failed to post:", error);
+    }
+  };
+
+  const handleRetry = async (id: string) => {
+    setRetryingId(id);
+    try {
+      const res = await fetch(`/api/posts/${id}/post-now`, { method: "POST" });
+      if (res.ok) {
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Failed to retry:", error);
+    } finally {
+      setRetryingId(null);
     }
   };
 
@@ -115,7 +130,7 @@ export default function PostList({ initialPosts }: PostListProps) {
         >
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <p className="text-gray-900 dark:text-white whitespace-pre-wrap break-words">
+              <p className="text-gray-900 dark:text-white whitespace-pre-wrap wrap-break-word">
                 {decodeHtml(post.content)}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
@@ -182,6 +197,15 @@ export default function PostList({ initialPosts }: PostListProps) {
                   className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                 >
                   Post Now
+                </button>
+              )}
+              {post.status === "failed" && post.source !== "x" && (
+                <button
+                  onClick={() => handleRetry(post.id)}
+                  disabled={retryingId === post.id}
+                  className="px-3 py-1.5 text-sm bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors disabled:opacity-50"
+                >
+                  {retryingId === post.id ? "Retrying..." : "Retry"}
                 </button>
               )}
               {post.source !== "x" && (

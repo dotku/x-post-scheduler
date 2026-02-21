@@ -7,13 +7,13 @@ const PRICING: Record<string, { inputPer1M: number; outputPer1M: number }> = {
 };
 
 const DEFAULT_MODEL = "gpt-4o";
-const MARKUP_MULTIPLIER = 3;
+const MARKUP_MULTIPLIER = 60;
 
 /** Flat fee in cents for agent service calls (no per-token data available). */
 export const AGENT_FLAT_FEE_CENTS = 5;
 
 /**
- * Calculate cost in cents for given token usage after 3x markup.
+ * Calculate cost in cents for given token usage after 60x markup.
  * Minimum charge: 1 cent.
  */
 export function calculateCostCents(
