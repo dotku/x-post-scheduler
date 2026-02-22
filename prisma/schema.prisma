@@ -32,6 +32,7 @@ model User {
   usageEvents        UsageEvent[]
   knowledgeImages    KnowledgeImage[]
   creditTransactions CreditTransaction[]
+  galleryItems       GalleryItem[]
 }
 
 model CronRunEvent {
@@ -197,4 +198,24 @@ model CreditTransaction {
 
   @@index([userId, createdAt])
   @@index([stripeSessionId])
+}
+
+model GalleryItem {
+  id          String   @id @default(cuid())
+  type        String   // "image" | "video"
+  modelId     String
+  modelLabel  String
+  prompt      String
+  blobUrl     String   // Vercel Blob permanent URL
+  sourceUrl   String   // original WaveSpeed URL
+  aspectRatio String?
+  mimeType    String   @default("image/jpeg")
+  isPublic    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([isPublic, createdAt])
 }
