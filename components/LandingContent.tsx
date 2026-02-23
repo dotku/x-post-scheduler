@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { IMAGE_MODELS, VIDEO_MODELS } from "@/lib/wavespeed";
 
 function detectInAppBrowser(userAgent: string) {
   const ua = userAgent.toLowerCase();
@@ -28,7 +29,7 @@ const features = [
     ),
     title: "Smart Scheduling",
     description:
-      "Schedule posts at optimal times for maximum engagement. Set one-time or recurring schedules with flexible cron expressions.",
+      "Schedule posts at optimal times for maximum engagement. Set one-time or auto post schedules with flexible cron expressions.",
   },
   {
     icon: (
@@ -65,9 +66,9 @@ const features = [
         d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
       />
     ),
-    title: "Recurring Automation",
+    title: "Auto Post",
     description:
-      "Set up recurring schedules to automatically post AI-generated content daily, weekly, or on a custom schedule.",
+      "Set up auto posts to automatically publish AI-generated content daily, weekly, or on a custom schedule.",
   },
   {
     icon: (
@@ -97,12 +98,107 @@ const features = [
   },
 ];
 
+interface PublicStatsResponse {
+  totals: {
+    users: number;
+    posts: number;
+    galleryItems: number;
+    knowledgeSources: number;
+    requests: number;
+    tokens: number;
+    webVisits: number;
+  };
+  window30d: {
+    requests: number;
+    tokens: number;
+    webVisits: number;
+    topPages: {
+      path: string;
+      visits: number;
+    }[];
+    byProvider: {
+      provider: string;
+      requests: number;
+      tokens: number;
+    }[];
+    topModels: {
+      provider: string;
+      model: string;
+      requests: number;
+      tokens: number;
+    }[];
+  };
+  updatedAt: string;
+}
+
+type ProviderInfo = {
+  name: string;
+  badge: string;
+  models: { id: string; label: string; mode: "image" | "video" | "text" }[];
+};
+
+function detectProvider(modelId: string) {
+  if (modelId.startsWith("bytedance/")) return "ByteDance";
+  if (modelId.startsWith("alibaba/")) return "Alibaba";
+  if (modelId.startsWith("wavespeed-ai/")) return "WaveSpeed";
+  if (modelId.startsWith("kwaivgi/")) return "Kuaishou";
+  return "Other";
+}
+
 export default function LandingContent() {
   const [userAgent] = useState(() =>
     typeof window === "undefined" ? "" : window.navigator.userAgent || ""
   );
   const [copied, setCopied] = useState(false);
+  const [stats, setStats] = useState<PublicStatsResponse | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
   const browserEnv = useMemo(() => detectInAppBrowser(userAgent), [userAgent]);
+  const providerInfo = useMemo<ProviderInfo[]>(() => {
+    const map = new Map<string, ProviderInfo>();
+
+    const ensure = (provider: string, badge: string) => {
+      const existing = map.get(provider);
+      if (existing) return existing;
+      const created: ProviderInfo = { name: provider, badge, models: [] };
+      map.set(provider, created);
+      return created;
+    };
+
+    for (const model of IMAGE_MODELS) {
+      const provider = detectProvider(model.id);
+      ensure(provider, "Image/Video").models.push({
+        id: model.id,
+        label: model.label,
+        mode: "image",
+      });
+    }
+    for (const model of VIDEO_MODELS) {
+      const provider = detectProvider(model.id);
+      ensure(provider, "Image/Video").models.push({
+        id: model.id,
+        label: model.label,
+        mode: "video",
+      });
+    }
+
+    ensure("OpenAI", "Text").models.push({
+      id: "gpt-4o",
+      label: "GPT-4o (tweet generation)",
+      mode: "text",
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/public/stats")
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return (await res.json()) as PublicStatsResponse;
+      })
+      .then((data) => setStats(data))
+      .finally(() => setStatsLoading(false));
+  }, []);
 
   async function handleCopyLink() {
     try {
@@ -243,6 +339,150 @@ export default function LandingContent() {
         </div>
       </section>
 
+      {/* Platform Usage */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-8">
+          <div>
+            <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+              Platform Usage
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Live aggregate usage across all users.
+            </p>
+          </div>
+          {stats?.updatedAt && (
+            <p className="text-xs text-gray-400">
+              Updated: {new Date(stats.updatedAt).toLocaleString()}
+            </p>
+          )}
+        </div>
+
+        {statsLoading ? (
+          <div className="text-sm text-gray-500 dark:text-gray-400">Loading usage metrics...</div>
+        ) : stats ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Users</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                  {stats.totals.users.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">AI Requests (All-time)</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                  {stats.totals.requests.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Tokens (All-time)</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                  {stats.totals.tokens.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Gallery Items</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                  {stats.totals.galleryItems.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Web Visits (All-time)</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                  {stats.totals.webVisits.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {stats.window30d.byProvider.length > 0 && (
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                    Last 30 days by provider
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {stats.window30d.byProvider.map((item) => (
+                      <div
+                        key={item.provider}
+                        className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm"
+                      >
+                        <span className="text-gray-700 dark:text-gray-300">{item.provider}</span>
+                        <span className="text-gray-900 dark:text-white">
+                          {item.requests.toLocaleString()} req
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+                <p className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                  Top pages (30d)
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {stats.window30d.topPages.slice(0, 6).map((item) => (
+                    <div
+                      key={item.path}
+                      className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm"
+                    >
+                      <span className="text-gray-700 dark:text-gray-300 truncate pr-2">{item.path}</span>
+                      <span className="text-gray-900 dark:text-white">
+                        {item.visits.toLocaleString()} visits
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Usage metrics unavailable right now.
+          </div>
+        )}
+      </section>
+
+      {/* Providers & Models */}
+      <section className="bg-white dark:bg-gray-800 py-16 sm:py-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">
+            Model Providers
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
+            Built-in model providers for text, image, and video generation.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {providerInfo.map((provider) => (
+              <div
+                key={provider.name}
+                className="rounded-xl border border-gray-200 dark:border-gray-700 p-4"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {provider.name}
+                  </h4>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                    {provider.badge}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {provider.models.map((model) => (
+                    <div
+                      key={model.id}
+                      className="flex items-center justify-between gap-2 rounded-md border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm"
+                    >
+                      <span className="text-gray-700 dark:text-gray-300 truncate">{model.label}</span>
+                      <span className="shrink-0 text-xs text-gray-400 uppercase">{model.mode}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* How it works */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
         <h3 className="text-2xl sm:text-3xl font-bold text-center text-gray-900 dark:text-white mb-12">
@@ -281,7 +521,7 @@ export default function LandingContent() {
               Schedule & automate
             </h4>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Create one-time or recurring posts. Let AI generate and post
+              Create one-time or auto posts. Let AI generate and post
               content automatically.
             </p>
           </div>

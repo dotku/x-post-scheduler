@@ -13,6 +13,10 @@ export interface VideoSubmitParams {
   duration?: number;
   /** Canonical aspect ratio: "16:9" | "9:16" | "1:1" */
   aspectRatio?: string;
+  /** Input image URL for image-to-video models */
+  imageUrl?: string;
+  /** Whether to generate audio/sound */
+  generateAudio?: boolean;
 }
 
 export interface VideoTask {
@@ -45,38 +49,56 @@ function buildRequestBody(
   modelId: string,
   prompt: string,
   duration?: number,
-  aspectRatio?: string
+  aspectRatio?: string,
+  imageUrl?: string,
+  generateAudio?: boolean
 ): Record<string, unknown> {
   const body: Record<string, unknown> = { prompt };
+  const ratio = aspectRatio ?? "16:9";
 
-  if (modelId.startsWith("wavespeed-ai/wan-") || modelId.startsWith("alibaba/wan-")) {
-    // WAN models use a "width*height" size string
+  if (modelId.startsWith("wavespeed-ai/wan-")) {
+    // WAN 2.2 models — no audio support
     const sizeMap: Record<string, Record<string, string>> = {
       "16:9": { "480p": "832*480", "720p": "1280*720" },
       "9:16": { "480p": "480*832", "720p": "720*1280" },
       "1:1":  { "480p": "480*480", "720p": "720*720" },
     };
     const res = modelId.includes("480p") ? "480p" : "720p";
-    const ratio = aspectRatio ?? "16:9";
     body.size = sizeMap[ratio]?.[res] ?? (res === "480p" ? "832*480" : "1280*720");
     if (duration) body.duration = duration;
+    if (imageUrl) body.image = imageUrl;
+    body.seed = -1;
+  } else if (modelId.startsWith("alibaba/wan-")) {
+    // Alibaba WAN models (Wan 2.6) — supports audio
+    const sizeMap: Record<string, string> = {
+      "16:9": "1280*720",
+      "9:16": "720*1280",
+      "1:1":  "720*720",
+    };
+    body.size = sizeMap[ratio] ?? "1280*720";
+    if (duration) body.duration = duration;
+    if (imageUrl) body.image = imageUrl;
+    if (generateAudio) body.generate_audio = true;
     body.seed = -1;
   } else if (modelId.startsWith("bytedance/seedance-")) {
-    // Seedance uses aspect_ratio + resolution strings
-    body.aspect_ratio = aspectRatio?.replace(":", ":") ?? "16:9";
+    // Seedance — supports audio via generate_audio
+    body.aspect_ratio = ratio;
     body.resolution = modelId.includes("fast") ? "480p" : "720p";
     if (duration) body.duration = duration;
-    body.generate_audio = false;
+    if (imageUrl) body.image_url = imageUrl;
+    body.generate_audio = generateAudio ?? false;
     body.seed = -1;
   } else if (modelId.startsWith("kwaivgi/")) {
     // Kling uses aspect_ratio
-    body.aspect_ratio = aspectRatio ?? "16:9";
+    body.aspect_ratio = ratio;
     if (duration) body.duration = duration;
+    if (imageUrl) body.image = imageUrl;
     body.seed = -1;
   } else {
     // Generic fallback
     if (duration) body.duration = duration;
     if (aspectRatio) body.aspect_ratio = aspectRatio;
+    if (imageUrl) body.image_url = imageUrl;
     body.seed = -1;
   }
 
@@ -91,7 +113,9 @@ export async function submitVideoTask(
     params.modelId,
     params.prompt,
     params.duration,
-    params.aspectRatio
+    params.aspectRatio,
+    params.imageUrl,
+    params.generateAudio
   );
 
   const res = await fetch(`${WAVESPEED_BASE}/${params.modelId}`, {
@@ -142,6 +166,10 @@ export async function getVideoTask(taskIdOrUrl: string): Promise<VideoTask> {
 export interface ImageSubmitParams {
   modelId: string;
   prompt: string;
+  /** "t2i"=text-to-image, "i2i"=image-to-image, "i2i_text"=image+text-to-image */
+  mode?: "t2i" | "i2i" | "i2i_text";
+  /** Input image URL for image-to-image style models */
+  imageUrl?: string;
   /** Canonical aspect ratio: "16:9" | "9:16" | "1:1" | "4:3" | "3:4" */
   aspectRatio?: string;
 }
@@ -190,6 +218,54 @@ function getImageSize(modelId: string, ratio: string): string {
   return SEEDREAM_SIZE[ratio] ?? SEEDREAM_SIZE["1:1"];
 }
 
+function buildImageRequestBodies(params: {
+  modelId: string;
+  prompt: string;
+  mode: "t2i" | "i2i" | "i2i_text";
+  imageUrl?: string;
+  ratio: string;
+}): Record<string, unknown>[] {
+  const size = getImageSize(params.modelId, params.ratio);
+  const prompt = params.prompt?.trim();
+  const imageUrl = params.imageUrl?.trim();
+  const hasPrompt = Boolean(prompt);
+  const hasImage = Boolean(imageUrl);
+
+  // t2i: existing behavior
+  if (params.mode === "t2i" || !hasImage) {
+    return [{ prompt: prompt ?? "", size }];
+  }
+
+  // i2i / i2i_text: provider endpoints differ in image field naming.
+  const bodies: Record<string, unknown>[] = [];
+  const withPrompt = params.mode === "i2i_text" && hasPrompt;
+
+  const basePayloads: Record<string, unknown>[] = [
+    { image: imageUrl, size },
+    { image_url: imageUrl, size },
+    { input_image: imageUrl, size },
+    { images: [imageUrl], size },
+    { image_urls: [imageUrl], size },
+  ];
+
+  for (const payload of basePayloads) {
+    if (withPrompt) {
+      bodies.push({ prompt, ...payload });
+    } else {
+      bodies.push(payload);
+    }
+  }
+
+  // Some models may still require prompt even for i2i.
+  if (!withPrompt && hasPrompt) {
+    for (const payload of basePayloads) {
+      bodies.push({ prompt, ...payload });
+    }
+  }
+
+  return bodies;
+}
+
 /**
  * Submit an image generation task (always async — caller must poll urls.get).
  */
@@ -198,38 +274,18 @@ export async function submitImageTask(
 ): Promise<VideoTask> {
   const key = getApiKey();
   const ratio = params.aspectRatio ?? "1:1";
-  const size = getImageSize(params.modelId, ratio);
-
-  let body: Record<string, unknown> = {
+  const mode = params.mode ?? "t2i";
+  const bodies = buildImageRequestBodies({
+    modelId: params.modelId,
     prompt: params.prompt,
-    size,
-  };
-
-  let res = await fetch(`${WAVESPEED_BASE}/${params.modelId}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
+    mode,
+    imageUrl: params.imageUrl,
+    ratio,
   });
 
-  let json = await parseJsonSafe(res);
-  const msg = String(json.message ?? "").toLowerCase();
-  const requiresLargeSize =
-    msg.includes("image size must be at least 3686400 pixels");
-
-  // Safety retry for providers that recently increased minimum image size.
-  if (
-    (!res.ok || json.code !== 200) &&
-    requiresLargeSize &&
-    !needsLargeImageSize(params.modelId)
-  ) {
-    body = {
-      prompt: params.prompt,
-      size: WAN_IMAGE_SIZE[ratio] ?? WAN_IMAGE_SIZE["1:1"],
-    };
-    res = await fetch(`${WAVESPEED_BASE}/${params.modelId}`, {
+  let lastError = "Failed to generate image";
+  for (const body of bodies) {
+    let res = await fetch(`${WAVESPEED_BASE}/${params.modelId}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,
@@ -237,13 +293,41 @@ export async function submitImageTask(
       },
       body: JSON.stringify(body),
     });
-    json = await parseJsonSafe(res);
+
+    let json = await parseJsonSafe(res);
+    if (res.ok && json.code === 200) {
+      return json.data as VideoTask;
+    }
+
+    const msg = String(json.message ?? `WaveSpeed error ${res.status}`);
+    lastError = msg;
+    const lowerMsg = msg.toLowerCase();
+    const requiresLargeSize =
+      lowerMsg.includes("image size must be at least 3686400 pixels");
+
+    // Safety retry for providers that recently increased minimum image size.
+    if (requiresLargeSize && !needsLargeImageSize(params.modelId)) {
+      const upgradedBody = {
+        ...body,
+        size: WAN_IMAGE_SIZE[ratio] ?? WAN_IMAGE_SIZE["1:1"],
+      };
+      res = await fetch(`${WAVESPEED_BASE}/${params.modelId}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(upgradedBody),
+      });
+      json = await parseJsonSafe(res);
+      if (res.ok && json.code === 200) {
+        return json.data as VideoTask;
+      }
+      lastError = String(json.message ?? `WaveSpeed error ${res.status}`);
+    }
   }
 
-  if (!res.ok || json.code !== 200) {
-    throw new Error(String(json.message ?? `WaveSpeed error ${res.status}`));
-  }
-  return json.data as VideoTask;
+  throw new Error(lastError);
 }
 
 export const IMAGE_MODELS: {
@@ -251,6 +335,7 @@ export const IMAGE_MODELS: {
   label: string;
   description: string;
   tier: "fast" | "standard" | "premium";
+  mode?: "t2i" | "i2i" | "i2i_text";
 }[] = [
   {
     id: "bytedance/seedream-v4.5",
@@ -282,6 +367,55 @@ export const IMAGE_MODELS: {
     description: "Alibaba Wan 图片版",
     tier: "fast",
   },
+  {
+    id: "wavespeed-ai/uno",
+    label: "UNO",
+    description: "WaveSpeed 图像编辑（i2i / 图文）",
+    tier: "standard",
+    mode: "i2i_text",
+  },
+  {
+    id: "wavespeed-ai/real-esrgan",
+    label: "Real-ESRGAN",
+    description: "WaveSpeed 图像增强/超分（i2i）",
+    tier: "fast",
+    mode: "i2i",
+  },
+  {
+    id: "wavespeed-ai/flux-kontext-pro/multi",
+    label: "FLUX Kontext Pro Multi",
+    description: "多图上下文编辑（图文）",
+    tier: "premium",
+    mode: "i2i_text",
+  },
+];
+
+export const I2V_MODELS: {
+  id: string;
+  label: string;
+  description: string;
+  tier: "fast" | "standard" | "premium";
+  supportsAudio?: boolean;
+}[] = [
+  {
+    id: "wavespeed-ai/wan-2.2/i2v-480p-ultra-fast",
+    label: "Wan 2.2 i2v — 480p Fast",
+    description: "Fast & cheap · $0.05/video",
+    tier: "fast",
+  },
+  {
+    id: "wavespeed-ai/wan-2.2/i2v-720p",
+    label: "Wan 2.2 i2v — 720p",
+    description: "Higher resolution · $0.30/video",
+    tier: "standard",
+  },
+  {
+    id: "bytedance/seedance-v1.5-pro/image-to-video",
+    label: "Seedance 1.5 Pro i2v",
+    description: "Cinematic quality · ByteDance",
+    tier: "premium",
+    supportsAudio: true,
+  },
 ];
 
 export const VIDEO_MODELS: {
@@ -289,6 +423,7 @@ export const VIDEO_MODELS: {
   label: string;
   description: string;
   tier: "fast" | "standard" | "premium";
+  supportsAudio?: boolean;
 }[] = [
   {
     id: "wavespeed-ai/wan-2.2/t2v-480p-ultra-fast",
@@ -307,12 +442,14 @@ export const VIDEO_MODELS: {
     label: "Wan 2.6",
     description: "Latest Wan with audio · best quality",
     tier: "standard",
+    supportsAudio: true,
   },
   {
     id: "bytedance/seedance-v1.5-pro/text-to-video",
     label: "Seedance 1.5 Pro",
     description: "Cinematic quality · ByteDance",
     tier: "premium",
+    supportsAudio: true,
   },
   {
     id: "kwaivgi/kling-video-o3-std/text-to-video",

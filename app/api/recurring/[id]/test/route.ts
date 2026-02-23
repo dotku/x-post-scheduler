@@ -3,8 +3,11 @@ import { prisma } from "@/lib/db";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { getUserXCredentials } from "@/lib/user-credentials";
 import { generateTweet } from "@/lib/openai";
-import { trackTokenUsage } from "@/lib/usage-tracking";
-import { hasCredits, deductCredits } from "@/lib/credits";
+import { trackTokenUsage, trackWavespeedUsage } from "@/lib/usage-tracking";
+import { hasCredits, deductCredits, getCreditBalance, getWavespeedFeeCents, deductWavespeedCredits } from "@/lib/credits";
+import { decodeRecurringAiPrompt } from "@/lib/recurring-ai";
+import { submitImageTask } from "@/lib/wavespeed";
+import { waitForImageOutput } from "@/lib/scheduler";
 
 export async function POST(
   request: NextRequest,
@@ -42,6 +45,9 @@ export async function POST(
     );
   }
 
+  const decodedAiPrompt = decodeRecurringAiPrompt(schedule.aiPrompt);
+  const imageModelId = decodedAiPrompt.imageModelId;
+
   if (!schedule.useAi) {
     return NextResponse.json({
       success: true,
@@ -73,7 +79,7 @@ export async function POST(
 
   const generated = await generateTweet(
     knowledgeContext,
-    schedule.aiPrompt || undefined,
+    decodedAiPrompt.prompt || undefined,
     schedule.aiLanguage || undefined
   );
 
@@ -104,9 +110,54 @@ export async function POST(
     );
   }
 
+  const responseContent = generated.content!;
+
+  // Generate image if an image model is configured
+  if (imageModelId) {
+    try {
+      const imageFeeCents = getWavespeedFeeCents(imageModelId, "image");
+      const balance = await getCreditBalance(user.id);
+      if (balance < imageFeeCents) {
+        return NextResponse.json({
+          success: true,
+          mode: "ai",
+          content: responseContent,
+          imageError: `Insufficient credits for image generation (need $${(imageFeeCents / 100).toFixed(2)})`,
+        });
+      }
+
+      const task = await submitImageTask({ modelId: imageModelId, prompt: responseContent, aspectRatio: "16:9" });
+      const pollKey = task.outputs?.[0] ? task.id : task.urls?.get || task.id;
+      const settled = task.outputs?.[0]
+        ? { outputUrl: task.outputs[0], taskId: task.id }
+        : await waitForImageOutput(pollKey);
+
+      try {
+        await deductWavespeedCredits({ userId: user.id, modelId: imageModelId, mediaType: "image", source: "recurring_item_test_image", taskId: settled.taskId });
+        await trackWavespeedUsage({ userId: user.id, source: "recurring_item_test_image", model: imageModelId, prompt: responseContent, metadata: { scheduleId: schedule.id, taskId: settled.taskId } });
+      } catch (usageErr) {
+        console.error("Failed to track/deduct test image usage:", usageErr);
+      }
+
+      return NextResponse.json({
+        success: true,
+        mode: "ai",
+        content: responseContent,
+        imageUrl: settled.outputUrl,
+      });
+    } catch (imgErr) {
+      return NextResponse.json({
+        success: true,
+        mode: "ai",
+        content: responseContent,
+        imageError: imgErr instanceof Error ? imgErr.message : "Image generation failed",
+      });
+    }
+  }
+
   return NextResponse.json({
     success: true,
     mode: "ai",
-    content: generated.content,
+    content: responseContent,
   });
 }

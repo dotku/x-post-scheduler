@@ -33,6 +33,7 @@ model User {
   knowledgeImages    KnowledgeImage[]
   creditTransactions CreditTransaction[]
   galleryItems       GalleryItem[]
+  webVisits          WebVisit[]
 }
 
 model CronRunEvent {
@@ -208,6 +209,8 @@ model GalleryItem {
   prompt      String
   blobUrl     String   // Vercel Blob permanent URL
   sourceUrl   String   // original WaveSpeed URL
+  inputImageUrl String?
+  generationMeta String?
   aspectRatio String?
   mimeType    String   @default("image/jpeg")
   isPublic    Boolean  @default(true)
@@ -218,4 +221,22 @@ model GalleryItem {
 
   @@index([userId, createdAt])
   @@index([isPublic, createdAt])
+}
+
+model WebVisit {
+  id        String   @id @default(cuid())
+  path      String
+  referrer  String?
+  sessionId String?
+  userAgent String?
+  country   String?
+  createdAt DateTime @default(now())
+
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([path, createdAt])
+  @@index([sessionId, createdAt])
+  @@index([userId, createdAt])
 }

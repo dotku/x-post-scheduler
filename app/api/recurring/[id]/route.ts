@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { getUserXCredentials } from "@/lib/user-credentials";
+import { IMAGE_MODELS } from "@/lib/wavespeed";
+import { decodeRecurringAiPrompt, encodeRecurringAiPrompt } from "@/lib/recurring-ai";
 
 export async function DELETE(
   request: NextRequest,
@@ -47,6 +49,7 @@ export async function PATCH(
     useAi?: boolean;
     aiPrompt?: string | null;
     aiLanguage?: string | null;
+    imageModelId?: string | null;
     xAccountId?: string | null;
   } = {};
 
@@ -85,6 +88,23 @@ export async function PATCH(
       );
     }
     updateData.aiPrompt = aiPrompt || null;
+  }
+
+  if ("imageModelId" in body) {
+    const imageModelId =
+      typeof body.imageModelId === "string" ? body.imageModelId.trim() : "";
+    if (imageModelId) {
+      const validModel = IMAGE_MODELS.find((model) => model.id === imageModelId);
+      if (!validModel) {
+        return NextResponse.json(
+          { error: "Invalid image model selection" },
+          { status: 400 }
+        );
+      }
+      updateData.imageModelId = imageModelId;
+    } else {
+      updateData.imageModelId = null;
+    }
   }
 
   if ("aiLanguage" in body) {
@@ -140,9 +160,42 @@ export async function PATCH(
     }
   }
 
+  // Image model is stored as prompt metadata for backward-compatible schema.
+  if (
+    "aiPrompt" in updateData ||
+    "imageModelId" in updateData ||
+    ("useAi" in updateData && !updateData.useAi)
+  ) {
+    const existingDecoded = decodeRecurringAiPrompt(existing.aiPrompt);
+    const nextUseAi =
+      "useAi" in updateData ? Boolean(updateData.useAi) : existing.useAi;
+
+    if (!nextUseAi) {
+      updateData.aiPrompt = null;
+    } else {
+      const nextPrompt =
+        "aiPrompt" in updateData ? updateData.aiPrompt : existingDecoded.prompt;
+      const nextImageModelId =
+        "imageModelId" in updateData
+          ? updateData.imageModelId
+          : existingDecoded.imageModelId;
+      updateData.aiPrompt = encodeRecurringAiPrompt({
+        prompt: nextPrompt,
+        imageModelId: nextImageModelId,
+      });
+    }
+  }
+
+  delete updateData.imageModelId;
+
   const schedule = await prisma.recurringSchedule.update({
     where: { id },
     data: updateData,
   });
-  return NextResponse.json(schedule);
+  const decoded = decodeRecurringAiPrompt(schedule.aiPrompt);
+  return NextResponse.json({
+    ...schedule,
+    aiPrompt: decoded.prompt,
+    imageModelId: decoded.imageModelId,
+  });
 }

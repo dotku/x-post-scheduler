@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
+import { isGuestSessionUser, requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { saveToGallery } from "@/lib/gallery";
 import { prisma } from "@/lib/db";
 
@@ -29,13 +29,26 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { type, modelId, modelLabel, prompt, sourceUrl, aspectRatio } = body as {
+  const {
+    type,
+    modelId,
+    modelLabel,
+    prompt,
+    sourceUrl,
+    inputImageUrl,
+    generationMeta,
+    aspectRatio,
+    isPublic,
+  } = body as {
     type: "image" | "video";
     modelId: string;
     modelLabel: string;
     prompt: string;
     sourceUrl: string;
+    inputImageUrl?: string;
+    generationMeta?: unknown;
     aspectRatio?: string;
+    isPublic?: boolean;
   };
 
   if (!sourceUrl || !prompt || !modelId) {
@@ -43,6 +56,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const isGuest = await isGuestSessionUser();
     const item = await saveToGallery({
       userId: user.id,
       type,
@@ -50,7 +64,10 @@ export async function POST(request: NextRequest) {
       modelLabel,
       prompt,
       sourceUrl,
+      inputImageUrl: inputImageUrl?.trim() || undefined,
+      generationMeta,
       aspectRatio,
+      isPublic: isGuest ? true : typeof isPublic === "boolean" ? isPublic : true,
     });
     return NextResponse.json({ item });
   } catch (error) {

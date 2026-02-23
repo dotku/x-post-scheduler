@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Auth0Provider } from "@auth0/nextjs-auth0/client";
 import { Analytics } from "@vercel/analytics/next";
+import PageviewTracker from "@/components/PageviewTracker";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,6 +32,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Auth0Provider>{children}</Auth0Provider>
+        <Suspense fallback={null}>
+          <PageviewTracker />
+        </Suspense>
         <Analytics />
       </body>
     </html>

@@ -158,8 +158,8 @@ export default function GeneratePage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
               AI Content Generator
             </h1>
             <Link
@@ -172,7 +172,7 @@ export default function GeneratePage() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Generation Form */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -346,7 +346,7 @@ export default function GeneratePage() {
         {mediaAssetId && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Attached Image
                 </h2>

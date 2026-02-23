@@ -38,6 +38,15 @@ interface UsageSummary {
     completionTokens: number;
     totalTokens: number;
   };
+  byModel?: {
+    provider: string;
+    model: string;
+    requests: number;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    estimatedCostCents: number;
+  }[];
 }
 
 interface CreditData {
@@ -51,6 +60,8 @@ interface CreditData {
     createdAt: string;
   }[];
 }
+
+type AppLanguage = "en" | "zh";
 
 export default function SettingsPage() {
   const { user, isLoading: authLoading } = useUser();
@@ -75,12 +86,24 @@ export default function SettingsPage() {
   const [xAccessToken, setXAccessToken] = useState("");
   const [xAccessTokenSecret, setXAccessTokenSecret] = useState("");
   const [setAsDefault, setSetAsDefault] = useState(true);
+  const [appLanguage, setAppLanguage] = useState<AppLanguage>("en");
 
   useEffect(() => {
     if (!authLoading && user) {
       void fetchData();
     }
   }, [authLoading, user]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("app-lang") || localStorage.getItem("gallery-lang");
+    if (saved === "zh" || saved === "en") {
+      setAppLanguage(saved);
+      return;
+    }
+    if (navigator.language.toLowerCase().startsWith("zh")) {
+      setAppLanguage("zh");
+    }
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -322,6 +345,15 @@ export default function SettingsPage() {
     }
   }
 
+  function handleSaveLanguage() {
+    localStorage.setItem("app-lang", appLanguage);
+    localStorage.setItem("gallery-lang", appLanguage);
+    setMessage({
+      type: "success",
+      text: appLanguage === "zh" ? "语言已更新为中文。" : "Language updated to English.",
+    });
+  }
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -352,8 +384,8 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
               Settings
             </h1>
             <Link
@@ -366,7 +398,33 @@ export default function SettingsPage() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Language
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Choose your preferred language for supported pages.
+          </p>
+          <div className="mt-4 flex flex-col sm:flex-row gap-3">
+            <select
+              value={appLanguage}
+              onChange={(e) => setAppLanguage(e.target.value as AppLanguage)}
+              className="w-full sm:w-56 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="en">English</option>
+              <option value="zh">简体中文</option>
+            </select>
+            <button
+              type="button"
+              onClick={handleSaveLanguage}
+              className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Save Language
+            </button>
+          </div>
+        </div>
+
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
@@ -563,7 +621,7 @@ export default function SettingsPage() {
             <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Current Balance</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                   ${(credits.balanceCents / 100).toFixed(2)}
                 </p>
               </div>
@@ -587,7 +645,7 @@ export default function SettingsPage() {
                 </p>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
                   {credits.transactions.map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between text-sm py-1">
+                    <div key={tx.id} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-sm py-1">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className={`font-mono font-medium shrink-0 ${tx.amountCents >= 0 ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}>
                           {tx.amountCents >= 0 ? "+" : ""}${(tx.amountCents / 100).toFixed(2)}
@@ -644,6 +702,36 @@ export default function SettingsPage() {
                 {usage.allTime.totalTokens.toLocaleString()}
               </span>
             </p>
+            {(usage.byModel?.length ?? 0) > 0 && (
+              <div className="mt-5">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Cost by Model ({usage.rangeDays}d, estimated)
+                </p>
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {usage.byModel!.map((item) => (
+                    <div
+                      key={`${item.provider}:${item.model}`}
+                      className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm text-gray-900 dark:text-white break-all">
+                          <span className="text-xs uppercase text-gray-500 dark:text-gray-400 mr-2">
+                            {item.provider}
+                          </span>
+                          {item.model}
+                        </p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                          ${(item.estimatedCostCents / 100).toFixed(2)}
+                        </p>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {item.requests.toLocaleString()} req • {item.totalTokens.toLocaleString()} tokens
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -660,7 +748,7 @@ export default function SettingsPage() {
         )}
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Add X Account
             </h2>

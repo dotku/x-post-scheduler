@@ -2,9 +2,45 @@ import { prisma } from "./db";
 import { postTweet, postTweetWithMedia } from "./x-client";
 import { getUserXCredentials } from "./user-credentials";
 import { generateTweet } from "./openai";
-import { trackTokenUsage } from "./usage-tracking";
-import { hasCredits, deductCredits } from "./credits";
+import { trackTokenUsage, trackWavespeedUsage } from "./usage-tracking";
+import {
+  hasCredits,
+  deductCredits,
+  deductWavespeedCredits,
+  getCreditBalance,
+  getWavespeedFeeCents,
+} from "./credits";
 import { addDays, addWeeks, addMonths } from "date-fns";
+import { decodeRecurringAiPrompt } from "./recurring-ai";
+import { submitImageTask, getVideoTask } from "./wavespeed";
+
+async function fetchBinary(url: string): Promise<{ buffer: Buffer; mimeType: string }> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch generated image (${response.status})`);
+  }
+  const mimeType = (response.headers.get("content-type") || "image/jpeg")
+    .split(";")[0]
+    .trim();
+  return {
+    buffer: Buffer.from(await response.arrayBuffer()),
+    mimeType,
+  };
+}
+
+export async function waitForImageOutput(taskIdOrUrl: string) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const task = await getVideoTask(taskIdOrUrl);
+    if (task.status === "completed" && task.outputs?.[0]) {
+      return { outputUrl: task.outputs[0], taskId: task.id };
+    }
+    if (task.status === "failed") {
+      throw new Error(task.error || "Image generation failed");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+  throw new Error("Image generation timed out");
+}
 
 export async function processScheduledPosts() {
   const now = new Date();
@@ -101,6 +137,8 @@ export async function processRecurringSchedules() {
 
     let contentToPost = schedule.content;
     let generationError: string | null = null;
+    const decodedAiPrompt = decodeRecurringAiPrompt(schedule.aiPrompt);
+    const imageModelId = decodedAiPrompt.imageModelId;
 
     if (schedule.useAi) {
       const userHasCredits = await hasCredits(schedule.userId!);
@@ -136,7 +174,7 @@ export async function processRecurringSchedules() {
 
           const generated = await generateTweet(
             knowledgeContext,
-            schedule.aiPrompt || undefined,
+            decodedAiPrompt.prompt || undefined,
             schedule.aiLanguage || undefined,
             recentPosts
           );
@@ -169,10 +207,74 @@ export async function processRecurringSchedules() {
         }
       }
     }
+    let result:
+      | { success: true; tweetId?: string; error?: string }
+      | { success: false; tweetId?: string | null; error?: string | null };
+    if (generationError) {
+      result = { success: false as const, error: generationError, tweetId: null };
+    } else if (imageModelId) {
+      try {
+        const imageFeeCents = getWavespeedFeeCents(imageModelId, "image");
+        const balance = await getCreditBalance(schedule.userId!);
+        if (balance < imageFeeCents) {
+          throw new Error(
+            `Insufficient credits for recurring image generation (need $${(
+              imageFeeCents / 100
+            ).toFixed(2)})`
+          );
+        }
 
-    const result = generationError
-      ? { success: false as const, error: generationError, tweetId: null }
-      : await postTweet(contentToPost, resolved.credentials);
+        const task = await submitImageTask({
+          modelId: imageModelId,
+          prompt: contentToPost,
+          aspectRatio: "16:9",
+        });
+        const pollKey = task.outputs?.[0] ? task.id : task.urls?.get || task.id;
+        const settled = task.outputs?.[0]
+          ? { outputUrl: task.outputs[0], taskId: task.id }
+          : await waitForImageOutput(pollKey);
+        const media = await fetchBinary(settled.outputUrl);
+        result = await postTweetWithMedia(
+          contentToPost,
+          media.buffer,
+          media.mimeType,
+          resolved.credentials
+        );
+
+        if (result.success) {
+          try {
+            await deductWavespeedCredits({
+              userId: schedule.userId!,
+              modelId: imageModelId,
+              mediaType: "image",
+              source: "recurring_scheduler_image",
+              taskId: settled.taskId,
+            });
+            await trackWavespeedUsage({
+              userId: schedule.userId!,
+              source: "recurring_scheduler_image",
+              model: imageModelId,
+              prompt: contentToPost,
+              metadata: {
+                scheduleId: schedule.id,
+                taskId: settled.taskId,
+                aspectRatio: "16:9",
+              },
+            });
+          } catch (usageError) {
+            console.error("Failed to track/deduct recurring image usage:", usageError);
+          }
+        }
+      } catch (error) {
+        result = {
+          success: false,
+          error: error instanceof Error ? error.message : "Recurring image generation failed",
+          tweetId: null,
+        };
+      }
+    } else {
+      result = await postTweet(contentToPost, resolved.credentials);
+    }
 
     await prisma.post.create({
       data: {

@@ -10,6 +10,7 @@ interface RecurringSchedule {
   content: string;
   useAi: boolean;
   aiPrompt: string | null;
+  imageModelId?: string | null;
   aiLanguage: string | null;
   xAccountId: string | null;
   frequency: string;
@@ -25,6 +26,15 @@ interface RecurringUsageSummary {
   completionTokens: number;
   totalTokens: number;
 }
+
+const IMAGE_MODELS = [
+  { id: "", label: "No image (text only)" },
+  { id: "bytedance/seedream-v4.5", label: "Seedream 4.5" },
+  { id: "bytedance/seedream-v4", label: "Seedream 4" },
+  { id: "bytedance/dreamina-v3.1/text-to-image", label: "Dreamina 3.1" },
+  { id: "wavespeed-ai/qwen-image/text-to-image", label: "Qwen Image" },
+  { id: "alibaba/wan-2.6/text-to-image", label: "Wan 2.6 Image" },
+];
 
 export default function RecurringPage() {
   const router = useRouter();
@@ -46,6 +56,7 @@ export default function RecurringPage() {
   const [useAi, setUseAi] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLanguage, setAiLanguage] = useState("");
+  const [imageModelId, setImageModelId] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">(
     "daily"
@@ -55,8 +66,13 @@ export default function RecurringPage() {
   const [isGeneratingSample, setIsGeneratingSample] = useState(false);
   const [sampleContent, setSampleContent] = useState("");
   const [testingScheduleId, setTestingScheduleId] = useState<string | null>(null);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [editAiPrompt, setEditAiPrompt] = useState("");
+  const [editImageModelId, setEditImageModelId] = useState("");
+  const [updatingScheduleId, setUpdatingScheduleId] = useState<string | null>(null);
+  const [editError, setEditError] = useState("");
   const [scheduleTestResults, setScheduleTestResults] = useState<
-    Record<string, { content?: string; error?: string }>
+    Record<string, { content?: string; error?: string; imageUrl?: string; imageError?: string }>
   >({});
   const [error, setError] = useState("");
 
@@ -145,6 +161,7 @@ export default function RecurringPage() {
           useAi,
           aiPrompt: aiPrompt || undefined,
           aiLanguage: aiLanguage || undefined,
+          imageModelId: imageModelId || undefined,
           xAccountId: selectedAccountId,
           frequency,
           cronExpr: time,
@@ -160,6 +177,7 @@ export default function RecurringPage() {
       setUseAi(false);
       setAiPrompt("");
       setAiLanguage("");
+      setImageModelId("");
       setFrequency("daily");
       setTime("09:00");
       void fetchAccounts();
@@ -178,7 +196,7 @@ export default function RecurringPage() {
 
     if (!useAi) {
       if (!content.trim()) {
-        setError("Please enter recurring content first");
+        setError("Please enter post content first");
         return;
       }
       setSampleContent(content.trim());
@@ -225,6 +243,46 @@ export default function RecurringPage() {
     fetchSchedules();
   };
 
+  const handleStartEdit = (schedule: RecurringSchedule) => {
+    if (!schedule.useAi) return;
+    setEditError("");
+    setEditingScheduleId(schedule.id);
+    setEditAiPrompt(schedule.aiPrompt || "");
+    setEditImageModelId(schedule.imageModelId || "");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingScheduleId(null);
+    setEditAiPrompt("");
+    setEditImageModelId("");
+    setEditError("");
+  };
+
+  const handleUpdateAiConfig = async (scheduleId: string) => {
+    setEditError("");
+    setUpdatingScheduleId(scheduleId);
+    try {
+      const res = await fetch(`/api/recurring/${scheduleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          aiPrompt: editAiPrompt,
+          imageModelId: editImageModelId,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update schedule");
+      }
+      await fetchSchedules();
+      handleCancelEdit();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Failed to update schedule");
+    } finally {
+      setUpdatingScheduleId(null);
+    }
+  };
+
   const handleTestSchedule = async (id: string) => {
     setTestingScheduleId(id);
     setScheduleTestResults((prev) => ({ ...prev, [id]: {} }));
@@ -239,7 +297,11 @@ export default function RecurringPage() {
 
       setScheduleTestResults((prev) => ({
         ...prev,
-        [id]: { content: data.content || "" },
+        [id]: {
+          content: data.content || "",
+          imageUrl: data.imageUrl || undefined,
+          imageError: data.imageError || undefined,
+        },
       }));
     } catch (err) {
       setScheduleTestResults((prev) => ({
@@ -257,9 +319,9 @@ export default function RecurringPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Recurring Posts
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+              Auto Post
             </h1>
             <Link
               href="/dashboard"
@@ -271,7 +333,7 @@ export default function RecurringPage() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
             <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -283,7 +345,7 @@ export default function RecurringPage() {
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
             <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-              Recurring Token Usage
+              Auto Post Token Usage
             </p>
             <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
               {recurringUsage.totalTokens.toLocaleString()} tokens
@@ -302,7 +364,7 @@ export default function RecurringPage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Create Recurring Schedule
+              Create Auto Post
             </h2>
           </div>
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -422,6 +484,29 @@ export default function RecurringPage() {
                     placeholder="Example: English or Chinese"
                   />
                 </div>
+                <div>
+                  <label
+                    htmlFor="imageModelId"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
+                    Image Model (Optional)
+                  </label>
+                  <select
+                    id="imageModelId"
+                    value={imageModelId}
+                    onChange={(e) => setImageModelId(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  >
+                    {IMAGE_MODELS.map((model) => (
+                      <option key={model.id || "none"} value={model.id}>
+                        {model.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    If selected, each auto post will auto-generate an image before posting.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -518,7 +603,7 @@ export default function RecurringPage() {
           ) : schedules.length === 0 ? (
             <div className="p-6 text-center">
               <p className="text-gray-500 dark:text-gray-400">
-                No recurring schedules yet. Create one above!
+                No auto posts yet. Create one above!
               </p>
             </div>
           ) : (
@@ -538,6 +623,13 @@ export default function RecurringPage() {
                       <span>
                         {schedule.useAi ? "AI" : "Fixed"}
                       </span>
+                      {schedule.imageModelId && (
+                        <span>
+                          Image:{" "}
+                          {IMAGE_MODELS.find((m) => m.id === schedule.imageModelId)?.label ??
+                            schedule.imageModelId}
+                        </span>
+                      )}
                       <span className="capitalize">{schedule.frequency}</span>
                       <span>at {schedule.cronExpr}</span>
                       <span>
@@ -545,13 +637,33 @@ export default function RecurringPage() {
                       </span>
                     </div>
                     {scheduleTestResults[schedule.id]?.content && (
-                      <div className="mt-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg p-3">
-                        <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
-                          Test Output
-                        </p>
-                        <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">
-                          {scheduleTestResults[schedule.id].content}
-                        </p>
+                      <div className="mt-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-lg p-3 space-y-3">
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+                            Test Output
+                          </p>
+                          <p className="text-sm text-gray-900 dark:text-white whitespace-pre-wrap">
+                            {scheduleTestResults[schedule.id].content}
+                          </p>
+                        </div>
+                        {scheduleTestResults[schedule.id].imageUrl && (
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+                              Generated Image
+                            </p>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={scheduleTestResults[schedule.id].imageUrl}
+                              alt="Test generated image"
+                              className="w-full rounded-lg border border-gray-200 dark:border-gray-700 max-h-64 object-contain"
+                            />
+                          </div>
+                        )}
+                        {scheduleTestResults[schedule.id].imageError && (
+                          <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                            Image: {scheduleTestResults[schedule.id].imageError}
+                          </p>
+                        )}
                       </div>
                     )}
                     {scheduleTestResults[schedule.id]?.error && (
@@ -559,8 +671,72 @@ export default function RecurringPage() {
                         {scheduleTestResults[schedule.id].error}
                       </p>
                     )}
+
+                    {editingScheduleId === schedule.id && schedule.useAi && (
+                      <div className="mt-3 border border-gray-200 dark:border-gray-600 rounded-lg p-3 space-y-3 bg-gray-50 dark:bg-gray-700/40">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                            AI Prompt
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={editAiPrompt}
+                            onChange={(e) => setEditAiPrompt(e.target.value)}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
+                            placeholder="Update AI prompt (optional)"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                            Image Model (Optional)
+                          </label>
+                          <select
+                            value={editImageModelId}
+                            onChange={(e) => setEditImageModelId(e.target.value)}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                          >
+                            {IMAGE_MODELS.map((model) => (
+                              <option key={model.id || "none"} value={model.id}>
+                                {model.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {editError && (
+                          <p className="text-sm text-red-600 dark:text-red-400">{editError}</p>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleUpdateAiConfig(schedule.id)}
+                            disabled={updatingScheduleId === schedule.id}
+                            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                          >
+                            {updatingScheduleId === schedule.id ? "Saving..." : "Save"}
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            disabled={updatingScheduleId === schedule.id}
+                            className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-wrap items-center gap-3 shrink-0">
+                    {schedule.useAi && (
+                      <button
+                        onClick={() =>
+                          editingScheduleId === schedule.id
+                            ? handleCancelEdit()
+                            : handleStartEdit(schedule)
+                        }
+                        className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+                      >
+                        {editingScheduleId === schedule.id ? "Close Edit" : "Edit"}
+                      </button>
+                    )}
                     <button
                       onClick={() => handleTestSchedule(schedule.id)}
                       disabled={testingScheduleId === schedule.id}

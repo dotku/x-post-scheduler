@@ -9,13 +9,33 @@ const PRICING: Record<string, { inputPer1M: number; outputPer1M: number }> = {
 const DEFAULT_MODEL = "gpt-4o";
 const MARKUP_MULTIPLIER = 60;
 
+function parsePositiveMultiplier(raw: string | undefined, fallback: number) {
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
 /** Flat fee in cents for agent service calls (no per-token data available). */
 export const AGENT_FLAT_FEE_CENTS = 5;
 
-const WAVESPEED_DEFAULT_IMAGE_FEE_CENTS = 5; // $0.05
-const WAVESPEED_DEFAULT_VIDEO_FEE_CENTS = 30; // $0.30
+const WAVESPEED_CHARGE_MULTIPLIER = parsePositiveMultiplier(
+  process.env.WAVESPEED_CHARGE_MULTIPLIER,
+  MARKUP_MULTIPLIER
+);
+const WAVESPEED_IMAGE_CHARGE_MULTIPLIER = parsePositiveMultiplier(
+  process.env.WAVESPEED_IMAGE_CHARGE_MULTIPLIER,
+  WAVESPEED_CHARGE_MULTIPLIER
+);
+const WAVESPEED_VIDEO_CHARGE_MULTIPLIER = parsePositiveMultiplier(
+  process.env.WAVESPEED_VIDEO_CHARGE_MULTIPLIER,
+  WAVESPEED_CHARGE_MULTIPLIER
+);
 
-const WAVESPEED_MODEL_FEE_CENTS: Record<string, number> = {
+const WAVESPEED_DEFAULT_IMAGE_BASE_COST_CENTS = 5; // $0.05
+const WAVESPEED_DEFAULT_VIDEO_BASE_COST_CENTS = 30; // $0.30
+
+const WAVESPEED_MODEL_BASE_COST_CENTS: Record<string, number> = {
   // image
   "bytedance/seedream-v4.5": 4, // $0.04
   "bytedance/seedream-v4": 4, // keep aligned with 4.5
@@ -67,12 +87,16 @@ export function getWavespeedFeeCents(
   modelId: string,
   mediaType: "image" | "video"
 ): number {
-  return (
-    WAVESPEED_MODEL_FEE_CENTS[modelId] ??
+  const baseCostCents =
+    WAVESPEED_MODEL_BASE_COST_CENTS[modelId] ??
     (mediaType === "video"
-      ? WAVESPEED_DEFAULT_VIDEO_FEE_CENTS
-      : WAVESPEED_DEFAULT_IMAGE_FEE_CENTS)
-  );
+      ? WAVESPEED_DEFAULT_VIDEO_BASE_COST_CENTS
+      : WAVESPEED_DEFAULT_IMAGE_BASE_COST_CENTS);
+  const multiplier =
+    mediaType === "video"
+      ? WAVESPEED_VIDEO_CHARGE_MULTIPLIER
+      : WAVESPEED_IMAGE_CHARGE_MULTIPLIER;
+  return Math.max(1, Math.ceil(baseCostCents * multiplier));
 }
 
 /**

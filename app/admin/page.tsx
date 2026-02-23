@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
+import { getWavespeedFeeCents } from "@/lib/credits";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,11 @@ function estimateOpenAICostUsd(params: {
   const inputCost = (params.promptTokens / 1_000_000) * pricing.input;
   const outputCost = (params.completionTokens / 1_000_000) * pricing.output;
   return inputCost + outputCost;
+}
+
+function toCountNumber(value: bigint | number | null | undefined) {
+  if (typeof value === "bigint") return Number(value);
+  return value ?? 0;
 }
 
 function toNumber(value: unknown): number | null {
@@ -40,6 +46,31 @@ function readNumberByKeys(
     if (value !== null) return value;
   }
   return null;
+}
+
+function isMissingWebVisitRelationError(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { message?: unknown; meta?: unknown };
+  const message = typeof candidate.message === "string" ? candidate.message : "";
+  const meta = JSON.stringify(candidate.meta ?? {});
+  return (
+    message.includes("42P01") ||
+    message.includes('relation "WebVisit" does not exist') ||
+    meta.includes("42P01")
+  );
+}
+
+function inferWavespeedMediaType(modelId: string): "image" | "video" {
+  const id = modelId.toLowerCase();
+  if (
+    id.includes("video") ||
+    id.includes("/t2v") ||
+    id.includes("/i2v") ||
+    id.includes("seedance")
+  ) {
+    return "video";
+  }
+  return "image";
 }
 
 async function fetchWavespeedUsage(rangeDays = 30) {
@@ -143,6 +174,12 @@ export default async function AdminPage() {
     wavespeedUsage,
     openAiUsage30d,
     openAiByModel30d,
+    wavespeedByModel30d,
+    revenue24hAgg,
+    revenue30dAgg,
+    revenueAllTimeAgg,
+    payingUsers30d,
+    payingUsersAllTime,
   ] = await Promise.all([
     prisma.cronRunEvent.count({ where: { createdAt: { gte: since24h } } }),
     prisma.cronRunEvent.count({ where: { createdAt: { gte: since7d } } }),
@@ -207,11 +244,129 @@ export default async function AdminPage() {
       orderBy: { _sum: { totalTokens: "desc" } },
       take: 8,
     }),
+    prisma.usageEvent.groupBy({
+      by: ["model"],
+      where: {
+        provider: "wavespeed",
+        createdAt: { gte: since30d },
+      },
+      _count: { _all: true },
+      orderBy: { _count: { model: "desc" } },
+      take: 50,
+    }),
+    prisma.creditTransaction.aggregate({
+      where: {
+        type: "topup",
+        amountCents: { gt: 0 },
+        createdAt: { gte: since24h },
+      },
+      _sum: { amountCents: true },
+      _count: { _all: true },
+    }),
+    prisma.creditTransaction.aggregate({
+      where: {
+        type: "topup",
+        amountCents: { gt: 0 },
+        createdAt: { gte: since30d },
+      },
+      _sum: { amountCents: true },
+      _count: { _all: true },
+    }),
+    prisma.creditTransaction.aggregate({
+      where: {
+        type: "topup",
+        amountCents: { gt: 0 },
+      },
+      _sum: { amountCents: true },
+      _count: { _all: true },
+    }),
+    prisma.creditTransaction.findMany({
+      where: {
+        type: "topup",
+        amountCents: { gt: 0 },
+        createdAt: { gte: since30d },
+      },
+      distinct: ["userId"],
+      select: { userId: true },
+    }),
+    prisma.creditTransaction.findMany({
+      where: {
+        type: "topup",
+        amountCents: { gt: 0 },
+      },
+      distinct: ["userId"],
+      select: { userId: true },
+    }),
   ]);
 
-  const successRate7d = runs7d > 0 ? (success7d / runs7d) * 100 : 0;
+  let webVisits24h = 0;
+  let webVisits30d = 0;
+  let topPages30d: Array<{ path: string; visits: bigint }> = [];
+  try {
+    const hasWebVisitTable = await prisma.$queryRaw<Array<{ exists: string | null }>>`
+      SELECT to_regclass('public."WebVisit"')::text AS exists
+    `;
+    if (hasWebVisitTable[0]?.exists) {
+      const [webVisits24hResult, webVisits30dResult, topPages] = await Promise.all([
+        prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*)::bigint AS count
+          FROM "WebVisit"
+          WHERE "createdAt" >= ${since24h}
+        `,
+        prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*)::bigint AS count
+          FROM "WebVisit"
+          WHERE "createdAt" >= ${since30d}
+        `,
+        prisma.$queryRaw<Array<{ path: string; visits: bigint }>>`
+          SELECT "path", COUNT(*)::bigint AS visits
+          FROM "WebVisit"
+          WHERE "createdAt" >= ${since30d}
+          GROUP BY "path"
+          ORDER BY visits DESC
+          LIMIT 10
+        `,
+      ]);
+      webVisits24h = toCountNumber(webVisits24hResult[0]?.count);
+      webVisits30d = toCountNumber(webVisits30dResult[0]?.count);
+      topPages30d = topPages;
+    }
+  } catch (error) {
+    if (!isMissingWebVisitRelationError(error)) {
+      console.error("Failed to load Website Traffic stats:", error);
+    }
+  }
+  const revenue24hCents = revenue24hAgg._sum.amountCents ?? 0;
+  const revenue30dCents = revenue30dAgg._sum.amountCents ?? 0;
+  const revenueAllTimeCents = revenueAllTimeAgg._sum.amountCents ?? 0;
+  const payingUsers30dCount = payingUsers30d.length;
+  const payingUsersAllTimeCount = payingUsersAllTime.length;
+  const arppu30dCents = payingUsers30dCount > 0 ? Math.round(revenue30dCents / payingUsers30dCount) : 0;
   const openAiPromptTokens30d = openAiUsage30d._sum.promptTokens ?? 0;
   const openAiCompletionTokens30d = openAiUsage30d._sum.completionTokens ?? 0;
+  const openAiCharge30dCents = Math.max(
+    1,
+    Math.ceil(
+      ((openAiPromptTokens30d / 1_000_000) * 250 + (openAiCompletionTokens30d / 1_000_000) * 1000) *
+        60
+    )
+  );
+  const wavespeedCharge30dCents = (wavespeedByModel30d as Array<{ model: string | null; _count: { _all: number } }>).reduce((sum, row) => {
+    const modelId = row.model ?? "";
+    if (!modelId) return sum;
+    const fee = getWavespeedFeeCents(modelId, inferWavespeedMediaType(modelId));
+    return sum + fee * row._count._all;
+  }, 0);
+  const usageBilled30dCents = openAiCharge30dCents + wavespeedCharge30dCents;
+  const usageRunRatePerDayCents = usageBilled30dCents / 30;
+  const estRevenue7dCents = Math.round(usageRunRatePerDayCents * 7);
+  const estRevenue30dCents = Math.round(usageRunRatePerDayCents * 30);
+  const estRevenue90dCents = Math.round(usageRunRatePerDayCents * 90);
+  const estRevenue12mCents = Math.round(usageRunRatePerDayCents * 365);
+  const promoCostPerUserCents = 500;
+  const promoCostTotalCents = totalUsers * promoCostPerUserCents;
+
+  const successRate7d = runs7d > 0 ? (success7d / runs7d) * 100 : 0;
   const openAiTotalTokens30d = openAiUsage30d._sum.totalTokens ?? 0;
   const openAiRequests30d = openAiUsage30d._count._all;
   const openAiCostUsd30d = estimateOpenAICostUsd({
@@ -219,12 +374,32 @@ export default async function AdminPage() {
     promptTokens: openAiPromptTokens30d,
     completionTokens: openAiCompletionTokens30d,
   });
+  const wavespeedCostUsd30d =
+    wavespeedUsage.enabled && wavespeedUsage.available ? wavespeedUsage.summary.totalCostUsd : 0;
+  const estimatedCost30dCents = Math.round((openAiCostUsd30d + wavespeedCostUsd30d) * 100);
+  const costRunRatePerDayCents = estimatedCost30dCents / 30;
+  const estCost7dCents = Math.round(costRunRatePerDayCents * 7);
+  const estCost30dCents = Math.round(costRunRatePerDayCents * 30);
+  const estCost90dCents = Math.round(costRunRatePerDayCents * 90);
+  const estCost12mCents = Math.round(costRunRatePerDayCents * 365);
+  const operatingProfit7dCents = estRevenue7dCents - Math.round(costRunRatePerDayCents * 7);
+  const operatingProfit30dCents = estRevenue30dCents - Math.round(costRunRatePerDayCents * 30);
+  const operatingProfit90dCents = estRevenue90dCents - Math.round(costRunRatePerDayCents * 90);
+  const operatingProfit12mCents = estRevenue12mCents - Math.round(costRunRatePerDayCents * 365);
+  const estProfit7dCents =
+    estRevenue7dCents - Math.round(costRunRatePerDayCents * 7) - promoCostTotalCents;
+  const estProfit30dCents =
+    estRevenue30dCents - Math.round(costRunRatePerDayCents * 30) - promoCostTotalCents;
+  const estProfit90dCents =
+    estRevenue90dCents - Math.round(costRunRatePerDayCents * 90) - promoCostTotalCents;
+  const estProfit12mCents =
+    estRevenue12mCents - Math.round(costRunRatePerDayCents * 365) - promoCostTotalCents;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
             Admin Dashboard
           </h1>
           <Link
@@ -236,7 +411,7 @@ export default async function AdminPage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card title="Runs (24h)" value={runs24h.toLocaleString()} />
           <Card title="Runs (7d)" value={runs7d.toLocaleString()} />
@@ -248,6 +423,179 @@ export default async function AdminPage() {
           <Card title="Total Users" value={totalUsers.toLocaleString()} />
           <Card title="Recurring Users" value={recurringUsers.length.toLocaleString()} />
           <Card title="Active Schedules" value={activeSchedules.toLocaleString()} />
+        </section>
+
+        <section className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Website Traffic
+            </h2>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Card title="Pageviews (24h)" value={webVisits24h.toLocaleString()} />
+              <Card title="Pageviews (30d)" value={webVisits30d.toLocaleString()} />
+            </div>
+            {topPages30d.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Top Pages (30d)
+                </p>
+                {topPages30d.map((row: { path: string; visits: bigint }) => (
+                  <div
+                    key={row.path}
+                    className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm"
+                  >
+                    <span className="text-gray-700 dark:text-gray-300 truncate pr-3">
+                      {row.path}
+                    </span>
+                    <span className="text-gray-900 dark:text-white shrink-0">
+                      {toCountNumber(row.visits).toLocaleString()} visits
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Revenue
+            </h2>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card title="Revenue (24h)" value={`$${(revenue24hCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+              <Card title="Revenue (30d)" value={`$${(revenue30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+              <Card title="Revenue (All-time)" value={`$${(revenueAllTimeCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+              <Card title="ARPPU (30d)" value={`$${(arppu30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Card title="Paying Users (30d)" value={payingUsers30dCount.toLocaleString()} />
+              <Card title="Paying Users (All-time)" value={payingUsersAllTimeCount.toLocaleString()} />
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Revenue is based on successful credit top-ups (`CreditTransaction.type = topup`).
+            </p>
+            <div className="pt-2">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Revenue Estimate (Assume All Usage Is Paid)
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card
+                  title="Estimate (7d)"
+                  value={`$${(estRevenue7dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+                <Card
+                  title="Estimate (30d)"
+                  value={`$${(estRevenue30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+                <Card
+                  title="Estimate (90d)"
+                  value={`$${(estRevenue90dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+                <Card
+                  title="Estimate (12m)"
+                  value={`$${(estRevenue12mCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Estimated from last 30 days usage volume with current pricing: $
+                {(usageBilled30dCents / 100).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}{" "}
+                (OpenAI ${(openAiCharge30dCents / 100).toFixed(2)} + WaveSpeed{" "}
+                ${(wavespeedCharge30dCents / 100).toFixed(2)}).
+              </p>
+            </div>
+            <div className="pt-2">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Cost Estimate (Model Cost Run Rate)
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card
+                  title="Cost Estimate (7d)"
+                  value={`$${(estCost7dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+                <Card
+                  title="Cost Estimate (30d)"
+                  value={`$${(estCost30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+                <Card
+                  title="Cost Estimate (90d)"
+                  value={`$${(estCost90dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+                <Card
+                  title="Cost Estimate (12m)"
+                  value={`$${(estCost12mCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+              </div>
+            </div>
+            <div className="pt-2">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Operating Profit Estimate (Before AD Cost)
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card
+                  title="Operating Profit (7d)"
+                  value={`$${(operatingProfit7dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+                <Card
+                  title="Operating Profit (30d)"
+                  value={`$${(operatingProfit30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+                <Card
+                  title="Operating Profit (90d)"
+                  value={`$${(operatingProfit90dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+                <Card
+                  title="Operating Profit (12m)"
+                  value={`$${(operatingProfit12mCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+              </div>
+            </div>
+            <div className="pt-2">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Net Profit Estimate (After AD Cost)
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card
+                  title="Profit Estimate (7d)"
+                  value={`$${(estProfit7dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+                <Card
+                  title="Profit Estimate (30d)"
+                  value={`$${(estProfit30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+                <Card
+                  title="Profit Estimate (90d)"
+                  value={`$${(estProfit90dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+                <Card
+                  title="Profit Estimate (12m)"
+                  value={`$${(estProfit12mCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                />
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Cost baseline (30d): OpenAI ${openAiCostUsd30d.toFixed(2)}
+                {" + "}
+                WaveSpeed ${wavespeedCostUsd30d.toFixed(2)}
+                {" = "}
+                ${(estimatedCost30dCents / 100).toFixed(2)}.
+                {" "}Promo subsidy deducted: ${(promoCostTotalCents / 100).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })} ({totalUsers.toLocaleString()} users × $5.00).
+                {" "}Revenue estimate here uses billed usage deductions (not actual top-up cash timing).
+                {wavespeedUsage.enabled && wavespeedUsage.available === false
+                  ? " WaveSpeed cost unavailable, so profit is likely overstated."
+                  : ""}
+              </p>
+            </div>
+          </div>
         </section>
 
         <section className="bg-white dark:bg-gray-800 rounded-lg shadow">
@@ -283,10 +631,10 @@ export default async function AdminPage() {
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Top Models
                     </p>
-                    {wavespeedUsage.topModels.map((item, index) => (
+                    {wavespeedUsage.topModels.map((item: { model: string; requests: number; costUsd: number }, index: number) => (
                       <div
                         key={`${item.model}-${index}`}
-                        className="flex items-center justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm"
+                        className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm"
                       >
                         <span className="text-gray-700 dark:text-gray-300 truncate pr-3">
                           {item.model}
@@ -325,7 +673,7 @@ export default async function AdminPage() {
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   By Model
                 </p>
-                {openAiByModel30d.map((item) => {
+                {openAiByModel30d.map((item: { model: string | null; _sum: { promptTokens: number | null; completionTokens: number | null; totalTokens: number | null } }) => {
                   const promptTokens = item._sum.promptTokens ?? 0;
                   const completionTokens = item._sum.completionTokens ?? 0;
                   const estCost = estimateOpenAICostUsd({
@@ -336,7 +684,7 @@ export default async function AdminPage() {
                   return (
                     <div
                       key={item.model ?? "unknown"}
-                      className="flex items-center justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm"
+                      className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm"
                     >
                       <span className="text-gray-700 dark:text-gray-300 truncate pr-3">
                         {item.model ?? "unknown"}
@@ -369,10 +717,10 @@ export default async function AdminPage() {
               <p className="text-gray-500 dark:text-gray-400">No runs logged yet.</p>
             ) : (
               <div className="space-y-3">
-                {byJob30d.map((item) => (
+                {byJob30d.map((item: { jobName: string; _count: { _all: number }; _avg: { durationMs: number | null } }) => (
                   <div
                     key={item.jobName}
-                    className="flex items-center justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3"
+                    className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3"
                   >
                     <p className="font-medium text-gray-900 dark:text-white">{item.jobName}</p>
                     <p className="text-sm text-gray-600 dark:text-gray-300">
@@ -398,7 +746,7 @@ export default async function AdminPage() {
               <p className="text-gray-500 dark:text-gray-400">No failures recorded.</p>
             ) : (
               <div className="space-y-3">
-                {recentFailures.map((item) => (
+                {recentFailures.map((item: { id: string; jobName: string; statusCode: number | null; error: string | null; triggeredBy: string | null; createdAt: Date }) => (
                   <div
                     key={item.id}
                     className="border border-red-200 dark:border-red-900/50 rounded-lg px-4 py-3 bg-red-50/40 dark:bg-red-900/10"
@@ -427,7 +775,7 @@ function Card({ title, value }: { title: string; value: string }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-5">
       <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
-      <p className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
+      <p className="mt-2 text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
     </div>
   );
 }

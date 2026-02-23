@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { postTweet } from "@/lib/x-client";
+import { postTweet, postTweetWithMedia } from "@/lib/x-client";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { getUserXCredentials } from "@/lib/user-credentials";
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { content, scheduledAt, postImmediately, mediaAssetId, xAccountId } =
+  const { content, scheduledAt, postImmediately, mediaAssetId, xAccountId, mediaUrl } =
     body;
 
   if (!content || content.length === 0) {
@@ -54,7 +54,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await postTweet(content, resolved.credentials);
+    let result;
+    if (typeof mediaUrl === "string" && mediaUrl) {
+      const mediaRes = await fetch(mediaUrl);
+      if (!mediaRes.ok) {
+        return NextResponse.json({ error: "Failed to fetch media" }, { status: 400 });
+      }
+      const buffer = Buffer.from(await mediaRes.arrayBuffer());
+      const mimeType = (mediaRes.headers.get("content-type") ?? "image/jpeg").split(";")[0].trim();
+      result = await postTweetWithMedia(content, buffer, mimeType, resolved.credentials);
+    } else {
+      result = await postTweet(content, resolved.credentials);
+    }
 
     const post = await prisma.post.create({
       data: {
@@ -64,6 +75,7 @@ export async function POST(request: NextRequest) {
         tweetId: result.tweetId || null,
         error: result.error || null,
         mediaAssetId: typeof mediaAssetId === "string" ? mediaAssetId : null,
+        mediaUrls: typeof mediaUrl === "string" && mediaUrl ? JSON.stringify([mediaUrl]) : null,
         xAccountId: resolved.accountId,
         userId: user.id,
       },
@@ -86,6 +98,7 @@ export async function POST(request: NextRequest) {
       status: "scheduled",
       scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
       mediaAssetId: typeof mediaAssetId === "string" ? mediaAssetId : null,
+      mediaUrls: typeof mediaUrl === "string" && mediaUrl ? JSON.stringify([mediaUrl]) : null,
       xAccountId: resolvedForSchedule.accountId,
       userId: user.id,
     },

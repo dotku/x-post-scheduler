@@ -13,14 +13,23 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { modelId, prompt, aspectRatio } = body as {
+  const { modelId, prompt, aspectRatio, mode, imageUrl } = body as {
     modelId: string;
     prompt: string;
     aspectRatio?: string;
+    mode?: "t2i" | "i2i" | "i2i_text";
+    imageUrl?: string;
   };
 
-  if (!prompt?.trim()) {
+  const submitMode = mode ?? "t2i";
+  const trimmedPrompt = prompt?.trim() ?? "";
+  const trimmedImageUrl = imageUrl?.trim() ?? "";
+
+  if ((submitMode === "t2i" || submitMode === "i2i_text") && !trimmedPrompt) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
+  }
+  if ((submitMode === "i2i" || submitMode === "i2i_text") && !trimmedImageUrl) {
+    return NextResponse.json({ error: "Input image URL is required for i2i mode" }, { status: 400 });
   }
 
   const validModel = IMAGE_MODELS.find((m) => m.id === modelId);
@@ -41,7 +50,13 @@ export async function POST(request: NextRequest) {
 
   try {
     // submitImageTask uses enable_sync_mode — returns completed result directly
-    const task = await submitImageTask({ modelId, prompt, aspectRatio });
+    const task = await submitImageTask({
+      modelId,
+      prompt: trimmedPrompt || "Image enhancement",
+      mode: submitMode,
+      imageUrl: trimmedImageUrl || undefined,
+      aspectRatio,
+    });
     try {
       await deductWavespeedCredits({
         userId: user.id,
@@ -66,8 +81,12 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         source: "toolbox_image_generate",
         model: modelId,
-        prompt,
-        metadata: { aspectRatio: aspectRatio ?? "1:1" },
+        prompt: trimmedPrompt,
+        metadata: {
+          aspectRatio: aspectRatio ?? "1:1",
+          mode: submitMode,
+          hasImageInput: Boolean(trimmedImageUrl),
+        },
       });
     } catch (usageError) {
       console.error("Failed to track WaveSpeed image usage:", usageError);

@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { addDays, addWeeks, addMonths } from "date-fns";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { getUserXCredentials } from "@/lib/user-credentials";
+import { IMAGE_MODELS } from "@/lib/wavespeed";
+import { decodeRecurringAiPrompt, encodeRecurringAiPrompt } from "@/lib/recurring-ai";
 
 function calculateNextRun(frequency: string, cronExpr: string): Date {
   const now = new Date();
@@ -56,6 +58,15 @@ export async function GET() {
     }),
   ]);
 
+  const normalizedSchedules = schedules.map((schedule) => {
+    const decoded = decodeRecurringAiPrompt(schedule.aiPrompt);
+    return {
+      ...schedule,
+      aiPrompt: decoded.prompt,
+      imageModelId: decoded.imageModelId,
+    };
+  });
+
   return NextResponse.json({
     balanceCents: dbUser?.creditBalanceCents ?? 0,
     usage: {
@@ -64,7 +75,7 @@ export async function GET() {
       completionTokens: recurringUsage._sum.completionTokens ?? 0,
       totalTokens: recurringUsage._sum.totalTokens ?? 0,
     },
-    schedules,
+    schedules: normalizedSchedules,
   });
 }
 
@@ -77,7 +88,16 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { content, frequency, cronExpr, useAi, aiPrompt, aiLanguage, xAccountId } =
+  const {
+    content,
+    frequency,
+    cronExpr,
+    useAi,
+    aiPrompt,
+    aiLanguage,
+    xAccountId,
+    imageModelId,
+  } =
     body;
   const isAiMode = Boolean(useAi);
   const normalizedContent = typeof content === "string" ? content.trim() : "";
@@ -85,6 +105,8 @@ export async function POST(request: NextRequest) {
     typeof aiPrompt === "string" ? aiPrompt.trim() : undefined;
   const normalizedLanguage =
     typeof aiLanguage === "string" ? aiLanguage.trim() : undefined;
+  const normalizedImageModelId =
+    typeof imageModelId === "string" ? imageModelId.trim() : undefined;
 
   if (!isAiMode) {
     if (!normalizedContent) {
@@ -105,6 +127,16 @@ export async function POST(request: NextRequest) {
       { error: "AI prompt exceeds 500 characters" },
       { status: 400 }
     );
+  }
+
+  if (normalizedImageModelId) {
+    const validModel = IMAGE_MODELS.find((model) => model.id === normalizedImageModelId);
+    if (!validModel) {
+      return NextResponse.json(
+        { error: "Invalid image model selection" },
+        { status: 400 }
+      );
+    }
   }
 
   if (!frequency || !["daily", "weekly", "monthly"].includes(frequency)) {
@@ -134,7 +166,12 @@ export async function POST(request: NextRequest) {
     data: {
       content: isAiMode ? "" : normalizedContent,
       useAi: isAiMode,
-      aiPrompt: isAiMode ? normalizedPrompt : null,
+      aiPrompt: isAiMode
+        ? encodeRecurringAiPrompt({
+            prompt: normalizedPrompt,
+            imageModelId: normalizedImageModelId,
+          })
+        : null,
       aiLanguage: isAiMode ? normalizedLanguage : null,
       frequency,
       cronExpr,
@@ -145,5 +182,10 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return NextResponse.json(schedule);
+  const decoded = decodeRecurringAiPrompt(schedule.aiPrompt);
+  return NextResponse.json({
+    ...schedule,
+    aiPrompt: decoded.prompt,
+    imageModelId: decoded.imageModelId,
+  });
 }

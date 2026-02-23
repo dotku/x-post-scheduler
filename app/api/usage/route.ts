@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
+import { calculateCostCents, getWavespeedFeeCents } from "@/lib/credits";
 
 function toPositiveInt(value: string | null, fallback: number) {
   if (!value) return fallback;
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
   return parsed;
+}
+
+function inferWavespeedMediaType(modelId: string): "image" | "video" {
+  const id = modelId.toLowerCase();
+  if (
+    id.includes("video") ||
+    id.includes("/t2v") ||
+    id.includes("/i2v") ||
+    id.includes("seedance")
+  ) {
+    return "video";
+  }
+  return "image";
 }
 
 export async function GET(request: NextRequest) {
@@ -20,7 +34,7 @@ export async function GET(request: NextRequest) {
   const days = Math.min(toPositiveInt(request.nextUrl.searchParams.get("days"), 30), 365);
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  const [windowAgg, allTimeAgg, bySource, recent] = await Promise.all([
+  const [windowAgg, allTimeAgg, bySource, byModel, recent] = await Promise.all([
     prisma.usageEvent.aggregate({
       where: { userId: user.id, createdAt: { gte: since } },
       _sum: {
@@ -45,6 +59,18 @@ export async function GET(request: NextRequest) {
       _sum: { totalTokens: true },
       _count: { _all: true },
       orderBy: { _sum: { totalTokens: "desc" } },
+    }),
+    prisma.usageEvent.groupBy({
+      by: ["provider", "model"],
+      where: { userId: user.id, createdAt: { gte: since } },
+      _sum: {
+        promptTokens: true,
+        completionTokens: true,
+        totalTokens: true,
+      },
+      _count: { _all: true },
+      orderBy: { _count: { model: "desc" } },
+      take: 30,
     }),
     prisma.usageEvent.findMany({
       where: { userId: user.id },
@@ -82,6 +108,41 @@ export async function GET(request: NextRequest) {
       requests: row._count._all,
       totalTokens: row._sum.totalTokens ?? 0,
     })),
+    byModel: byModel.map((row) => {
+      const provider = row.provider ?? "unknown";
+      const model = row.model ?? "unknown";
+      const count = row._count as { _all?: number };
+      const sum = row._sum as {
+        promptTokens?: number | null;
+        completionTokens?: number | null;
+        totalTokens?: number | null;
+      };
+      const requests = count._all ?? 0;
+      const promptTokens = sum.promptTokens ?? 0;
+      const completionTokens = sum.completionTokens ?? 0;
+      const totalTokens = sum.totalTokens ?? 0;
+
+      let estimatedCostCents = 0;
+      if (provider === "openai") {
+        estimatedCostCents = calculateCostCents(
+          { promptTokens, completionTokens, totalTokens },
+          model
+        );
+      } else if (provider === "wavespeed" && model !== "unknown") {
+        estimatedCostCents =
+          getWavespeedFeeCents(model, inferWavespeedMediaType(model)) * requests;
+      }
+
+      return {
+        provider,
+        model,
+        requests,
+        promptTokens,
+        completionTokens,
+        totalTokens,
+        estimatedCostCents,
+      };
+    }),
     recent,
   });
 }

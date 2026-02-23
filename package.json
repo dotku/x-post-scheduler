@@ -7,6 +7,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
+    "test:e2e": "playwright test",
     "scheduler": "npx tsx scripts/scheduler.ts",
     "postinstall": "prisma generate"
   },
@@ -27,6 +28,7 @@
     "twitter-api-v2": "^1.29.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/node-cron": "^3.0.11",

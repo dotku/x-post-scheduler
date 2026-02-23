@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
-import { submitVideoTask, VIDEO_MODELS } from "@/lib/wavespeed";
+import { submitVideoTask, VIDEO_MODELS, I2V_MODELS } from "@/lib/wavespeed";
 import { trackWavespeedUsage } from "@/lib/usage-tracking";
 import { deductWavespeedCredits, getCreditBalance, getWavespeedFeeCents } from "@/lib/credits";
 
@@ -13,18 +13,21 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { modelId, prompt, duration, aspectRatio } = body as {
+  const { modelId, prompt, duration, aspectRatio, imageUrl, generateAudio } = body as {
     modelId: string;
     prompt: string;
     duration?: number;
     aspectRatio?: string;
+    imageUrl?: string;
+    generateAudio?: boolean;
   };
 
   if (!prompt?.trim()) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
 
-  const validModel = VIDEO_MODELS.find((m) => m.id === modelId);
+  const allVideoModels = [...VIDEO_MODELS, ...I2V_MODELS];
+  const validModel = allVideoModels.find((m) => m.id === modelId);
   if (!validModel) {
     return NextResponse.json({ error: "Invalid model" }, { status: 400 });
   }
@@ -41,7 +44,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const task = await submitVideoTask({ modelId, prompt, duration, aspectRatio });
+    const task = await submitVideoTask({ modelId, prompt, duration, aspectRatio, imageUrl, generateAudio });
     try {
       await deductWavespeedCredits({
         userId: user.id,

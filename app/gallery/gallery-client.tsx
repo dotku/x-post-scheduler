@@ -10,6 +10,9 @@ interface GalleryItem {
   modelLabel: string;
   prompt: string;
   blobUrl: string;
+  sourceUrl?: string;
+  inputImageUrl?: string | null;
+  generationMeta?: string | null;
   aspectRatio: string | null;
   mimeType: string;
   isPublic: boolean;
@@ -40,6 +43,7 @@ const TEXT = {
     makePrivate: "Make private",
     makePublic: "Make public",
     delete: "Delete",
+    details: "Details",
     deletingFailed: "Failed to delete item",
     loading: "Loading...",
     noPublic: "No public items yet - be the first to generate one!",
@@ -66,6 +70,7 @@ const TEXT = {
     makePrivate: "设为私密",
     makePublic: "设为公开",
     delete: "删除",
+    details: "详情",
     deletingFailed: "删除失败",
     loading: "加载中...",
     noPublic: "还没有公开作品，快来生成第一条吧！",
@@ -99,8 +104,8 @@ function MediaCard({
     setToggleError("");
     try {
       await onToggle?.(item.id, !item.isPublic);
-    } catch {
-      setToggleError(t.failedUpdate);
+    } catch (err) {
+      setToggleError(err instanceof Error ? err.message : t.failedUpdate);
     } finally {
       setToggling(false);
     }
@@ -152,6 +157,12 @@ function MediaCard({
       </div>
 
       <div className="p-3 space-y-2">
+        <Link
+          href={`/gallery/${item.id}`}
+          className="inline-block text-xs text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          {t.details}
+        </Link>
         <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 leading-snug">
           {item.prompt}
         </p>
@@ -205,7 +216,7 @@ export default function GalleryClientPage() {
   const t = TEXT[lang];
 
   useEffect(() => {
-    const saved = localStorage.getItem("gallery-lang");
+    const saved = localStorage.getItem("app-lang") || localStorage.getItem("gallery-lang");
     if (saved === "zh" || saved === "en") {
       setLang(saved);
       return;
@@ -217,6 +228,7 @@ export default function GalleryClientPage() {
 
   const updateLang = (nextLang: Lang) => {
     setLang(nextLang);
+    localStorage.setItem("app-lang", nextLang);
     localStorage.setItem("gallery-lang", nextLang);
   };
 
@@ -288,7 +300,10 @@ export default function GalleryClientPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isPublic }),
     });
-    if (!r.ok) throw new Error("Toggle failed");
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({} as { error?: string }));
+      throw new Error(d.error || t.failedUpdate);
+    }
     setMyItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, isPublic } : item))
     );
@@ -313,14 +328,14 @@ export default function GalleryClientPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t.title}</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{t.title}</h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
                 {t.subtitle}
               </p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               <div className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden">
                 <button
                   onClick={() => updateLang("en")}
@@ -367,8 +382,8 @@ export default function GalleryClientPage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 mb-8 max-w-xs">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 mb-6 sm:mb-8 w-full max-w-xs">
           <button
             onClick={() => setTab("public")}
             className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -394,7 +409,7 @@ export default function GalleryClientPage() {
         </div>
 
         {publicError && (
-          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm flex items-center justify-between gap-3">
+          <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <span>{publicError}</span>
             <button
               onClick={fetchPublic}

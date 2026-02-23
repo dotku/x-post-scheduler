@@ -60,7 +60,10 @@ export async function saveToGallery(params: {
   modelLabel: string;
   prompt: string;
   sourceUrl: string;
+  inputImageUrl?: string;
+  generationMeta?: unknown;
   aspectRatio?: string;
+  isPublic?: boolean;
 }) {
   const response = await fetchWithRetry(params.sourceUrl);
 
@@ -95,9 +98,11 @@ export async function saveToGallery(params: {
       prompt: params.prompt,
       blobUrl: persistedUrl,
       sourceUrl: params.sourceUrl,
+      inputImageUrl: params.inputImageUrl ?? null,
+      generationMeta: params.generationMeta ? JSON.stringify(params.generationMeta) : null,
       aspectRatio: params.aspectRatio ?? null,
       mimeType,
-      isPublic: true,
+      isPublic: params.isPublic ?? true,
     },
   });
 }

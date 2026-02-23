@@ -133,9 +133,9 @@ export default async function Dashboard() {
               <Link
                 href="/recurring"
                 className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-                title="Recurring Posts"
+                title="Auto Post"
               >
-                Recurring Posts
+                Auto Post
               </Link>
               <Link
                 href="/knowledge"
@@ -242,7 +242,7 @@ export default async function Dashboard() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Active Recurring Schedules
+                Active Auto Posts
               </h2>
             </div>
             <div className="divide-y divide-gray-200 dark:divide-gray-700">

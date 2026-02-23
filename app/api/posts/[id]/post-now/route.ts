@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { postTweet } from "@/lib/x-client";
+import { postTweet, postTweetWithMedia } from "@/lib/x-client";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { getUserXCredentials } from "@/lib/user-credentials";
 
@@ -40,7 +40,29 @@ export async function POST(
     );
   }
 
-  const result = await postTweet(post.content, resolved.credentials);
+  // Parse mediaUrls JSON field (e.g., ["https://..."])
+  let mediaUrlList: string[] = [];
+  if (post.mediaUrls) {
+    try {
+      const parsed = JSON.parse(post.mediaUrls);
+      if (Array.isArray(parsed)) mediaUrlList = parsed;
+    } catch {
+      // ignore malformed JSON
+    }
+  }
+
+  let result;
+  if (mediaUrlList.length > 0) {
+    const mediaRes = await fetch(mediaUrlList[0]);
+    if (!mediaRes.ok) {
+      return NextResponse.json({ error: "Failed to fetch media" }, { status: 400 });
+    }
+    const buffer = Buffer.from(await mediaRes.arrayBuffer());
+    const mimeType = (mediaRes.headers.get("content-type") ?? "image/jpeg").split(";")[0].trim();
+    result = await postTweetWithMedia(post.content, buffer, mimeType, resolved.credentials);
+  } else {
+    result = await postTweet(post.content, resolved.credentials);
+  }
 
   const updatedPost = await prisma.post.update({
     where: { id },

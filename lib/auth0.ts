@@ -44,3 +44,43 @@ export async function requireAuth(): Promise<AuthenticatedUser> {
 export function unauthorizedResponse() {
   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
+
+const DEFAULT_ROLE_CLAIM_KEYS = [
+  "https://x-post-scheduler/roles",
+  "https://xpostscheduler/roles",
+  "roles",
+];
+
+function getRolesFromSessionUser(user: unknown): string[] {
+  if (!user || typeof user !== "object") return [];
+  const obj = user as Record<string, unknown>;
+  const configured = process.env.AUTH0_ROLES_CLAIM?.trim();
+  const keys = configured
+    ? [configured, ...DEFAULT_ROLE_CLAIM_KEYS]
+    : DEFAULT_ROLE_CLAIM_KEYS;
+
+  for (const key of keys) {
+    const raw = obj[key];
+    if (Array.isArray(raw)) {
+      return raw
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean);
+    }
+    if (typeof raw === "string") {
+      return raw
+        .split(",")
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean);
+    }
+  }
+
+  return [];
+}
+
+export async function isGuestSessionUser() {
+  const session = await auth0.getSession();
+  if (!session?.user) return false;
+  const roles = getRolesFromSessionUser(session.user);
+  return roles.includes("guest");
+}

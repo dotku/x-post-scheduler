@@ -18,17 +18,16 @@ function ScheduleForm() {
   const [scheduledTime, setScheduledTime] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
 
-  // Pre-fill content from URL params (from AI generate page)
+  // Pre-fill content and mediaUrl from URL params (from AI generate page / toolbox)
   useEffect(() => {
     const prefillContent = searchParams.get("content");
-    if (prefillContent) {
-      setContent(prefillContent);
-    }
+    if (prefillContent) setContent(prefillContent);
     const prefillAccount = searchParams.get("xAccountId");
-    if (prefillAccount) {
-      setSelectedAccountId(prefillAccount);
-    }
+    if (prefillAccount) setSelectedAccountId(prefillAccount);
+    const prefillMedia = searchParams.get("mediaUrl");
+    if (prefillMedia) setMediaUrl(prefillMedia);
   }, [searchParams]);
 
   useEffect(() => {
@@ -90,6 +89,7 @@ function ScheduleForm() {
           postImmediately: scheduleType === "now",
           scheduledAt,
           xAccountId: selectedAccountId,
+          ...(mediaUrl ? { mediaUrl } : {}),
         }),
       });
 
@@ -113,7 +113,7 @@ function ScheduleForm() {
   const minTime = format(now, "HH:mm");
 
   return (
-    <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Content */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -145,6 +145,30 @@ function ScheduleForm() {
             </span>
           </div>
         </div>
+
+        {/* Media Preview */}
+        {mediaUrl && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="flex justify-between items-center mb-3">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Attached Image
+              </label>
+              <button
+                type="button"
+                onClick={() => setMediaUrl(null)}
+                className="text-sm text-red-500 hover:text-red-700"
+              >
+                Remove
+              </button>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={mediaUrl}
+              alt="Attached media"
+              className="w-full rounded-lg max-h-64 object-contain border border-gray-200 dark:border-gray-700"
+            />
+          </div>
+        )}
 
         {/* Schedule Options */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -249,11 +273,11 @@ function ScheduleForm() {
         )}
 
         {/* Submit Button */}
-        <div className="flex justify-end">
+        <div className="flex justify-stretch sm:justify-end">
           <button
             type="submit"
             disabled={isSubmitting || charCount > 280}
-            className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="w-full sm:w-auto px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {isSubmitting
               ? "Submitting..."
@@ -272,8 +296,8 @@ export default function SchedulePage() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
               Create Post
             </h1>
             <Link
