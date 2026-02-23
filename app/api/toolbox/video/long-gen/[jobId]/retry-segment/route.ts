@@ -52,27 +52,33 @@ export async function POST(
       );
     }
 
-    if (seg.status === "completed") {
-      return NextResponse.json(
-        { error: `Segment ${segmentIndex} is already completed` },
-        { status: 400 },
-      );
-    }
-
     // Reset only the target segment to queued
+    const oldOutputUrl = seg.outputUrl as string | null;
     const updatedSegments = segments.map((s) =>
       s.index === segmentIndex
         ? { ...s, status: "queued", outputUrl: null, error: null, taskId: null }
         : s,
     );
 
-    // Also reset job status to pending so processVideoJob will pick it up
+    // If the segment was completed, remove its URL from completedUrls
+    let completedUrls: string[] = [];
+    try {
+      completedUrls = job.completedUrls ? JSON.parse(job.completedUrls) : [];
+    } catch {}
+    if (oldOutputUrl) {
+      completedUrls = completedUrls.filter((u) => u !== oldOutputUrl);
+    }
+
+    // Reset job to pending so processVideoJob will pick it up.
+    // stitchedUrl is intentionally NOT cleared — keep the existing stitched video
+    // until the segment successfully regenerates and a new stitch is triggered manually.
     await prisma.videoJob.update({
       where: { id: jobId },
       data: {
         status: "pending",
         error: null,
         segments: JSON.stringify(updatedSegments),
+        completedUrls: JSON.stringify(completedUrls),
       },
     });
 

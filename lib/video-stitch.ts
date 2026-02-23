@@ -117,53 +117,66 @@ export async function stitchVideos(videoUrls: string[]): Promise<string> {
         inputPaths.push(inputPath);
     }
 
-    // Probe for audio presence (needed to decide whether to apply acrossfade)
+    // Probe all clips for duration and audio presence
     const infos = await Promise.all(inputPaths.map(getVideoInfo));
     const n = inputPaths.length;
     const allHaveAudio = infos.every((info) => info.hasAudio);
 
-    console.log(`[Stitch] Combining ${n} videos, audio=${allHaveAudio}...`);
+    // Visual crossfade duration (0.5s) — creates a smooth blend between clips
+    const XFADE_DURATION = 0.5;
+
+    // Compute xfade offset for each splice point.
+    // offset[i] = sum of durations[0..i] - XFADE_DURATION*(i+1)
+    // This is the PTS (in the chained xfade output) at which transition i begins.
+    let cumulative = 0;
+    const xfadeOffsets: number[] = [];
+    for (let i = 0; i < n - 1; i++) {
+      cumulative += infos[i].duration;
+      xfadeOffsets.push(Math.max(0, cumulative - XFADE_DURATION * (i + 1)));
+    }
+
+    console.log(`[Stitch] Combining ${n} videos, audio=${allHaveAudio}, xfade offsets=${xfadeOffsets.map(o => o.toFixed(2)).join(",")}...`);
+
     const command = ffmpeg();
     inputPaths.forEach((p) => command.input(p));
 
     await new Promise<void>((resolve, reject) => {
+      const filterParts: string[] = [];
+
+      // Video xfade chain — fade transition between consecutive clips
+      for (let i = 0; i < n - 1; i++) {
+        const leftLabel = i === 0 ? `[0:v]` : `[xv${i - 1}]`;
+        const rightLabel = `[${i + 1}:v]`;
+        const outLabel = i === n - 2 ? `[v]` : `[xv${i}]`;
+        filterParts.push(
+          `${leftLabel}${rightLabel}xfade=transition=fade:duration=${XFADE_DURATION}:offset=${xfadeOffsets[i].toFixed(3)}${outLabel}`,
+        );
+      }
+
+      const outputOpts = [
+        "-filter_complex", filterParts.join(";"),
+        "-map", "[v]",
+        "-c:v", "libx264", "-crf", "18", "-preset", "fast", "-movflags", "+faststart",
+      ];
+
       if (allHaveAudio) {
-        // Use filter_complex to add a 20ms audio crossfade at each splice point.
-        // This eliminates the DC-offset pop/click without any audible transition effect.
-        // Video is also concatenated through the filter (re-encoded at high quality).
-        const AUDIO_FADE = 0.02; // 20ms — invisible crossfade, just removes the click
-        const filterParts: string[] = [];
-
-        // Video concat
-        const vInputs = inputPaths.map((_, i) => `[${i}:v]`).join("");
-        filterParts.push(`${vInputs}concat=n=${n}:v=1:a=0[v]`);
-
-        // Audio acrossfade chain
+        // Audio acrossfade chain — matches visual crossfade duration to keep them in sync
         for (let i = 0; i < n - 1; i++) {
           const inA = i === 0 ? `[0:a][1:a]` : `[af${i - 1}][${i + 1}:a]`;
-          filterParts.push(`${inA}acrossfade=d=${AUDIO_FADE}:c1=tri:c2=tri[af${i}]`);
+          const outA = i === n - 2 ? `[a]` : `[af${i}]`;
+          filterParts.push(`${inA}acrossfade=d=${XFADE_DURATION}:c1=tri:c2=tri${outA}`);
         }
-        const finalAudio = `af${n - 2}`;
-
-        command
-          .outputOptions([
-            "-filter_complex", filterParts.join(";"),
-            "-map", "[v]",
-            "-map", `[${finalAudio}]`,
-            "-c:v", "libx264", "-crf", "18", "-preset", "fast", "-movflags", "+faststart",
-            "-c:a", "aac", "-b:a", "128k",
-          ])
-          .output(outputPath)
-          .on("error", (err) => { console.error("[Stitch] FFMPEG error:", err); reject(err); })
-          .on("end", () => { console.log("[Stitch] Processing finished successfully"); resolve(); })
-          .run();
-      } else {
-        // No audio — simple concat is fine, no click risk
-        command
-          .on("error", (err) => { console.error("[Stitch] FFMPEG error:", err); reject(err); })
-          .on("end", () => { console.log("[Stitch] Processing finished successfully"); resolve(); })
-          .mergeToFile(outputPath, tempDir);
+        // Rebuild filter_complex with audio filters included
+        outputOpts[1] = filterParts.join(";");
+        outputOpts.push("-map", "[a]", "-c:a", "aac", "-b:a", "128k");
       }
+
+      command
+        .outputOptions(outputOpts)
+        .output(outputPath)
+        .on("error", (err) => { console.error("[Stitch] FFMPEG error:", err); reject(err); })
+        .on("end", () => { console.log("[Stitch] Processing finished successfully"); resolve(); })
+        .run();
     });
 
     // Upload result to blob storage

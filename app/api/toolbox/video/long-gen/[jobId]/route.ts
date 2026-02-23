@@ -4,6 +4,69 @@ import { prisma } from "@/lib/db";
 import { buildSignedBlobProxyUrl } from "@/lib/blob-proxy";
 
 /**
+ * PATCH: Update job prompt and/or per-segment prompts
+ * Body: { prompt?: string; segmentPrompts?: Record<number, string> }
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ jobId: string }> },
+) {
+  let user;
+  try {
+    user = await requireAuth();
+  } catch {
+    return unauthorizedResponse();
+  }
+
+  const { jobId } = await params;
+
+  let body: { prompt?: string; segmentPrompts?: Record<number, string> };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  if (!body.prompt && !body.segmentPrompts) {
+    return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+  }
+
+  try {
+    const job = await prisma.videoJob.findUnique({ where: { id: jobId } });
+
+    if (!job) {
+      return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    }
+    if (job.userId !== user.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+
+    const updateData: { prompt?: string; segments?: string } = {};
+
+    if (body.prompt !== undefined) {
+      updateData.prompt = body.prompt.trim();
+    }
+
+    if (body.segmentPrompts && Object.keys(body.segmentPrompts).length > 0) {
+      const segments = JSON.parse(job.segments) as Array<{ index: number; prompt?: string; [key: string]: unknown }>;
+      const updated = segments.map((s) => {
+        const newPrompt = body.segmentPrompts![s.index];
+        return newPrompt !== undefined ? { ...s, prompt: newPrompt.trim() } : s;
+      });
+      updateData.segments = JSON.stringify(updated);
+    }
+
+    await prisma.videoJob.update({ where: { id: jobId }, data: updateData });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(`[JobPatch] Error:`, msg);
+    return NextResponse.json({ error: `Failed: ${msg}` }, { status: 500 });
+  }
+}
+
+/**
  * GET: Check job status and progress
  */
 export async function GET(

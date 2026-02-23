@@ -10,6 +10,7 @@ interface Segment {
   outputUrl: string | null;
   error: string | null;
   taskId: string | null;
+  prompt?: string;
 }
 
 interface VideoJob {
@@ -41,6 +42,8 @@ export default function VideoJobsPage() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [now, setNow] = useState(new Date());
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [editingPrompt, setEditingPrompt] = useState<{ jobId: string; draft: string } | null>(null);
+  const [editingSegPrompt, setEditingSegPrompt] = useState<{ jobId: string; segIndex: number; draft: string } | null>(null);
 
   // Update time every second for live ETA calculations
   useEffect(() => {
@@ -112,6 +115,26 @@ export default function VideoJobsPage() {
       console.error(error);
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleUpdatePrompt = async (
+    jobId: string,
+    prompt: string,
+    segmentPrompts?: Record<number, string>,
+  ) => {
+    const res = await fetch(`/api/toolbox/video/long-gen/${jobId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, segmentPrompts }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setEditingPrompt(null);
+      setEditingSegPrompt(null);
+      await fetchJobs();
+    } else {
+      alert(`❌ ${data.error}`);
     }
   };
 
@@ -391,18 +414,60 @@ export default function VideoJobsPage() {
                   {/* Top Section */}
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                          {job.prompt}
-                        </h3>
+                      <div className="flex items-center gap-3 mb-2 flex-wrap">
                         <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                          className={`px-2 py-1 rounded-full text-xs font-medium shrink-0 ${getStatusColor(
                             job.status,
                           )}`}
                         >
                           {job.status.toUpperCase()}
                         </span>
                       </div>
+                      {/* Prompt — inline editable */}
+                      {editingPrompt?.jobId === job.id ? (
+                        <div className="mb-2">
+                          <textarea
+                            className="w-full text-sm rounded border border-blue-400 p-2 bg-white dark:bg-gray-900 text-gray-900 dark:text-white resize-y"
+                            rows={3}
+                            value={editingPrompt.draft}
+                            onChange={(e) =>
+                              setEditingPrompt({ jobId: job.id, draft: e.target.value })
+                            }
+                            autoFocus
+                          />
+                          <div className="flex gap-2 mt-1">
+                            <button
+                              onClick={() =>
+                                handleUpdatePrompt(job.id, editingPrompt.draft)
+                              }
+                              className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                            >
+                              保存
+                            </button>
+                            <button
+                              onClick={() => setEditingPrompt(null)}
+                              className="text-xs px-3 py-1 bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded hover:bg-gray-300"
+                            >
+                              取消
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-2 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex-1">
+                            {job.prompt}
+                          </h3>
+                          <button
+                            onClick={() =>
+                              setEditingPrompt({ jobId: job.id, draft: job.prompt })
+                            }
+                            className="shrink-0 text-xs px-2 py-1 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-300 dark:border-gray-600 rounded hover:border-blue-400 transition"
+                            title="编辑 Prompt"
+                          >
+                            ✎ 编辑
+                          </button>
+                        </div>
+                      )}
                       <p className="text-sm text-gray-600 dark:text-gray-400">
                         Model:{" "}
                         <span className="font-medium">{job.modelLabel}</span> •
@@ -522,7 +587,7 @@ export default function VideoJobsPage() {
                               >
                                 Segment {seg.index}
                               </span>
-                              {(seg.status === "generating" || seg.status === "failed") && (
+                              {seg.status !== "queued" && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -583,14 +648,28 @@ export default function VideoJobsPage() {
                         <p className="text-sm font-bold text-purple-900 dark:text-purple-300">
                           🎬 Stitched Video Ready
                         </p>
-                        <a
-                          href={job.stitchedUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 transition"
-                        >
-                          Download / View
-                        </a>
+                        <div className="flex gap-2">
+                          {job.completedUrls.length >= 2 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleStitchJob(job.id);
+                              }}
+                              className="text-xs bg-orange-500 text-white px-3 py-1 rounded hover:bg-orange-600 transition"
+                              title="重新拼接所有已完成片段"
+                            >
+                              ↺ 重新拼接
+                            </button>
+                          )}
+                          <a
+                            href={job.stitchedUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 transition"
+                          >
+                            Download / View
+                          </a>
+                        </div>
                       </div>
                       <video
                         src={job.stitchedUrl}
@@ -600,7 +679,7 @@ export default function VideoJobsPage() {
                     </div>
                   )}
 
-                  {/* Manual Stitch Button (Card View) */}
+                  {/* Manual Stitch Button (Card View) — only shown when not yet stitched */}
                   {!job.stitchedUrl && job.completedUrls.length >= 2 && (
                     <div className="mb-4">
                       <button
@@ -734,20 +813,20 @@ export default function VideoJobsPage() {
                         </div>
                       )}
 
-                      {/* Manual Stitch Button */}
-                      {!job.stitchedUrl && job.completedUrls.length >= 2 && (
-                        <div className="p-4 bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800 rounded-lg flex items-center justify-between">
-                          <p className="text-sm text-green-800 dark:text-green-300">
+                      {/* Manual Stitch / Re-stitch Button */}
+                      {job.completedUrls.length >= 2 && (
+                        <div className={`p-4 border rounded-lg flex items-center justify-between ${job.stitchedUrl ? "bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800" : "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"}`}>
+                          <p className={`text-sm ${job.stitchedUrl ? "text-orange-800 dark:text-orange-300" : "text-green-800 dark:text-green-300"}`}>
                             <strong>
-                              {job.completedUrls.length} segments ready!
+                              {job.completedUrls.length} segments ready.
                             </strong>{" "}
-                            You can manually stitch them now.
+                            {job.stitchedUrl ? "Re-stitch to incorporate any regenerated segments." : "You can manually stitch them now."}
                           </p>
                           <button
                             onClick={() => handleStitchJob(job.id)}
-                            className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700 transition"
+                            className={`px-4 py-2 text-white text-sm font-medium rounded transition ${job.stitchedUrl ? "bg-orange-500 hover:bg-orange-600" : "bg-green-600 hover:bg-green-700"}`}
                           >
-                            ✂️ Stitch Videos
+                            {job.stitchedUrl ? "↺ 重新拼接" : "✂️ Stitch Videos"}
                           </button>
                         </div>
                       )}
@@ -785,32 +864,93 @@ export default function VideoJobsPage() {
                           Segment Details ({job.segments.length})
                         </h3>
                         <div className="space-y-3">
-                          {job.segments.map((seg, idx) => (
-                            <div
-                              key={idx}
-                              className="border border-gray-200 dark:border-gray-700 rounded p-3 bg-gray-50 dark:bg-gray-900/50"
-                            >
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="font-mono text-sm font-bold">
-                                  Segment {seg.index}
-                                </span>
-                                <span
-                                  className={`px-2 py-1 rounded text-xs font-medium ${
-                                    seg.status === "completed"
-                                      ? "bg-green-100 text-green-700"
-                                      : seg.status === "failed"
-                                        ? "bg-red-100 text-red-700"
-                                        : "bg-yellow-100 text-yellow-700"
-                                  }`}
-                                >
-                                  {seg.status}
-                                </span>
+                          {job.segments.map((seg, idx) => {
+                            const isEditingSeg =
+                              editingSegPrompt?.jobId === job.id &&
+                              editingSegPrompt.segIndex === seg.index;
+                            return (
+                              <div
+                                key={idx}
+                                className="border border-gray-200 dark:border-gray-700 rounded p-3 bg-gray-50 dark:bg-gray-900/50"
+                              >
+                                <div className="flex items-center gap-2 mb-2">
+                                  <span className="font-mono text-sm font-bold">
+                                    Segment {seg.index}
+                                  </span>
+                                  <span
+                                    className={`px-2 py-1 rounded text-xs font-medium ${
+                                      seg.status === "completed"
+                                        ? "bg-green-100 text-green-700"
+                                        : seg.status === "failed"
+                                          ? "bg-red-100 text-red-700"
+                                          : "bg-yellow-100 text-yellow-700"
+                                    }`}
+                                  >
+                                    {seg.status}
+                                  </span>
+                                </div>
+                                {/* Segment prompt — inline editable */}
+                                <div className="mb-2">
+                                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Prompt:</p>
+                                  {isEditingSeg ? (
+                                    <div>
+                                      <textarea
+                                        className="w-full text-xs rounded border border-blue-400 p-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-y"
+                                        rows={3}
+                                        value={editingSegPrompt.draft}
+                                        onChange={(e) =>
+                                          setEditingSegPrompt({
+                                            jobId: job.id,
+                                            segIndex: seg.index,
+                                            draft: e.target.value,
+                                          })
+                                        }
+                                        autoFocus
+                                      />
+                                      <div className="flex gap-2 mt-1">
+                                        <button
+                                          onClick={() =>
+                                            handleUpdatePrompt(
+                                              job.id,
+                                              job.prompt,
+                                              { [seg.index]: editingSegPrompt.draft },
+                                            )
+                                          }
+                                          className="text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                        >
+                                          保存
+                                        </button>
+                                        <button
+                                          onClick={() => setEditingSegPrompt(null)}
+                                          className="text-xs px-2 py-1 bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 rounded"
+                                        >
+                                          取消
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-start gap-2">
+                                      <p className="text-xs text-gray-800 dark:text-gray-200 flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded p-2">
+                                        {seg.prompt || <span className="italic text-gray-400">(uses job prompt)</span>}
+                                      </p>
+                                      <button
+                                        onClick={() =>
+                                          setEditingSegPrompt({
+                                            jobId: job.id,
+                                            segIndex: seg.index,
+                                            draft: seg.prompt || job.prompt,
+                                          })
+                                        }
+                                        className="shrink-0 text-xs px-2 py-1 text-gray-500 hover:text-blue-600 border border-gray-300 dark:border-gray-600 rounded hover:border-blue-400 transition"
+                                      >
+                                        ✎
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                              <pre className="text-xs bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 overflow-auto max-h-48 text-gray-700 dark:text-gray-300">
-                                {JSON.stringify(seg, null, 2)}
-                              </pre>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
 
