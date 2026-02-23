@@ -36,12 +36,17 @@ const WAVESPEED_DEFAULT_IMAGE_BASE_COST_CENTS = 5; // $0.05
 const WAVESPEED_DEFAULT_VIDEO_BASE_COST_CENTS = 30; // $0.30
 
 const WAVESPEED_MODEL_BASE_COST_CENTS: Record<string, number> = {
-  // image
+  // image t2i
   "bytedance/seedream-v4.5": 4, // $0.04
   "bytedance/seedream-v4": 4, // keep aligned with 4.5
   "wavespeed-ai/qwen-image/text-to-image": 5, // $0.05
   "alibaba/wan-2.6/text-to-image": 8, // larger generation size
   "bytedance/dreamina-v3.1/text-to-image": 6,
+  // image i2i
+  "wavespeed-ai/uno": 5,
+  "wavespeed-ai/real-esrgan": 5,
+  "wavespeed-ai/flux-kontext-pro": 8,
+  "wavespeed-ai/flux-kontext-pro/multi": 8,
   // video
   "wavespeed-ai/wan-2.2/t2v-480p-ultra-fast": 5, // $0.05
   "wavespeed-ai/wan-2.2/t2v-720p": 30, // $0.30

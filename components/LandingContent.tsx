@@ -231,6 +231,12 @@ export default function LandingContent() {
             >
               Docs
             </Link>
+            <Link
+              href="/invest"
+              className="text-gray-600 dark:text-gray-400 hover:underline underline-offset-4"
+            >
+              Investor
+            </Link>
             {!browserEnv.isInAppBrowser && (
               <Link
                 href="/login"
@@ -592,9 +598,12 @@ export default function LandingContent() {
 
       {/* Footer */}
       <footer className="border-t border-gray-200 dark:border-gray-700 py-8">
-        <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-          X Post Scheduler
-        </p>
+        <div className="flex flex-col items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+          <p>X Post Scheduler</p>
+          <Link href="/invest" className="hover:underline underline-offset-4">
+            Investor Memo
+          </Link>
+        </div>
       </footer>
     </div>
   );

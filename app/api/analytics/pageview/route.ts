@@ -46,14 +46,18 @@ export async function POST(request: NextRequest) {
   );
 
   let userId: string | null = null;
-  const session = await auth0.getSession();
-  const sub = session?.user?.sub;
-  if (sub) {
-    const user = await prisma.user.findUnique({
-      where: { auth0Sub: sub },
-      select: { id: true },
-    });
-    userId = user?.id ?? null;
+  try {
+    const session = await auth0.getSession();
+    const sub = session?.user?.sub;
+    if (sub) {
+      const user = await prisma.user.findUnique({
+        where: { auth0Sub: sub },
+        select: { id: true },
+      });
+      userId = user?.id ?? null;
+    }
+  } catch {
+    userId = null;
   }
 
   try {

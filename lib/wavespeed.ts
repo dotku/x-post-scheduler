@@ -85,7 +85,7 @@ function buildRequestBody(
     body.aspect_ratio = ratio;
     body.resolution = modelId.includes("fast") ? "480p" : "720p";
     if (duration) body.duration = duration;
-    if (imageUrl) body.image_url = imageUrl;
+    if (imageUrl) body.image = imageUrl; // API requires "image", not "image_url"
     body.generate_audio = generateAudio ?? false;
     body.seed = -1;
   } else if (modelId.startsWith("kwaivgi/")) {
@@ -134,6 +134,34 @@ export async function submitVideoTask(
   return json.data as VideoTask;
 }
 
+export interface BgmSubmitParams {
+  videoUrl: string;
+  prompt: string;
+  duration?: number;
+}
+
+export async function submitBgmTask(params: BgmSubmitParams): Promise<VideoTask> {
+  const key = getApiKey();
+  const body: Record<string, unknown> = {
+    video: params.videoUrl,
+    prompt: params.prompt,
+    duration: params.duration ?? 8,
+  };
+  const res = await fetch(`${WAVESPEED_BASE}/wavespeed-ai/mmaudio-v2`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const json = await parseJsonSafe(res);
+  if (!res.ok || json.code !== 200) {
+    throw new Error(String(json.message ?? `WaveSpeed error ${res.status}`));
+  }
+  return json.data as VideoTask;
+}
+
 /**
  * Poll task status. Pass either:
  * - The full `urls.get` URL returned in the submit response (preferred), or
@@ -168,8 +196,10 @@ export interface ImageSubmitParams {
   prompt: string;
   /** "t2i"=text-to-image, "i2i"=image-to-image, "i2i_text"=image+text-to-image */
   mode?: "t2i" | "i2i" | "i2i_text";
-  /** Input image URL for image-to-image style models */
+  /** Input image URL for single-image models */
   imageUrl?: string;
+  /** Input image URLs for multi-image models (e.g. flux-kontext-pro/multi) */
+  imageUrls?: string[];
   /** Canonical aspect ratio: "16:9" | "9:16" | "1:1" | "4:3" | "3:4" */
   aspectRatio?: string;
 }
@@ -223,6 +253,7 @@ function buildImageRequestBodies(params: {
   prompt: string;
   mode: "t2i" | "i2i" | "i2i_text";
   imageUrl?: string;
+  imageUrls?: string[];
   ratio: string;
 }): Record<string, unknown>[] {
   const size = getImageSize(params.modelId, params.ratio);
@@ -230,6 +261,27 @@ function buildImageRequestBodies(params: {
   const imageUrl = params.imageUrl?.trim();
   const hasPrompt = Boolean(prompt);
   const hasImage = Boolean(imageUrl);
+
+  // FLUX Kontext Pro (single-image): uses { prompt, image, aspect_ratio } — not size
+  if (params.modelId === "wavespeed-ai/flux-kontext-pro") {
+    const body: Record<string, unknown> = {
+      prompt: prompt || "Edit this image",
+      image: imageUrl,
+      aspect_ratio: params.ratio,
+    };
+    return [body];
+  }
+
+  // FLUX Kontext Pro Multi: uses { prompt, images: [...], aspect_ratio }
+  if (params.modelId === "wavespeed-ai/flux-kontext-pro/multi") {
+    const images = params.imageUrls?.length ? params.imageUrls : imageUrl ? [imageUrl] : [];
+    const body: Record<string, unknown> = {
+      prompt: prompt || "Edit these images",
+      images,
+      aspect_ratio: params.ratio,
+    };
+    return [body];
+  }
 
   // t2i: existing behavior
   if (params.mode === "t2i" || !hasImage) {
@@ -280,6 +332,7 @@ export async function submitImageTask(
     prompt: params.prompt,
     mode,
     imageUrl: params.imageUrl,
+    imageUrls: params.imageUrls,
     ratio,
   });
 
@@ -380,6 +433,13 @@ export const IMAGE_MODELS: {
     description: "WaveSpeed 图像增强/超分（i2i）",
     tier: "fast",
     mode: "i2i",
+  },
+  {
+    id: "wavespeed-ai/flux-kontext-pro",
+    label: "FLUX Kontext Pro",
+    description: "单图上下文编辑，修图 / 修文字首选",
+    tier: "premium",
+    mode: "i2i_text",
   },
   {
     id: "wavespeed-ai/flux-kontext-pro/multi",

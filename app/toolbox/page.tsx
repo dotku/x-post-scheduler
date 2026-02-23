@@ -120,6 +120,12 @@ const IMAGE_MODELS_T2I: StudioModel[] = [
 
 const IMAGE_MODELS_I2I: StudioModel[] = [
   {
+    id: "wavespeed-ai/flux-kontext-pro",
+    label: "FLUX Kontext Pro",
+    description: "单图上下文编辑，修图 / 修文字首选",
+    tier: "premium",
+  },
+  {
     id: "wavespeed-ai/uno",
     label: "UNO",
     description: "WaveSpeed 图像编辑（i2i / 图文）",
@@ -195,6 +201,7 @@ const CLIENT_WAVESPEED_MODEL_BASE_COST_CENTS: Record<string, number> = {
   // image i2i
   "wavespeed-ai/uno": 5,
   "wavespeed-ai/real-esrgan": 5,
+  "wavespeed-ai/flux-kontext-pro": 8,
   "wavespeed-ai/flux-kontext-pro/multi": 8,
   // video
   "wavespeed-ai/wan-2.2/t2v-480p-ultra-fast": 5,
@@ -247,6 +254,47 @@ const INPUT_CLEANUP_DELAY_MINUTES = Math.max(
 );
 const INPUT_CLEANUP_DELAY_MS = INPUT_CLEANUP_DELAY_MINUTES * 60 * 1000;
 
+/** Maps t2v model IDs to their i2v counterparts for seamless segment continuity. */
+const T2V_TO_I2V: Record<string, string> = {
+  "wavespeed-ai/wan-2.2/t2v-480p-ultra-fast": "wavespeed-ai/wan-2.2/i2v-480p-ultra-fast",
+  "wavespeed-ai/wan-2.2/t2v-720p": "wavespeed-ai/wan-2.2/i2v-720p",
+  "bytedance/seedance-v1.5-pro/text-to-video": "bytedance/seedance-v1.5-pro/image-to-video",
+};
+
+/** Extracts the last frame of a video URL as a JPEG Blob (client-side, via canvas). */
+async function extractLastFrame(proxyUrl: string): Promise<Blob> {
+  const video = document.createElement("video");
+  video.crossOrigin = "anonymous";
+  video.muted = true;
+  video.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px";
+  document.body.appendChild(video);
+  try {
+    await new Promise<void>((resolve, reject) => {
+      video.addEventListener("loadedmetadata", () => resolve(), { once: true });
+      video.addEventListener("error", () => reject(new Error("Failed to load video for frame extraction")), { once: true });
+      video.src = proxyUrl;
+      video.load();
+    });
+    video.currentTime = Math.max(0, video.duration - 0.1);
+    await new Promise<void>((resolve) => {
+      video.addEventListener("seeked", () => resolve(), { once: true });
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 720;
+    canvas.height = video.videoHeight || 1280;
+    canvas.getContext("2d")!.drawImage(video, 0, 0);
+    return new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
+        "image/jpeg",
+        0.92
+      );
+    });
+  } finally {
+    document.body.removeChild(video);
+  }
+}
+
 function getImageModePath(mode: "t2i" | "i2i" | "i2i_text") {
   switch (mode) {
     case "t2i":
@@ -295,6 +343,7 @@ export default function ToolboxPage() {
   const [imageMode, setImageMode] = useState<"t2i" | "i2i" | "i2i_text">("t2i");
   const [imageModelId, setImageModelId] = useState(IMAGE_MODELS_T2I[0].id);
   const [imageInputUrl, setImageInputUrl] = useState<string | null>(null);
+  const [imageInputUrls, setImageInputUrls] = useState<string[]>([]); // for multi-image models
   const [imageUploadLoading, setImageUploadLoading] = useState(false);
   const [imageUploadError, setImageUploadError] = useState("");
 
@@ -305,6 +354,25 @@ export default function ToolboxPage() {
   const [longVideoSegments, setLongVideoSegments] = useState<LongVideoSegment[]>([]);
   const [stitchedVideoUrl, setStitchedVideoUrl] = useState<string | null>(null);
   const [isStitching, setIsStitching] = useState(false);
+  const [stitchProgress, setStitchProgress] = useState<{ current: number; total: number } | null>(null);
+
+  // audio mixing
+  const [audioMode, setAudioMode] = useState<"voiceover" | "bgm" | "both" | null>(null);
+  const [voiceoverText, setVoiceoverText] = useState("");
+  const [ttsVoice, setTtsVoice] = useState<"alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer">("nova");
+  const [voiceoverVolume, setVoiceoverVolume] = useState(90);
+  const [bgmFile, setBgmFile] = useState<File | null>(null);
+  const [bgmVolume, setBgmVolume] = useState(30);
+  const [bgmSource, setBgmSource] = useState<"upload" | "ai">("ai");
+  const [bgmPrompt, setBgmPrompt] = useState("");
+  const [isGeneratingBgm, setIsGeneratingBgm] = useState(false);
+  const [bgmAudioUrl, setBgmAudioUrl] = useState<string | null>(null);
+  const [isMixing, setIsMixing] = useState(false);
+  const [mixedVideoUrl, setMixedVideoUrl] = useState<string | null>(null);
+  const [audioError, setAudioError] = useState("");
+  const [ttsPreviewUrl, setTtsPreviewUrl] = useState<string | null>(null);
+  const [isTtsPreviewing, setIsTtsPreviewing] = useState(false);
+  const bgmFileRef = useRef<HTMLInputElement | null>(null);
 
   // gallery save status
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -324,7 +392,7 @@ export default function ToolboxPage() {
     const mode = params.get("mode");
     if (t === "video") {
       setTab("video");
-      setAspectIdx(1); // 16:9 for video
+      setAspectIdx(0); // 9:16 portrait default
       if (mode === "i2v" || mode === "t2v") {
         setVideoMode(mode);
       }
@@ -471,6 +539,22 @@ export default function ToolboxPage() {
     input.value = "";
   };
 
+  const onMultiImageFilesPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.currentTarget.files ?? []);
+    if (!files.length) return;
+    e.currentTarget.value = "";
+    setImageUploadError("");
+    setImageUploadLoading(true);
+    try {
+      const urls = await Promise.all(files.map((f) => uploadImageFile(f)));
+      setImageInputUrls((prev) => [...prev, ...urls]);
+    } catch (err) {
+      setImageUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setImageUploadLoading(false);
+    }
+  };
+
   const pollVideoSync = (id: string, pollUrl?: string) =>
     new Promise<string>((resolve, reject) => {
       const tick = async () => {
@@ -508,11 +592,13 @@ export default function ToolboxPage() {
     const activeModel = activeModels.find((m) => m.id === activeModelId);
     const segmentCount = Math.max(2, Math.min(8, longVideoSegmentsCount));
     const basePrompt = prompt.trim();
+    // i2v equivalent for seamless chaining; null means no visual handoff available
+    const i2vContinuityModelId = T2V_TO_I2V[activeModelId] ?? null;
 
     const initialSegments: LongVideoSegment[] = Array.from({ length: segmentCount }).map(
       (_, idx) => ({
         index: idx + 1,
-        prompt: `${basePrompt}. Segment ${idx + 1}/${segmentCount}, keep continuity with the previous segment.`,
+        prompt: basePrompt,
         taskId: null,
         pollUrl: null,
         status: "queued",
@@ -532,6 +618,9 @@ export default function ToolboxPage() {
 
     try {
       const completedUrls: string[] = [];
+      // prevFrameUrl: the uploaded URL of the last frame from the previous segment
+      let prevFrameUrl: string | null = videoMode === "i2v" ? i2vImageUrl : null;
+
       for (const segment of initialSegments) {
         setLongVideoSegments((prev) =>
           prev.map((item) =>
@@ -539,15 +628,28 @@ export default function ToolboxPage() {
           )
         );
 
+        // For segments after the first: use i2v model with last frame for visual continuity
+        const isFirstSeg = segment.index === 1;
+        const segModelId =
+          !isFirstSeg && prevFrameUrl && i2vContinuityModelId
+            ? i2vContinuityModelId
+            : activeModelId;
+        const segImageUrl =
+          !isFirstSeg && prevFrameUrl
+            ? prevFrameUrl
+            : videoMode === "i2v"
+            ? i2vImageUrl
+            : undefined;
+
         const submitRes = await fetch("/api/toolbox/video", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            modelId: activeModelId,
+            modelId: segModelId,
             prompt: segment.prompt,
             duration,
             aspectRatio: ASPECT_RATIOS[aspectIdx].value,
-            ...(videoMode === "i2v" && i2vImageUrl ? { imageUrl: i2vImageUrl } : {}),
+            ...(segImageUrl ? { imageUrl: segImageUrl } : {}),
             ...(generateAudio ? { generateAudio: true } : {}),
           }),
         });
@@ -578,11 +680,52 @@ export default function ToolboxPage() {
               : item
           )
         );
+
+        // Extract last frame for next segment's visual handoff (skip for the last segment)
+        if (segment.index < segmentCount) {
+          try {
+            const proxyUrl = `/api/toolbox/proxy?url=${encodeURIComponent(segOutputUrl)}`;
+            const frameBlob = await extractLastFrame(proxyUrl);
+            const form = new FormData();
+            form.append("file", frameBlob, "frame.jpg");
+            const uploadRes = await fetch("/api/toolbox/upload-image", { method: "POST", body: form });
+            if (uploadRes.ok) {
+              const uploadData = (await uploadRes.json()) as { url?: string };
+              prevFrameUrl = uploadData.url ?? null;
+            }
+          } catch {
+            // Non-fatal: fall back to text-only continuity for next segment
+            prevFrameUrl = null;
+          }
+        }
       }
 
       stopTimer();
       setStatus("completed");
       setOutputUrl(completedUrls[completedUrls.length - 1] ?? null);
+
+      // Auto-stitch all segments into one long video
+      if (completedUrls.length >= 2) {
+        setIsStitching(true);
+        setStitchProgress({ current: 0, total: completedUrls.length });
+        try {
+          const proxyUrls = completedUrls.map(
+            (url) => `/api/toolbox/proxy?url=${encodeURIComponent(url)}`
+          );
+          const stitchedUrl = await stitchProxyUrls(proxyUrls, (current, total) =>
+            setStitchProgress({ current, total })
+          );
+          setStitchedVideoUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return stitchedUrl; });
+          setOutputUrl(stitchedUrl);
+        } catch (stitchErr) {
+          // Non-fatal: segments are still accessible individually
+          setError(stitchErr instanceof Error ? stitchErr.message : "Auto-stitch failed");
+        } finally {
+          setIsStitching(false);
+          setStitchProgress(null);
+        }
+      }
+
       if (completedUrls.length > 0 && activeModel) {
         saveToGallery(
           "video",
@@ -621,107 +764,336 @@ export default function ToolboxPage() {
     }
   };
 
-  const handleStitch = async () => {
-    const completedSegments = longVideoSegments.filter(
-      (segment) => segment.status === "completed" && segment.outputUrl
-    );
-    if (completedSegments.length < 2) {
-      setError("Need at least 2 completed segments to stitch.");
-      return;
-    }
+  /** Core stitch logic: plays proxy URLs sequentially through a hidden video and records to WebM. */
+  const stitchProxyUrls = async (
+    proxyUrls: string[],
+    onProgress?: (current: number, total: number) => void
+  ): Promise<string> => {
+    const video = document.createElement("video");
+    video.crossOrigin = "anonymous";
+    video.playsInline = true;
+    video.muted = true;
+    video.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px";
+    document.body.appendChild(video);
 
-    setIsStitching(true);
-    setError("");
     try {
-      const proxyUrls = completedSegments.map(
-        (segment) => `/api/toolbox/proxy?url=${encodeURIComponent(segment.outputUrl!)}`
-      );
-
-      const video = document.createElement("video");
-      video.crossOrigin = "anonymous";
-      video.playsInline = true;
-      video.muted = false;
-
       const captureVideo = video as HTMLVideoElement & {
         captureStream?: () => MediaStream;
         mozCaptureStream?: () => MediaStream;
       };
+
+      await new Promise<void>((resolve, reject) => {
+        video.addEventListener("loadedmetadata", () => resolve(), { once: true });
+        video.addEventListener("error", () => reject(new Error("Failed to load first segment")), { once: true });
+        video.src = proxyUrls[0];
+        video.load();
+      });
+
       const stream =
         typeof captureVideo.captureStream === "function"
           ? captureVideo.captureStream()
           : captureVideo.mozCaptureStream?.();
+      if (!stream) throw new Error("captureStream is not supported (Chrome required).");
 
-      if (!stream) {
-        throw new Error("captureStream is not supported in this browser.");
-      }
-
-      const candidates = [
-        "video/webm;codecs=vp9,opus",
-        "video/webm;codecs=vp8,opus",
-        "video/webm",
-      ];
-      const mimeType =
-        candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) || "";
-
-      if (!mimeType) {
-        throw new Error("MediaRecorder webm is not supported in this browser.");
-      }
+      const candidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+      const mimeType = candidates.find((c) => MediaRecorder.isTypeSupported(c)) || "";
+      if (!mimeType) throw new Error("MediaRecorder webm not supported in this browser.");
 
       const chunks: BlobPart[] = [];
       const recorder = new MediaRecorder(stream, { mimeType });
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) chunks.push(event.data);
-      };
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
-      const waitVideoEvent = (eventName: "ended" | "loadedmetadata" | "error") =>
+      const waitForEnd = () =>
         new Promise<void>((resolve, reject) => {
-          const onDone = () => {
-            cleanup();
-            resolve();
-          };
-          const onError = () => {
-            cleanup();
-            reject(new Error("Failed while processing segment stream."));
-          };
-          const cleanup = () => {
-            video.removeEventListener(eventName, onDone as EventListener);
-            video.removeEventListener("error", onError);
-          };
-          video.addEventListener(eventName, onDone as EventListener, { once: true });
-          video.addEventListener("error", onError, { once: true });
+          video.addEventListener("ended", () => resolve(), { once: true });
+          video.addEventListener("error", () => reject(new Error("Failed while playing segment")), { once: true });
         });
 
-      recorder.start();
-      for (const proxyUrl of proxyUrls) {
-        video.src = proxyUrl;
-        await waitVideoEvent("loadedmetadata");
+      recorder.start(100);
+      for (let i = 0; i < proxyUrls.length; i++) {
+        if (i > 0) {
+          video.src = proxyUrls[i];
+          video.load();
+          await new Promise<void>((resolve, reject) => {
+            video.addEventListener("loadedmetadata", () => resolve(), { once: true });
+            video.addEventListener("error", () => reject(new Error(`Failed to load segment ${i + 1}`)), { once: true });
+          });
+        }
+        const endPromise = waitForEnd();
         await video.play();
-        await waitVideoEvent("ended");
+        await endPromise;
+        onProgress?.(i + 1, proxyUrls.length);
       }
 
-      const stitchedBlob = await new Promise<Blob>((resolve, reject) => {
+      const blob = await new Promise<Blob>((resolve, reject) => {
         recorder.addEventListener("stop", () => {
-          if (chunks.length === 0) {
-            reject(new Error("No recorded data generated."));
-            return;
-          }
+          if (chunks.length === 0) { reject(new Error("No recorded data generated.")); return; }
           resolve(new Blob(chunks, { type: mimeType }));
         });
         recorder.addEventListener("error", () => reject(new Error("Recorder error")));
         recorder.stop();
       });
 
-      const objectUrl = URL.createObjectURL(stitchedBlob);
-      setStitchedVideoUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return objectUrl;
-      });
+      return URL.createObjectURL(blob);
+    } finally {
+      document.body.removeChild(video);
+    }
+  };
+
+  const handleStitch = async () => {
+    const completedSegments = longVideoSegments.filter(
+      (s) => s.status === "completed" && s.outputUrl
+    );
+    if (completedSegments.length < 2) {
+      setError("Need at least 2 completed segments to stitch.");
+      return;
+    }
+    setIsStitching(true);
+    setStitchProgress({ current: 0, total: completedSegments.length });
+    setError("");
+    try {
+      const proxyUrls = completedSegments.map(
+        (s) => `/api/toolbox/proxy?url=${encodeURIComponent(s.outputUrl!)}`
+      );
+      const objectUrl = await stitchProxyUrls(proxyUrls, (current, total) =>
+        setStitchProgress({ current, total })
+      );
+      setStitchedVideoUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return objectUrl; });
       setOutputUrl(objectUrl);
       setStatus("completed");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to stitch segments");
     } finally {
       setIsStitching(false);
+      setStitchProgress(null);
+    }
+  };
+
+  const handleMixAudio = async () => {
+    const sourceUrl = mixedVideoUrl || stitchedVideoUrl || outputUrl;
+    if (!sourceUrl) return;
+    const needsVoiceover = audioMode === "voiceover" || audioMode === "both";
+    const needsBgm = audioMode === "bgm" || audioMode === "both";
+    if (needsVoiceover && !voiceoverText.trim()) { setAudioError("请输入旁白文字"); return; }
+    if (needsBgm && bgmSource === "upload" && !bgmFile) { setAudioError("请选择背景音乐文件"); return; }
+    if (needsBgm && bgmSource === "ai" && !bgmAudioUrl) { setAudioError("请先点击「AI 生成背景音乐」"); return; }
+
+    setIsMixing(true);
+    setAudioError("");
+
+    // AudioContext must be created synchronously during the user-gesture handler,
+    // before any await, otherwise Chrome suspends it.
+    const audioCtx = new AudioContext();
+    const cleanupEls: HTMLElement[] = [];
+    const blobUrls: string[] = [];
+
+    try {
+      await audioCtx.resume();
+
+      // 1. Fetch TTS audio blob (if needed)
+      let ttsBlob: Blob | null = null;
+      if (needsVoiceover) {
+        const res = await fetch("/api/toolbox/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: voiceoverText.trim(), voice: ttsVoice }),
+        });
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}));
+          throw new Error((j as { error?: string }).error || "TTS generation failed");
+        }
+        ttsBlob = await res.blob();
+      }
+
+      // 2. Video source (proxy if remote)
+      const videoSrc = sourceUrl.startsWith("blob:")
+        ? sourceUrl
+        : `/api/toolbox/proxy?url=${encodeURIComponent(sourceUrl)}`;
+
+      // 3. Hidden video element — load and wait for metadata
+      const videoEl = document.createElement("video");
+      videoEl.playsInline = true;
+      videoEl.muted = true; // required for captureStream autoplay
+      videoEl.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px";
+      document.body.appendChild(videoEl);
+      cleanupEls.push(videoEl);
+
+      await new Promise<void>((resolve, reject) => {
+        videoEl.addEventListener("loadedmetadata", () => resolve(), { once: true });
+        videoEl.addEventListener("error", () => reject(new Error("视频加载失败")), { once: true });
+        videoEl.src = videoSrc;
+        videoEl.load();
+      });
+
+      // 4. Build audio graph: each source → gain → destination
+      const dest = audioCtx.createMediaStreamDestination();
+      const audioPlayEls: HTMLAudioElement[] = [];
+
+      const addAudioTrack = async (blobOrFile: Blob | File, volume: number, loop: boolean) => {
+        const objUrl = URL.createObjectURL(blobOrFile);
+        blobUrls.push(objUrl);
+        const el = document.createElement("audio");
+        el.src = objUrl;
+        el.loop = loop;
+        document.body.appendChild(el);
+        cleanupEls.push(el);
+        // Wait until audio can be decoded
+        await new Promise<void>((resolve, reject) => {
+          el.addEventListener("canplaythrough", () => resolve(), { once: true });
+          el.addEventListener("error", () => reject(new Error("音频加载失败")), { once: true });
+          el.load();
+        });
+        const source = audioCtx.createMediaElementSource(el);
+        const gain = audioCtx.createGain();
+        gain.gain.value = volume / 100;
+        source.connect(gain);
+        gain.connect(dest);
+        audioPlayEls.push(el);
+      };
+
+      if (ttsBlob) await addAudioTrack(ttsBlob, voiceoverVolume, false);
+      if (needsBgm) {
+        if (bgmSource === "ai" && bgmAudioUrl) {
+          const audioBlob = await fetch(bgmAudioUrl).then((r) => r.blob());
+          await addAudioTrack(audioBlob, bgmVolume, true);
+        } else if (bgmSource === "upload" && bgmFile) {
+          await addAudioTrack(bgmFile, bgmVolume, true);
+        }
+      }
+
+      // 5. Capture video frames + mixed audio tracks
+      const captureVideo = videoEl as HTMLVideoElement & { captureStream?: () => MediaStream };
+      const videoStream = captureVideo.captureStream?.();
+      if (!videoStream) throw new Error("captureStream 不支持，请使用 Chrome 浏览器");
+
+      const combined = new MediaStream([
+        ...videoStream.getVideoTracks(),
+        ...dest.stream.getAudioTracks(),
+      ]);
+
+      const candidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+      const mimeType = candidates.find((c) => MediaRecorder.isTypeSupported(c)) || "";
+      if (!mimeType) throw new Error("当前浏览器不支持 WebM 录制");
+
+      const chunks: BlobPart[] = [];
+      const recorder = new MediaRecorder(combined, { mimeType });
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+      // 6. Start recording, then play video + all audio simultaneously
+      recorder.start(100);
+      await Promise.all([videoEl.play(), ...audioPlayEls.map((el) => el.play())]);
+
+      await new Promise<void>((resolve, reject) => {
+        videoEl.addEventListener("ended", () => resolve(), { once: true });
+        videoEl.addEventListener("error", () => reject(new Error("播放出错")), { once: true });
+      });
+
+      for (const el of audioPlayEls) el.pause();
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        recorder.addEventListener("stop", () => {
+          if (chunks.length === 0) { reject(new Error("录制无数据，请检查视频是否可正常播放")); return; }
+          resolve(new Blob(chunks, { type: mimeType }));
+        });
+        recorder.addEventListener("error", () => reject(new Error("Recorder error")));
+        recorder.stop();
+      });
+
+      const url = URL.createObjectURL(blob);
+      setMixedVideoUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return url; });
+    } catch (err) {
+      setAudioError(err instanceof Error ? err.message : "Audio mixing failed");
+    } finally {
+      for (const el of cleanupEls) {
+        try { document.body.removeChild(el); } catch { /* ok */ }
+      }
+      for (const u of blobUrls) URL.revokeObjectURL(u);
+      audioCtx.close().catch(() => {});
+      setIsMixing(false);
+    }
+  };
+
+  const handleTtsPreview = async () => {
+    if (!voiceoverText.trim()) { setAudioError("请输入旁白文字再预览"); return; }
+    setIsTtsPreviewing(true);
+    setAudioError("");
+    try {
+      const res = await fetch("/api/toolbox/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: voiceoverText.trim(), voice: ttsVoice }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error((j as { error?: string }).error || "TTS preview failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setTtsPreviewUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return url; });
+    } catch (err) {
+      setAudioError(err instanceof Error ? err.message : "TTS preview failed");
+    } finally {
+      setIsTtsPreviewing(false);
+    }
+  };
+
+  const handleGenerateBgm = async () => {
+    const sourceUrl = mixedVideoUrl || stitchedVideoUrl || outputUrl;
+    if (!sourceUrl) { setAudioError("请先生成视频"); return; }
+    if (!bgmPrompt.trim()) { setAudioError("请输入音乐风格描述"); return; }
+    setIsGeneratingBgm(true);
+    setAudioError("");
+
+    // Resolve a public video URL for MMAudio (blob URLs won't work as MMAudio input)
+    let videoUrl = sourceUrl;
+    if (sourceUrl.startsWith("blob:")) {
+      // Upload the blob to Vercel Blob first so MMAudio can access it
+      try {
+        const blobData = await fetch(sourceUrl).then((r) => r.blob());
+        const form = new FormData();
+        // MMAudio accepts video; upload as a dummy "image" endpoint won't work — use a video upload or skip
+        // Fallback: use the last WaveSpeed outputUrl if available
+        videoUrl = outputUrl && !outputUrl.startsWith("blob:") ? outputUrl : sourceUrl;
+        void blobData; // unused if we fall back
+      } catch {
+        videoUrl = outputUrl && !outputUrl.startsWith("blob:") ? outputUrl : sourceUrl;
+      }
+    }
+
+    try {
+      // Submit MMAudio v2 task
+      const submitRes = await fetch("/api/toolbox/bgm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoUrl, prompt: bgmPrompt.trim() }),
+      });
+      const submitData = await submitRes.json() as { task?: { id: string; urls?: { get?: string } }; error?: string };
+      if (!submitRes.ok) throw new Error(submitData.error ?? "BGM submission failed");
+
+      const taskId = submitData.task!.id;
+      const pollUrl = submitData.task!.urls?.get ?? null;
+
+      // Poll until done
+      for (let i = 0; i < 60; i++) {
+        await new Promise((r) => setTimeout(r, 3000));
+        const pollRes = await fetch(`/api/toolbox/bgm?taskId=${encodeURIComponent(pollUrl ?? taskId)}`);
+        const pollData = await pollRes.json() as { task?: { status: string; outputs: string[] }; error?: string };
+        if (!pollRes.ok) throw new Error(pollData.error ?? "Poll failed");
+        const task = pollData.task!;
+        if (task.status === "completed" && task.outputs.length > 0) {
+          // Download the audio via proxy and create a blob URL
+          const proxyUrl = `/api/toolbox/proxy?url=${encodeURIComponent(task.outputs[0])}`;
+          const audioBlob = await fetch(proxyUrl).then((r) => r.blob());
+          const url = URL.createObjectURL(audioBlob);
+          setBgmAudioUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return url; });
+          break;
+        }
+        if (task.status === "failed") throw new Error("BGM generation failed");
+      }
+    } catch (err) {
+      setAudioError(err instanceof Error ? err.message : "BGM generation failed");
+    } finally {
+      setIsGeneratingBgm(false);
     }
   };
 
@@ -795,7 +1167,8 @@ export default function ToolboxPage() {
 
   const handleGenerateImage = async () => {
     if ((imageMode === "t2i" || imageMode === "i2i_text") && !prompt.trim()) return;
-    if ((imageMode === "i2i" || imageMode === "i2i_text") && !imageInputUrl) return;
+    const isMultiModel = imageModelId === "wavespeed-ai/flux-kontext-pro/multi";
+    if ((imageMode === "i2i" || imageMode === "i2i_text") && !imageInputUrl && (!isMultiModel || imageInputUrls.length === 0)) return;
     setError("");
     setLongVideoSegments([]);
     if (stitchedVideoUrl) {
@@ -816,7 +1189,8 @@ export default function ToolboxPage() {
           modelId: imageModelId,
           prompt,
           mode: imageMode,
-          imageUrl: imageInputUrl,
+          imageUrl: imageModelId === "wavespeed-ai/flux-kontext-pro/multi" ? undefined : imageInputUrl,
+          imageUrls: imageModelId === "wavespeed-ai/flux-kontext-pro/multi" ? imageInputUrls : undefined,
           aspectRatio: ASPECT_RATIOS[aspectIdx].value,
         }),
       });
@@ -953,7 +1327,7 @@ export default function ToolboxPage() {
     setVideoMode("i2v");
     setI2vImageUrl(srcUrl);
     setI2vModelId(I2V_MODELS[0].id);
-    setAspectIdx(1); // 16:9 default for video
+    setAspectIdx(0); // 9:16 portrait default
   };
 
   const handleTabChange = (t: Tab) => {
@@ -965,6 +1339,7 @@ export default function ToolboxPage() {
     setGenerateAudio(false);
     setImageMode("t2i");
     setImageInputUrl(null);
+    setImageInputUrls([]);
     setImageUploadError("");
     setImageModelId(IMAGE_MODELS_T2I[0].id);
     setEnableLongVideo(false);
@@ -975,7 +1350,7 @@ export default function ToolboxPage() {
     }
     setStitchedVideoUrl(null);
     setIsStitching(false);
-    setAspectIdx(t === "image" ? 0 : 1); // image defaults 9:16, video defaults 16:9
+    setAspectIdx(0); // always default to 9:16 portrait
   };
 
   const isRunning = status === "generating" || status === "processing";
@@ -1176,48 +1551,88 @@ export default function ToolboxPage() {
             {tab === "image" && (imageMode === "i2i" || imageMode === "i2i_text") && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Input Image URL
+                  {imageModelId === "wavespeed-ai/flux-kontext-pro/multi" ? "参考图片（可多张）" : "Input Image URL"}
                 </label>
-                <div
-                  onPaste={(e) => void onPasteImageForTarget(e, "i2i")}
-                  className="mb-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-3 text-xs text-gray-500 dark:text-gray-400"
-                >
-                  Paste image here (Ctrl/Cmd+V), or upload from file.
-                  <div className="mt-2">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => void onFilePickedForTarget(e, "i2i")}
-                      disabled={isRunning || imageUploadLoading}
-                      className="block w-full text-xs text-gray-500 dark:text-gray-300 file:mr-2 file:rounded file:border-0 file:bg-blue-600 file:px-2 file:py-1 file:text-white"
-                    />
-                  </div>
-                </div>
-                {imageInputUrl ? (
-                  <div className="space-y-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={imageInputUrl}
-                      alt="i2i input"
-                      className="w-full rounded-lg border border-gray-200 dark:border-gray-700 max-h-48 object-contain"
-                    />
-                    <button
-                      onClick={() => setImageInputUrl(null)}
-                      disabled={isRunning}
-                      className="text-xs text-red-500 hover:text-red-700"
-                    >
-                      Remove image
-                    </button>
+
+                {imageModelId === "wavespeed-ai/flux-kontext-pro/multi" ? (
+                  /* Multi-image upload UI */
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-3 text-xs text-gray-500 dark:text-gray-400">
+                      选择多张参考图片（最多 4 张）
+                      <div className="mt-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={(e) => void onMultiImageFilesPicked(e)}
+                          disabled={isRunning || imageUploadLoading || imageInputUrls.length >= 4}
+                          className="block w-full text-xs text-gray-500 dark:text-gray-300 file:mr-2 file:rounded file:border-0 file:bg-blue-600 file:px-2 file:py-1 file:text-white"
+                        />
+                      </div>
+                    </div>
+                    {imageInputUrls.length > 0 && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {imageInputUrls.map((url, idx) => (
+                          <div key={idx} className="relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt={`ref ${idx + 1}`} className="w-full h-24 object-cover rounded-lg border border-gray-200 dark:border-gray-700" />
+                            <button
+                              onClick={() => setImageInputUrls((prev) => prev.filter((_, i) => i !== idx))}
+                              disabled={isRunning}
+                              className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <input
-                    type="url"
-                    placeholder="Paste image URL..."
-                    value={imageInputUrl ?? ""}
-                    onChange={(e) => setImageInputUrl(e.target.value || null)}
-                    disabled={isRunning}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                  />
+                  /* Single-image upload UI */
+                  <>
+                    <div
+                      onPaste={(e) => void onPasteImageForTarget(e, "i2i")}
+                      className="mb-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-3 text-xs text-gray-500 dark:text-gray-400"
+                    >
+                      Paste image here (Ctrl/Cmd+V), or upload from file.
+                      <div className="mt-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => void onFilePickedForTarget(e, "i2i")}
+                          disabled={isRunning || imageUploadLoading}
+                          className="block w-full text-xs text-gray-500 dark:text-gray-300 file:mr-2 file:rounded file:border-0 file:bg-blue-600 file:px-2 file:py-1 file:text-white"
+                        />
+                      </div>
+                    </div>
+                    {imageInputUrl ? (
+                      <div className="space-y-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={imageInputUrl}
+                          alt="i2i input"
+                          className="w-full rounded-lg border border-gray-200 dark:border-gray-700 max-h-48 object-contain"
+                        />
+                        <button
+                          onClick={() => setImageInputUrl(null)}
+                          disabled={isRunning}
+                          className="text-xs text-red-500 hover:text-red-700"
+                        >
+                          Remove image
+                        </button>
+                      </div>
+                    ) : (
+                      <input
+                        type="url"
+                        placeholder="Paste image URL..."
+                        value={imageInputUrl ?? ""}
+                        onChange={(e) => setImageInputUrl(e.target.value || null)}
+                        disabled={isRunning}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                      />
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -1322,12 +1737,30 @@ export default function ToolboxPage() {
                   tab === "image"
                     ? imageMode === "i2i"
                       ? "可选：描述希望优化方向（不填也可以）"
+                      : imageMode === "i2i_text"
+                      ? "描述修改内容，例如：修复图中的中文文字乱码，正确文字应为「…」，保持版式不变"
                       : "描述你想要的图片，支持中英文..."
                     : "Describe the video you want to generate..."
                 }
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-none"
                 disabled={isRunning}
               />
+              {tab === "image" && imageMode === "i2i_text" && (imageModelId === "wavespeed-ai/flux-kontext-pro" || imageModelId === "wavespeed-ai/flux-kontext-pro/multi") && !prompt && (
+                <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  <span className="font-medium">修复中文文字提示模板：</span>{" "}
+                  <button
+                    type="button"
+                    className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800"
+                    onClick={() =>
+                      setPrompt(
+                        "请修复图片中所有乱码的中文文字，保持原有版式、字体颜色、字号和位置完全不变，只将乱码替换为正确的中文内容。正确的文字应该是：「在此填写正确文字」"
+                      )
+                    }
+                  >
+                    点击填入模板
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Aspect ratio + Duration (video only) */}
@@ -1475,7 +1908,8 @@ export default function ToolboxPage() {
                     !prompt.trim())) ||
                 (tab === "image" &&
                   (imageMode === "i2i" || imageMode === "i2i_text") &&
-                  !imageInputUrl)
+                  !imageInputUrl &&
+                  !(imageModelId === "wavespeed-ai/flux-kontext-pro/multi" && imageInputUrls.length > 0))
               }
               className="w-full py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -1609,9 +2043,10 @@ export default function ToolboxPage() {
                 </div>
               )}
 
-              {status === "completed" && outputUrl && tab === "video" && (
+              {status === "completed" && outputUrl && tab === "video" && !enableLongVideo && (
                 <div className="space-y-4">
                   <video
+                    key={outputUrl}
                     src={outputUrl}
                     controls
                     autoPlay
@@ -1649,16 +2084,30 @@ export default function ToolboxPage() {
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                       Long Video Segments
                     </h3>
-                    <button
-                      onClick={handleStitch}
-                      disabled={
-                        isStitching ||
-                        longVideoSegments.filter((segment) => segment.status === "completed").length < 2
-                      }
-                      className="text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white disabled:opacity-50"
-                    >
-                      {isStitching ? "Stitching..." : "Stitch Segments"}
-                    </button>
+                    {isStitching && stitchProgress ? (
+                      <div className="flex items-center gap-2 min-w-[140px]">
+                        <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                            style={{ width: `${Math.round((stitchProgress.current / stitchProgress.total) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                          {stitchProgress.current}/{stitchProgress.total}
+                        </span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleStitch}
+                        disabled={
+                          isStitching ||
+                          longVideoSegments.filter((s) => s.status === "completed").length < 2
+                        }
+                        className="text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white disabled:opacity-50"
+                      >
+                        Stitch Segments
+                      </button>
+                    )}
                   </div>
                   <div className="space-y-2">
                     {longVideoSegments.map((segment) => (
@@ -1706,23 +2155,260 @@ export default function ToolboxPage() {
                 </div>
               )}
 
-              {stitchedVideoUrl && tab === "video" && (
+              {(stitchedVideoUrl || isStitching) && tab === "video" && (
                 <div className="mt-6 space-y-3">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                    Stitched Result
-                  </h3>
-                  <video
-                    src={stitchedVideoUrl}
-                    controls
-                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 max-h-[60vh] mx-auto"
-                  />
-                  <a
-                    href={stitchedVideoUrl}
-                    download="long-video.webm"
-                    className="inline-flex text-sm px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">长视频</h3>
+                    {isStitching && stitchProgress && (
+                      <div className="flex items-center gap-2 flex-1 ml-4">
+                        <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                            style={{ width: `${Math.round((stitchProgress.current / stitchProgress.total) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                          {Math.round((stitchProgress.current / stitchProgress.total) * 100)}%
+                          （{stitchProgress.current}/{stitchProgress.total} 段）
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {isStitching && !stitchProgress && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">合并中，请稍等…</p>
+                  )}
+                  {!isStitching && !stitchedVideoUrl && longVideoSegments.some((s) => s.status === "completed") && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">合并失败，可在下方手动合并各段。</p>
+                  )}
+                  {!isStitching && stitchedVideoUrl && (
+                    <>
+                      <video
+                        key={stitchedVideoUrl}
+                        src={stitchedVideoUrl}
+                        controls
+                        autoPlay
+                        className="w-full rounded-lg border border-gray-200 dark:border-gray-700 max-h-[60vh] mx-auto"
+                      />
+                      <a
+                        href={stitchedVideoUrl}
+                        download="long-video.webm"
+                        className="inline-flex text-sm px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                      >
+                        下载长视频
+                      </a>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Audio mixing panel — shown when video is ready */}
+              {tab === "video" && (stitchedVideoUrl || (outputUrl && status === "completed")) && (
+                <div className="mt-6 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setAudioMode((prev) => (prev ? null : "voiceover"))}
+                    className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750"
                   >
-                    Download Stitched Video
-                  </a>
+                    <span>🎙 添加旁白 / 背景音乐</span>
+                    <span className="text-gray-400">{audioMode ? "▲" : "▼"}</span>
+                  </button>
+
+                  {audioMode && (
+                    <div className="p-4 space-y-4">
+                      {/* Mode selector */}
+                      <div className="flex gap-2">
+                        {(["voiceover", "bgm", "both"] as const).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setAudioMode(m)}
+                            className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                              audioMode === m
+                                ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300"
+                                : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300"
+                            }`}
+                          >
+                            {m === "voiceover" ? "🎙 旁白" : m === "bgm" ? "🎵 背景音乐" : "两者都加"}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Voiceover section */}
+                      {(audioMode === "voiceover" || audioMode === "both") && (
+                        <div className="space-y-3">
+                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">旁白文字</label>
+                          <textarea
+                            value={voiceoverText}
+                            onChange={(e) => setVoiceoverText(e.target.value)}
+                            rows={3}
+                            placeholder="输入旁白内容，支持中英文（最多 4096 字）…"
+                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white resize-none"
+                          />
+                          <div className="flex flex-wrap gap-3 items-center">
+                            <div>
+                              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">音色</label>
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={ttsVoice}
+                                  onChange={(e) => { setTtsVoice(e.target.value as typeof ttsVoice); setTtsPreviewUrl(null); }}
+                                  className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700 dark:text-white"
+                                >
+                                  {(["nova", "shimmer", "alloy", "echo", "fable", "onyx"] as const).map((v) => (
+                                    <option key={v} value={v}>{v}</option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={handleTtsPreview}
+                                  disabled={isTtsPreviewing}
+                                  className="text-xs px-2 py-1 rounded border border-purple-400 text-purple-600 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 disabled:opacity-50"
+                                >
+                                  {isTtsPreviewing ? "生成中…" : "试听"}
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flex-1 min-w-[120px]">
+                              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                旁白音量 {voiceoverVolume}%
+                              </label>
+                              <input
+                                type="range"
+                                min={0}
+                                max={100}
+                                value={voiceoverVolume}
+                                onChange={(e) => setVoiceoverVolume(Number(e.target.value))}
+                                className="w-full"
+                              />
+                            </div>
+                          </div>
+                          {ttsPreviewUrl && (
+                            <audio
+                              key={ttsPreviewUrl}
+                              src={ttsPreviewUrl}
+                              controls
+                              autoPlay
+                              className="w-full mt-1"
+                            />
+                          )}
+                        </div>
+                      )}
+
+                      {/* BGM section */}
+                      {(audioMode === "bgm" || audioMode === "both") && (
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">背景音乐</label>
+                            <div className="flex gap-1">
+                              {(["ai", "upload"] as const).map((s) => (
+                                <button
+                                  key={s}
+                                  type="button"
+                                  onClick={() => setBgmSource(s)}
+                                  className={`px-2 py-0.5 rounded text-xs border transition-colors ${
+                                    bgmSource === s
+                                      ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300"
+                                      : "border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400"
+                                  }`}
+                                >
+                                  {s === "ai" ? "🎵 AI 生成" : "📁 上传文件"}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {bgmSource === "ai" ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={bgmPrompt}
+                                onChange={(e) => setBgmPrompt(e.target.value)}
+                                rows={2}
+                                placeholder="描述音乐风格，例如：轻柔钢琴背景音乐，舒缓温暖，无人声…"
+                                className="w-full px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white resize-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleGenerateBgm}
+                                disabled={isGeneratingBgm}
+                                className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                              >
+                                {isGeneratingBgm ? "AI 生成中…" : bgmAudioUrl ? "重新生成" : "AI 生成背景音乐"}
+                              </button>
+                              {bgmAudioUrl && (
+                                <audio key={bgmAudioUrl} src={bgmAudioUrl} controls className="w-full" />
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => bgmFileRef.current?.click()}
+                                  className="text-xs px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                                >
+                                  {bgmFile ? bgmFile.name : "选择音频文件"}
+                                </button>
+                                {bgmFile && (
+                                  <button type="button" onClick={() => setBgmFile(null)} className="text-xs text-red-500">✕</button>
+                                )}
+                              </div>
+                              <input
+                                ref={bgmFileRef}
+                                type="file"
+                                accept="audio/*"
+                                className="hidden"
+                                onChange={(e) => setBgmFile(e.target.files?.[0] ?? null)}
+                              />
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                              音乐音量 {bgmVolume}%
+                            </label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={100}
+                              value={bgmVolume}
+                              onChange={(e) => setBgmVolume(Number(e.target.value))}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleMixAudio}
+                        disabled={isMixing}
+                        className="w-full py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                      >
+                        {isMixing ? "混音中…（实时渲染，请耐心等待）" : "生成带音频视频"}
+                      </button>
+
+                      {audioError && (
+                        <p className="text-xs text-red-500 dark:text-red-400">{audioError}</p>
+                      )}
+
+                      {mixedVideoUrl && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-green-600 dark:text-green-400 font-medium">✓ 混音完成</p>
+                          <video
+                            src={mixedVideoUrl}
+                            controls
+                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 max-h-[60vh]"
+                          />
+                          <a
+                            href={mixedVideoUrl}
+                            download="video-with-audio.webm"
+                            className="inline-flex text-sm px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                          >
+                            下载带音频视频
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

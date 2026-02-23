@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import type React from "react";
 import Link from "next/link";
 
 interface GalleryItem {
@@ -80,6 +81,32 @@ const TEXT = {
   },
 } as const;
 
+/** Responsive masonry column count tracked via ResizeObserver / window resize. */
+function useMasonryColumns(): number {
+  const [cols, setCols] = useState(2);
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth;
+      if (w >= 1280) setCols(4);
+      else if (w >= 1024) setCols(3);
+      else if (w >= 640) setCols(2);
+      else setCols(1);
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  return cols;
+}
+
+/** Convert "16:9" → { aspectRatio: "16/9" } for inline style */
+function aspectRatioStyle(ratio: string | null | undefined): React.CSSProperties {
+  if (!ratio) return {};
+  const [w, h] = ratio.split(":").map(Number);
+  if (!w || !h) return {};
+  return { aspectRatio: `${w}/${h}` };
+}
+
 function MediaCard({
   item,
   isOwner,
@@ -122,14 +149,16 @@ function MediaCard({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow">
+    <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
       <div className="relative bg-gray-100 dark:bg-gray-700">
         {item.type === "video" ? (
           <video
             src={item.blobUrl}
-            className="w-full aspect-video object-cover"
+            className="w-full object-cover"
+            style={aspectRatioStyle(item.aspectRatio)}
             muted
             loop
+            playsInline
             onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play()}
             onMouseLeave={(e) => {
               const v = e.currentTarget as HTMLVideoElement;
@@ -142,7 +171,7 @@ function MediaCard({
           <img
             src={item.blobUrl}
             alt={item.prompt}
-            className="w-full object-cover"
+            className="w-full h-auto block"
             loading="lazy"
           />
         )}
@@ -323,6 +352,15 @@ export default function GalleryClientPage() {
   };
 
   const displayedItems = tab === "public" ? publicItems : myItems;
+  const masonryCols = useMasonryColumns();
+  // Distribute items left-to-right: item[0]→col0, item[1]→col1, …, item[N]→col0, …
+  const masonryColumns = useMemo(
+    () =>
+      Array.from({ length: masonryCols }, (_, ci) =>
+        displayedItems.filter((_, idx) => idx % masonryCols === ci)
+      ),
+    [displayedItems, masonryCols]
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -443,16 +481,20 @@ export default function GalleryClientPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {displayedItems.map((item) => (
-                <MediaCard
-                  key={item.id}
-                  item={item}
-                  isOwner={tab === "mine"}
-                  lang={lang}
-                  onToggle={handleToggle}
-                  onDelete={handleDelete}
-                />
+            <div className="flex gap-4 items-start">
+              {masonryColumns.map((col, ci) => (
+                <div key={ci} className="flex-1 flex flex-col gap-4 min-w-0">
+                  {col.map((item) => (
+                    <MediaCard
+                      key={item.id}
+                      item={item}
+                      isOwner={tab === "mine"}
+                      lang={lang}
+                      onToggle={handleToggle}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
               ))}
             </div>
 

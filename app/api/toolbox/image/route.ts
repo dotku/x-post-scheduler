@@ -13,22 +13,24 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { modelId, prompt, aspectRatio, mode, imageUrl } = body as {
+  const { modelId, prompt, aspectRatio, mode, imageUrl, imageUrls } = body as {
     modelId: string;
     prompt: string;
     aspectRatio?: string;
     mode?: "t2i" | "i2i" | "i2i_text";
     imageUrl?: string;
+    imageUrls?: string[];
   };
 
   const submitMode = mode ?? "t2i";
   const trimmedPrompt = prompt?.trim() ?? "";
   const trimmedImageUrl = imageUrl?.trim() ?? "";
+  const validImageUrls = (imageUrls ?? []).filter(Boolean);
 
   if ((submitMode === "t2i" || submitMode === "i2i_text") && !trimmedPrompt) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
-  if ((submitMode === "i2i" || submitMode === "i2i_text") && !trimmedImageUrl) {
+  if ((submitMode === "i2i" || submitMode === "i2i_text") && !trimmedImageUrl && validImageUrls.length === 0) {
     return NextResponse.json({ error: "Input image URL is required for i2i mode" }, { status: 400 });
   }
 
@@ -55,6 +57,7 @@ export async function POST(request: NextRequest) {
       prompt: trimmedPrompt || "Image enhancement",
       mode: submitMode,
       imageUrl: trimmedImageUrl || undefined,
+      imageUrls: validImageUrls.length > 0 ? validImageUrls : undefined,
       aspectRatio,
     });
     try {

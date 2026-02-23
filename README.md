@@ -71,6 +71,26 @@ wrangler deploy
   - `/api/scheduler`
   - `/api/daily-generate`
 
+## Vercel Analytics Drain (Optional)
+
+To ingest Vercel Web Analytics pageviews into your existing `WebVisit` table, configure a drain to:
+
+- Endpoint: `https://<your-domain>/api/analytics/drain`
+
+Optional security env vars:
+
+- `VERCEL_DRAIN_SIGNATURE_SECRET`: verify `x-vercel-signature` (HMAC-SHA1 of raw body)
+- `VERCEL_ANALYTICS_DRAIN_TOKEN`: if set, request must include one of:
+  - `x-analytics-drain-token: <token>`
+  - `x-vercel-drain-token: <token>`
+  - `Authorization: Bearer <token>`
+
+Notes:
+
+- Route supports JSON array payloads and NDJSON batches.
+- Verification challenge header `x-vercel-verify` is echoed automatically.
+- Ensure Prisma migration containing `WebVisit` has been applied.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

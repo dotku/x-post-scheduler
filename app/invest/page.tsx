@@ -19,6 +19,8 @@ export const metadata: Metadata = {
   description: "Investor page for X Post Scheduler.",
 };
 
+export const dynamic = "force-dynamic";
+
 type Lang = "en" | "zh";
 
 const TEXT = {
@@ -29,7 +31,7 @@ const TEXT = {
     title2: "media operating system",
     title3: "for creators.",
     intro:
-      "X Post Scheduler started as automation. It is now a production stack for text, image, and video generation, scheduling, and publishing. We are raising to scale distribution and turn creator workflows into a recurring software business.",
+      "X Post Scheduler started as automation. It is now an AI media operating system with text, image, video, and voice creation workflows, scheduling, and publishing. We are raising to expand model coverage, platform-native distribution, and multi-agent creation for viral content.",
     requestDeck: "Request Deck",
     bookCall: "Book 20-min Call",
     valuationLabel: "Valuation",
@@ -46,21 +48,22 @@ const TEXT = {
     useOfFunds: "Use of Funds",
     ctaTitle: "Let's build the category leader.",
     ctaText:
-      "If you invest in workflow-first AI products with clear monetization paths, we should talk. We can share product demo, retention cohorts, usage economics, and roadmap in one session.",
+      "If you invest in workflow-first AI products with clear monetization paths, we should talk. We can share product demos, growth metrics, and a roadmap to cover all mainstream media creation models with one-click distribution across YouTube, X, Facebook, Instagram, and Reddit.",
     contact: "Contact Founders",
     viewProduct: "View Product",
     viewStats: "View Live Stats",
     disclaimer:
       "This is an internal indicative estimate, not investment advice or a formal valuation report.",
     updatedAt: "Updated at",
-    kpiVisits30d: "30d Web Visits",
-    kpiVisits7d: "7d visits",
+    kpiVisits30d: "30d Visitors",
+    kpiVisits7d: "7d visitors",
+    kpiVisitsUnavailable: "tracking initializing (client-side pageview events not received yet)",
     kpiActiveCreators: "Active Creators (30d)",
     kpiActiveCreatorsNote: "distinct users with AI usage events",
     kpiRequests: "AI Requests (30d)",
     kpiCashTopup: "Cash Top-up (30d)",
     kpiCashTopupNote: "actual paid credit purchases",
-    calcRevenue: "Estimated Revenue (30d) = OpenAI billed usage + WaveSpeed billed usage",
+    calcRevenue: "Estimated Revenue (30d) = billed model usage across text, image, video, and voice",
     calcArr: "Implied ARR = 12 x 30d estimated revenue",
     calcMultiple: "Multiple bands adjust with active creators, web traffic, and request volume.",
     calcRatio: "Observed cash top-up (30d)",
@@ -78,11 +81,25 @@ const TEXT = {
     roadmapScore: "Roadmap Intensity",
     marketScore: "Market Momentum",
     modelAssumption:
-      "Model assumptions: team burn + infra run-rate + go-to-market budget + roadmap one-off + contingency.",
+      "Model assumptions: lean team burn + infra run-rate + go-to-market budget + roadmap one-off + contingency.",
+    marketBenchmark:
+      "Market benchmark guardrail: target dilution bands are 12% / 18% / 25% for conservative / balanced / aggressive planning.",
     monthlyBurn: "Estimated Monthly Burn",
     roadmapBudget: "Roadmap Budget",
     gtmBudget: "Go-to-Market Budget",
     contingency: "Contingency",
+    equityTitle: "Estimated Equity Offered",
+    equitySubtitle:
+      "Estimated post-money dilution based on current valuation bands and suggested raise sizes.",
+    scenarioConservative: "Conservative scenario",
+    scenarioBalanced: "Balanced scenario",
+    scenarioAggressive: "Aggressive scenario",
+    raiseAmount: "Raise",
+    preMoney: "Pre-money",
+    postMoney: "Post-money",
+    equityOffered: "Estimated Equity",
+    equityFormula: "Formula: equity = raise / (pre-money + raise)",
+    targetDilution: "Target Dilution",
   },
   zh: {
     memo: "投资人简报",
@@ -91,7 +108,7 @@ const TEXT = {
     title2: "创作者媒体操作系统",
     title3: "让内容生产可规模化。",
     intro:
-      "X Post Scheduler 最初是自动化发帖工具，现在已发展为覆盖文本、图片、视频生成与调度发布的一体化生产系统。我们正在融资，用于扩大分发能力并将创作者工作流转化为可持续的订阅业务。",
+      "X Post Scheduler 最初是自动化发帖工具，现在已发展为覆盖文本、图片、视频、语音创作工作流，并支持调度与发布的 AI 媒体操作系统。我们正在融资，用于扩展模型覆盖、平台化分发能力，以及多智能体爆款内容生产能力。",
     requestDeck: "索取融资材料",
     bookCall: "预约 20 分钟沟通",
     valuationLabel: "估值",
@@ -108,20 +125,21 @@ const TEXT = {
     useOfFunds: "资金用途",
     ctaTitle: "一起打造这个品类的头部产品。",
     ctaText:
-      "如果你关注工作流驱动、且具备清晰变现路径的 AI 产品，我们可以进一步沟通。我们可以在一次会议中分享产品演示、留存数据、使用经济模型与路线图。",
+      "如果你关注工作流驱动、且具备清晰变现路径的 AI 产品，我们可以进一步沟通。我们可以在一次会议中分享产品演示、增长数据，以及覆盖主流媒体创作模型、并实现 YouTube、X、Facebook、Instagram、Reddit 一键分发的路线图。",
     contact: "联系创始人",
     viewProduct: "查看产品",
     viewStats: "查看实时数据",
     disclaimer: "本页面为内部测算估值，不构成投资建议或正式估值报告。",
     updatedAt: "更新时间",
-    kpiVisits30d: "30天网站访问",
-    kpiVisits7d: "7天访问",
+    kpiVisits30d: "30天访客",
+    kpiVisits7d: "7天访客",
+    kpiVisitsUnavailable: "访问埋点初始化中（暂未收到前端 pageview 事件）",
     kpiActiveCreators: "活跃创作者（30天）",
     kpiActiveCreatorsNote: "30天内有 AI 使用记录的去重用户",
     kpiRequests: "AI 请求量（30天）",
     kpiCashTopup: "现金充值（30天）",
     kpiCashTopupNote: "用户实际完成支付充值",
-    calcRevenue: "估算收入（30天）= OpenAI 计费 + WaveSpeed 计费",
+    calcRevenue: "估算收入（30天）= 文本/图片/视频/语音模型计费使用总额",
     calcArr: "推算 ARR = 30天估算收入 x 12",
     calcMultiple: "估值倍数会根据活跃创作者、访问量和请求量动态调整。",
     calcRatio: "观察到的现金充值（30天）",
@@ -131,43 +149,55 @@ const TEXT = {
     fundingRange: "建议融资规模",
     fundingLow: "保守方案",
     fundingBase: "推荐方案",
-    fundingHigh: "进攻方案",
+    fundingHigh: "激进方案",
     runway: "目标跑道",
     months: "个月",
     featureScore: "产品成熟度",
     roadmapScore: "路线图强度",
     marketScore: "市场动能",
-    modelAssumption: "模型假设：团队人力成本 + 基础设施成本 + 市场投入 + 路线图一次性投入 + 风险缓冲。",
+    modelAssumption: "模型假设：精简团队人力成本 + 基础设施成本 + 市场投入 + 路线图一次性投入 + 风险缓冲。",
+    marketBenchmark: "市场基准约束：保守/平衡/激进三档目标稀释比例分别为 12% / 18% / 25%。",
     monthlyBurn: "月度成本估算",
     roadmapBudget: "路线图预算",
     gtmBudget: "市场增长预算",
     contingency: "风险缓冲",
+    equityTitle: "预计可出让股份",
+    equitySubtitle: "基于当前估值区间与建议融资规模，估算投后稀释比例。",
+    scenarioConservative: "保守场景",
+    scenarioBalanced: "平衡场景",
+    scenarioAggressive: "激进场景",
+    raiseAmount: "融资额",
+    preMoney: "融资前估值",
+    postMoney: "融资后估值",
+    equityOffered: "预计出让股份",
+    equityFormula: "公式：股权占比 = 融资额 /（融资前估值 + 融资额）",
+    targetDilution: "目标稀释比例",
   },
 } as const;
 
 const MOAT_TEXT = {
   en: [
-    "Workflow moat: scheduling, generation, knowledge, and gallery are integrated in one product loop.",
-    "Cost moat: provider routing (OpenAI + WaveSpeed + others) lets us optimize margin per generation.",
-    "Data moat: real prompt/output/engagement traces improve templates and defaults over time.",
+    "Workflow moat: research, generation, scheduling, publishing, and gallery are integrated in one loop.",
+    "Distribution moat: one-click channel-specific outputs for YouTube, X, Facebook, Instagram, and Reddit.",
+    "Intelligence moat: multi-agent planning, drafting, editing, and optimization improve viral hit-rate over time.",
   ],
   zh: [
-    "工作流护城河：调度、生成、知识库、画廊形成闭环，用户迁移成本高。",
-    "成本护城河：多模型供应商路由（OpenAI + WaveSpeed 等）可持续优化毛利。",
-    "数据护城河：真实提示词/输出/互动数据沉淀，持续提升模板与默认策略。",
+    "工作流护城河：调研、生成、调度、发布、画廊回流形成一体化闭环，用户迁移成本高。",
+    "分发护城河：支持 YouTube、X、Facebook、Instagram、Reddit 平台化的一键分发与差异化内容包装。",
+    "智能体护城河：多智能体协同完成选题、撰写、编辑与优化，持续提升爆款内容产出率。",
   ],
 } as const;
 
 const USE_OF_FUNDS_TEXT = {
   en: [
-    { title: "Growth", detail: "Performance acquisition, creator referral system, and conversion optimization." },
-    { title: "Product", detail: "Long-video pipeline, higher-fidelity i2i workflows, and multilingual UX upgrades." },
-    { title: "Infra", detail: "Smarter model routing, reliability hardening, and margin-aware generation controls." },
+    { title: "Growth", detail: "Creator acquisition, referral loops, and channel-specific conversion optimization." },
+    { title: "Product", detail: "Platform-native content formats and one-click distribution for major social networks." },
+    { title: "AI Engine", detail: "Broader mainstream model coverage and multi-agent workflows for viral content generation." },
   ],
   zh: [
-    { title: "增长", detail: "效果投放、创作者推荐体系、转化漏斗优化。" },
-    { title: "产品", detail: "长视频链路、更高质量图生图流程、双语/多语体验提升。" },
-    { title: "基础设施", detail: "更智能的模型路由、稳定性加固、面向利润的生成控制。" },
+    { title: "增长", detail: "创作者增长体系、推荐裂变与按平台的转化优化。" },
+    { title: "产品", detail: "面向主流社交平台的内容模板、差异化编排与一键分发能力。" },
+    { title: "AI 引擎", detail: "覆盖主流媒体创作模型，并通过多智能体工作流提升爆款内容生成能力。" },
   ],
 } as const;
 
@@ -189,6 +219,10 @@ function usd(cents: number) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   })}`;
+}
+
+function pct(value: number) {
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 export default async function InvestPage({
@@ -253,12 +287,22 @@ export default async function InvestPage({
     if (hasWebVisitTable[0]?.exists) {
       const [visits30dResult, visits7dResult] = await Promise.all([
         prisma.$queryRaw<Array<{ count: bigint }>>`
-          SELECT COUNT(*)::bigint AS count
+          SELECT COUNT(
+            DISTINCT COALESCE(
+              NULLIF("sessionId", ''),
+              CASE WHEN "userId" IS NOT NULL THEN ('u:' || "userId") ELSE ('v:' || "id") END
+            )
+          )::bigint AS count
           FROM "WebVisit"
           WHERE "createdAt" >= ${since30d}
         `,
         prisma.$queryRaw<Array<{ count: bigint }>>`
-          SELECT COUNT(*)::bigint AS count
+          SELECT COUNT(
+            DISTINCT COALESCE(
+              NULLIF("sessionId", ''),
+              CASE WHEN "userId" IS NOT NULL THEN ('u:' || "userId") ELSE ('v:' || "id") END
+            )
+          )::bigint AS count
           FROM "WebVisit"
           WHERE "createdAt" >= ${since7d}
         `,
@@ -303,9 +347,14 @@ export default async function InvestPage({
   const lowMultiple = Math.max(3, baseMultiple - 1);
   const highMultiple = Math.min(10, baseMultiple + 1);
 
-  const valuationLowCents = Math.max(250_000_00, Math.round(estArrCents * lowMultiple));
-  const valuationBaseCents = Math.max(400_000_00, Math.round(estArrCents * baseMultiple));
-  const valuationHighCents = Math.max(600_000_00, Math.round(estArrCents * highMultiple));
+  const isSeedStageLike =
+    activeCreators30d >= 30 || paidRevenue30dCents >= 2_000_00 || usageAgg30d._count._all >= 1000;
+  const valuationFloor = isSeedStageLike
+    ? { low: 500_000_000, base: 900_000_000, high: 1_500_000_000 }
+    : { low: 200_000_000, base: 350_000_000, high: 600_000_000 };
+  const valuationLowCents = Math.max(valuationFloor.low, Math.round(estArrCents * lowMultiple));
+  const valuationBaseCents = Math.max(valuationFloor.base, Math.round(estArrCents * baseMultiple));
+  const valuationHighCents = Math.max(valuationFloor.high, Math.round(estArrCents * highMultiple));
   const markupMultiplier = Number(process.env.MARKUP_MULTIPLIER ?? "60") || 60;
   const openAiProviderCost30dCents = Math.max(
     0,
@@ -339,28 +388,51 @@ export default async function InvestPage({
     )
   );
 
-  const targetRunwayMonths = marketScore >= 7 ? 18 : 24;
-  const monthlyTeamBurnCents = (10 + roadmapScore) * 5_000_00;
-  const monthlyInfraBurnCents = openAiProviderCost30dCents + wavespeedProviderCost30dCents;
-  const monthlyGtmBurnCents = (4 + marketScore) * 2_000_00;
+  const targetDilutionConservative = 0.12;
+  const targetDilutionBalanced = 0.18;
+  const targetDilutionAggressive = 0.25;
+
+  const targetRunwayMonths = marketScore >= 7 ? 18 : 12;
+  const leanTeamSize = Math.max(3, Math.min(6, 3 + Math.round((featureScore + roadmapScore - 8) / 4)));
+  const monthlyTeamBurnCents = leanTeamSize * 18_000_00;
+  const monthlyInfraBurnCents = Math.max(
+    2_000_00,
+    Math.round((openAiProviderCost30dCents + wavespeedProviderCost30dCents) * 4)
+  );
+  const monthlyGtmBurnCents = (3 + marketScore) * 2_500_00;
   const monthlyBurnCents = monthlyTeamBurnCents + monthlyInfraBurnCents + monthlyGtmBurnCents;
 
-  const roadmapOneOffBudgetCents = roadmapScore * 8_000_00;
-  const marketExpansionBudgetCents = marketScore * 5_000_00;
-  const contingencyCents = Math.round((monthlyBurnCents * targetRunwayMonths + roadmapOneOffBudgetCents) * 0.15);
-  const raiseBaseCents =
+  const roadmapOneOffBudgetCents = roadmapScore * 3_000_00;
+  const marketExpansionBudgetCents = marketScore * 2_000_00;
+  const contingencyCents = Math.round((monthlyBurnCents * targetRunwayMonths + roadmapOneOffBudgetCents) * 0.1);
+  const runwayDrivenRaiseCents =
     monthlyBurnCents * targetRunwayMonths +
     roadmapOneOffBudgetCents +
     marketExpansionBudgetCents +
     contingencyCents;
-  const raiseLowCents = Math.round(raiseBaseCents * 0.8);
-  const raiseHighCents = Math.round(raiseBaseCents * 1.25);
+
+  const dilutionDrivenRaiseCents = (preMoneyCents: number, targetDilution: number) =>
+    Math.round((preMoneyCents * targetDilution) / (1 - targetDilution));
+
+  const raiseLowCapCents = dilutionDrivenRaiseCents(valuationHighCents, targetDilutionConservative);
+  const raiseBaseCapCents = dilutionDrivenRaiseCents(valuationBaseCents, targetDilutionBalanced);
+  const raiseHighCapCents = dilutionDrivenRaiseCents(valuationLowCents, targetDilutionAggressive);
+
+  const raiseLowCents = Math.min(Math.round(runwayDrivenRaiseCents * 0.8), raiseLowCapCents);
+  const raiseBaseCents = Math.min(runwayDrivenRaiseCents, raiseBaseCapCents);
+  const raiseHighCents = Math.min(Math.round(runwayDrivenRaiseCents * 1.2), raiseHighCapCents);
+  const equityConservative = raiseLowCents / (valuationHighCents + raiseLowCents);
+  const equityBalanced = raiseBaseCents / (valuationBaseCents + raiseBaseCents);
+  const equityAggressive = raiseHighCents / (valuationLowCents + raiseHighCents);
 
   const kpis = [
     {
       label: t.kpiVisits30d,
       value: webVisits30d.toLocaleString(),
-      note: `${t.kpiVisits7d}: ${webVisits7d.toLocaleString()}`,
+      note:
+        webVisits30d === 0 && activeCreators30d > 0
+          ? t.kpiVisitsUnavailable
+          : `${t.kpiVisits7d}: ${webVisits7d.toLocaleString()}`,
     },
     {
       label: t.kpiActiveCreators,
@@ -538,6 +610,51 @@ export default async function InvestPage({
             </p>
           </div>
           <p className="mt-3 text-xs text-[#9fb9cc]">{t.modelAssumption}</p>
+          <p className="mt-1 text-xs text-[#9fb9cc]">{t.marketBenchmark}</p>
+        </section>
+
+        <section className="mt-6 rounded-2xl border border-[#F7B267]/35 bg-[#241b1a]/70 p-5">
+          <h2 className={`${heading.className} text-2xl text-[#F6FBFF]`}>{t.equityTitle}</h2>
+          <p className="mt-2 text-sm text-[#e5d8cf]">{t.equitySubtitle}</p>
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            <article className="rounded-xl border border-white/15 bg-white/5 p-4">
+              <p className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#f8cca6]`}>
+                {t.scenarioConservative}
+              </p>
+              <p className={`${heading.className} mt-2 text-3xl text-[#ffe8cf]`}>{pct(equityConservative)}</p>
+              <div className="mt-2 space-y-1 text-xs text-[#e6d6c9]">
+                <p>{t.raiseAmount}: {usd(raiseLowCents)}</p>
+                <p>{t.targetDilution}: {pct(targetDilutionConservative)}</p>
+                <p>{t.preMoney}: {usd(valuationHighCents)}</p>
+                <p>{t.postMoney}: {usd(valuationHighCents + raiseLowCents)}</p>
+              </div>
+            </article>
+            <article className="rounded-xl border border-white/20 bg-white/5 p-4">
+              <p className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#f8cca6]`}>
+                {t.scenarioBalanced}
+              </p>
+              <p className={`${heading.className} mt-2 text-3xl text-white`}>{pct(equityBalanced)}</p>
+              <div className="mt-2 space-y-1 text-xs text-[#e6d6c9]">
+                <p>{t.raiseAmount}: {usd(raiseBaseCents)}</p>
+                <p>{t.targetDilution}: {pct(targetDilutionBalanced)}</p>
+                <p>{t.preMoney}: {usd(valuationBaseCents)}</p>
+                <p>{t.postMoney}: {usd(valuationBaseCents + raiseBaseCents)}</p>
+              </div>
+            </article>
+            <article className="rounded-xl border border-white/15 bg-white/5 p-4">
+              <p className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#f8cca6]`}>
+                {t.scenarioAggressive}
+              </p>
+              <p className={`${heading.className} mt-2 text-3xl text-[#ffe8cf]`}>{pct(equityAggressive)}</p>
+              <div className="mt-2 space-y-1 text-xs text-[#e6d6c9]">
+                <p>{t.raiseAmount}: {usd(raiseHighCents)}</p>
+                <p>{t.targetDilution}: {pct(targetDilutionAggressive)}</p>
+                <p>{t.preMoney}: {usd(valuationLowCents)}</p>
+                <p>{t.postMoney}: {usd(valuationLowCents + raiseHighCents)}</p>
+              </div>
+            </article>
+          </div>
+          <p className="mt-3 text-xs text-[#c8b5a8]">{t.equityFormula}</p>
         </section>
 
         <section className="mt-6 rounded-2xl border border-white/15 bg-[#101f31]/70 p-5">
@@ -584,7 +701,7 @@ export default async function InvestPage({
           </article>
         </section>
 
-        <section className="mt-10 rounded-2xl border border-[#6CFFA3]/40 bg-gradient-to-r from-[#6CFFA3]/15 via-[#43C9FF]/10 to-[#F7B267]/20 p-6">
+        <section className="mt-10 rounded-2xl border border-[#6CFFA3]/40 bg-linear-to-r from-[#6CFFA3]/15 via-[#43C9FF]/10 to-[#F7B267]/20 p-6">
           <h2 className={`${heading.className} text-2xl text-white`}>{t.ctaTitle}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-7 text-[#D2E2F0]">{t.ctaText}</p>
           <div className="mt-4 flex flex-wrap gap-3">
