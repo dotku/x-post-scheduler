@@ -7,26 +7,24 @@ import { buildSignedBlobProxyUrl } from "@/lib/blob-proxy";
 import { format } from "date-fns";
 import PostList from "@/components/PostList";
 import UserMenu from "@/components/UserMenu";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { headers as nextHeaders } from "next/headers";
+import { getTranslations, getLocale } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
 const MAX_POSTS = 100;
 
-/** Resolve a stored media URL to one that the browser can load directly. */
 function resolveMediaUrl(rawUrl: string, origin: string): string {
   if (!rawUrl) return rawUrl;
-  // Already a proxy URL — keep as-is (the proxy will re-sign if needed)
   if (rawUrl.includes("/api/toolbox/blob-proxy")) return rawUrl;
-  // Private blob — wrap in signed proxy
   if (rawUrl.includes(".private.blob.vercel-storage.com")) {
     try { return buildSignedBlobProxyUrl(origin, rawUrl); } catch { return rawUrl; }
   }
   return rawUrl;
 }
 
-/** Parse the JSON mediaUrls string and resolve the first URL. */
 function resolvePostMediaUrl(mediaUrls: string | null, origin: string): string | null {
   if (!mediaUrls) return null;
   try {
@@ -46,7 +44,6 @@ async function getPosts(userId: string, origin: string) {
   });
   type DbPost = (typeof dbPosts)[number];
 
-  // Pre-resolve media URLs so the browser can load them directly
   const resolvedDbPosts = dbPosts.map((p) => ({
     ...p,
     resolvedMediaUrl: p.mediaAssetId
@@ -73,11 +70,7 @@ async function getPosts(userId: string, origin: string) {
         )
     );
     const remaining = MAX_POSTS - dbPosts.length;
-    const recentTweets = await getRecentTweets(
-      remaining,
-      existingTweetIds,
-      credentials.credentials
-    );
+    const recentTweets = await getRecentTweets(remaining, existingTweetIds, credentials.credentials);
     const apiPosts = recentTweets.map((tweet) => ({
       id: `x-${tweet.id}`,
       content: tweet.text,
@@ -107,12 +100,15 @@ async function getRecurringSchedules(userId: string) {
 }
 
 export default async function Dashboard() {
+  const t = await getTranslations("dashboard");
+  const tNav = await getTranslations("nav");
+  const locale = await getLocale();
   const user = await getAuthenticatedUser();
   if (!user) {
-    redirect("/login");
+    redirect(locale === "zh" ? "/zh/login" : "/login");
   }
 
-  const headersList = await headers();
+  const headersList = await nextHeaders();
   const host = headersList.get("host") || "localhost:3000";
   const proto = process.env.NODE_ENV === "production" ? "https" : "http";
   const origin = process.env.NEXT_PUBLIC_APP_URL || `${proto}://${host}`;
@@ -121,69 +117,29 @@ export default async function Dashboard() {
   const schedules = await getRecurringSchedules(user.id);
 
   type DbPost = (typeof dbPosts)[number];
-  const scheduledCount = dbPosts.filter(
-    (p: DbPost) => p.status === "scheduled"
-  ).length;
-  const postedCount = dbPosts.filter(
-    (p: DbPost) => p.status === "posted"
-  ).length;
-  const failedCount = dbPosts.filter(
-    (p: DbPost) => p.status === "failed"
-  ).length;
+  const scheduledCount = dbPosts.filter((p: DbPost) => p.status === "scheduled").length;
+  const postedCount = dbPosts.filter((p: DbPost) => p.status === "posted").length;
+  const failedCount = dbPosts.filter((p: DbPost) => p.status === "failed").length;
+
+  const prefix = locale === "zh" ? "/zh" : "";
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              X Post Scheduler
+              {tNav("appTitle")}
             </h1>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-              <Link
-                href="/gallery"
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-                title="Public Gallery Feed"
-              >
-                Gallery Feed
-              </Link>
-              <Link
-                href="/toolbox"
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-                title="Media Studio"
-              >
-                Media Studio
-              </Link>
-              <Link
-                href="/generate"
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-                title="AI Writer"
-              >
-                AI Writer
-              </Link>
-              <Link
-                href="/schedule"
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-                title="Compose Post"
-              >
-                Compose Post
-              </Link>
-              <Link
-                href="/recurring"
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-                title="Auto Post"
-              >
-                Auto Post
-              </Link>
-              <Link
-                href="/knowledge"
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-                title="Knowledge Base"
-              >
-                Knowledge Base
-              </Link>
+              <Link href={`${prefix}/gallery`} className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4">{tNav("gallery")}</Link>
+              <Link href={`${prefix}/toolbox`} className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4">{tNav("toolbox")}</Link>
+              <Link href={`${prefix}/generate`} className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4">{tNav("generate")}</Link>
+              <Link href={`${prefix}/schedule`} className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4">{tNav("compose")}</Link>
+              <Link href={`${prefix}/recurring`} className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4">{tNav("autoPost")}</Link>
+              <Link href={`${prefix}/knowledge`} className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4">{tNav("knowledge")}</Link>
               <div className="border-l border-gray-300 dark:border-gray-600 h-5 mx-1 hidden sm:block" />
+              <LanguageSwitcher />
               <UserMenu />
             </div>
           </div>
@@ -196,81 +152,39 @@ export default async function Dashboard() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900">
-                <svg
-                  className="w-6 h-6 text-yellow-600 dark:text-yellow-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
+                <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Scheduled
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {scheduledCount}
-                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t("scheduled")}</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{scheduledCount}</p>
               </div>
             </div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="p-3 rounded-full bg-green-100 dark:bg-green-900">
-                <svg
-                  className="w-6 h-6 text-green-600 dark:text-green-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
+                <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Posted
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {postedCount}
-                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t("posted")}</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{postedCount}</p>
               </div>
             </div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center">
               <div className="p-3 rounded-full bg-red-100 dark:bg-red-900">
-                <svg
-                  className="w-6 h-6 text-red-600 dark:text-red-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
               <div className="ml-4">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Failed
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {failedCount}
-                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t("failed")}</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{failedCount}</p>
               </div>
             </div>
           </div>
@@ -280,25 +194,19 @@ export default async function Dashboard() {
         {schedules.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Active Auto Posts
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("activeAutoPosts")}</h2>
             </div>
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {schedules.map((schedule) => (
-                <div
-                  key={schedule.id}
-                  className="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
-                >
+                <div key={schedule.id} className="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div>
                     <p className="text-gray-900 dark:text-white line-clamp-1">
                       {schedule.useAi
-                        ? `AI generated${schedule.aiPrompt ? `: ${schedule.aiPrompt}` : ""}`
+                        ? `${t("aiGenerated")}${schedule.aiPrompt ? `: ${schedule.aiPrompt}` : ""}`
                         : schedule.content}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {schedule.frequency} - Next:{" "}
-                      {format(new Date(schedule.nextRunAt), "PPp")}
+                      {schedule.frequency} - {t("next")}: {format(new Date(schedule.nextRunAt), "PPp")}
                     </p>
                   </div>
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
@@ -313,9 +221,7 @@ export default async function Dashboard() {
         {/* Posts List */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              All Posts
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t("allPosts")}</h2>
           </div>
           <PostList initialPosts={mergedPosts} />
         </div>

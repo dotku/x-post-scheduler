@@ -1,42 +1,4 @@
-import type { Metadata } from "next";
-import { Suspense } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
-import { Auth0Provider } from "@auth0/nextjs-auth0/client";
-import { Analytics } from "@vercel/analytics/next";
-import PageviewTracker from "@/components/PageviewTracker";
-import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "X Post Scheduler",
-  description: "Schedule and automate your X (Twitter) posts",
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <Auth0Provider>{children}</Auth0Provider>
-        <Suspense fallback={null}>
-          <PageviewTracker />
-        </Suspense>
-        <Analytics />
-      </body>
-    </html>
-  );
+// Root layout — minimal shell. All pages live under app/[locale]/ which provides html/body.
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return children;
 }
