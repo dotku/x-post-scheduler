@@ -29,6 +29,31 @@ export interface TimelineTweet {
   impressionCount: number | null;
 }
 
+export interface TweetMedia {
+  type: string;
+  url: string | null;
+}
+
+export async function getTweetWithMedia(
+  tweetId: string,
+  credentials: XCredentials
+): Promise<{ mediaUrls: string[] }> {
+  const client = createXClient(credentials);
+  const response = await client.v2.singleTweet(tweetId, {
+    expansions: ["attachments.media_keys"],
+    "media.fields": ["url", "preview_image_url", "type"],
+  });
+
+  const mediaItems = response.includes?.media ?? [];
+  const urls: string[] = [];
+  for (const m of mediaItems) {
+    const url = (m as { url?: string; preview_image_url?: string }).url
+      ?? (m as { url?: string; preview_image_url?: string }).preview_image_url;
+    if (url) urls.push(url);
+  }
+  return { mediaUrls: urls };
+}
+
 export async function postTweet(
   content: string,
   credentials: XCredentials

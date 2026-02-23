@@ -3,16 +3,42 @@ import { prisma } from "@/lib/db";
 import { getRecentTweets } from "@/lib/x-client";
 import { getAuthenticatedUser } from "@/lib/auth0";
 import { getUserXCredentials } from "@/lib/user-credentials";
+import { buildSignedBlobProxyUrl } from "@/lib/blob-proxy";
 import { format } from "date-fns";
 import PostList from "@/components/PostList";
 import UserMenu from "@/components/UserMenu";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
 const MAX_POSTS = 100;
 
-async function getPosts(userId: string) {
+/** Resolve a stored media URL to one that the browser can load directly. */
+function resolveMediaUrl(rawUrl: string, origin: string): string {
+  if (!rawUrl) return rawUrl;
+  // Already a proxy URL — keep as-is (the proxy will re-sign if needed)
+  if (rawUrl.includes("/api/toolbox/blob-proxy")) return rawUrl;
+  // Private blob — wrap in signed proxy
+  if (rawUrl.includes(".private.blob.vercel-storage.com")) {
+    try { return buildSignedBlobProxyUrl(origin, rawUrl); } catch { return rawUrl; }
+  }
+  return rawUrl;
+}
+
+/** Parse the JSON mediaUrls string and resolve the first URL. */
+function resolvePostMediaUrl(mediaUrls: string | null, origin: string): string | null {
+  if (!mediaUrls) return null;
+  try {
+    const arr = JSON.parse(mediaUrls);
+    const first = Array.isArray(arr) && arr[0] ? String(arr[0]) : null;
+    return first ? resolveMediaUrl(first, origin) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getPosts(userId: string, origin: string) {
   const dbPosts = await prisma.post.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
@@ -20,13 +46,21 @@ async function getPosts(userId: string) {
   });
   type DbPost = (typeof dbPosts)[number];
 
+  // Pre-resolve media URLs so the browser can load them directly
+  const resolvedDbPosts = dbPosts.map((p) => ({
+    ...p,
+    resolvedMediaUrl: p.mediaAssetId
+      ? `/api/media/${p.mediaAssetId}`
+      : resolvePostMediaUrl(p.mediaUrls, origin),
+  }));
+
   if (dbPosts.length >= MAX_POSTS) {
-    return { dbPosts, mergedPosts: dbPosts };
+    return { dbPosts, mergedPosts: resolvedDbPosts };
   }
 
   const credentials = await getUserXCredentials(userId);
   if (!credentials) {
-    return { dbPosts, mergedPosts: dbPosts };
+    return { dbPosts, mergedPosts: resolvedDbPosts };
   }
 
   try {
@@ -57,10 +91,10 @@ async function getPosts(userId: string) {
       impressionCount: tweet.impressionCount,
     }));
 
-    return { dbPosts, mergedPosts: [...dbPosts, ...apiPosts] };
+    return { dbPosts, mergedPosts: [...resolvedDbPosts, ...apiPosts] };
   } catch (error) {
     console.error("Failed to load recent tweets:", error);
-    return { dbPosts, mergedPosts: dbPosts };
+    return { dbPosts, mergedPosts: resolvedDbPosts };
   }
 }
 
@@ -78,7 +112,12 @@ export default async function Dashboard() {
     redirect("/login");
   }
 
-  const { dbPosts, mergedPosts } = await getPosts(user.id);
+  const headersList = await headers();
+  const host = headersList.get("host") || "localhost:3000";
+  const proto = process.env.NODE_ENV === "production" ? "https" : "http";
+  const origin = process.env.NEXT_PUBLIC_APP_URL || `${proto}://${host}`;
+
+  const { dbPosts, mergedPosts } = await getPosts(user.id, origin);
   const schedules = await getRecurringSchedules(user.id);
 
   type DbPost = (typeof dbPosts)[number];
