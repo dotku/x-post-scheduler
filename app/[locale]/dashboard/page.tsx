@@ -139,7 +139,9 @@ export default async function Dashboard({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {tNav("appTitle")}
+              <Link href={prefix || "/"} className="hover:opacity-80 transition-opacity">
+                {tNav("appTitle")}
+              </Link>
             </h1>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <Link href={`${prefix}/gallery`} className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4">{tNav("gallery")}</Link>

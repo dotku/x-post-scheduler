@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import type React from "react";
 import Link from "next/link";
+import { isVerifiedMember } from "@/lib/subscription";
 
 interface CommentUser {
   name: string | null;
@@ -34,7 +35,7 @@ interface GalleryItem {
   likeCount?: number;
   commentCount?: number;
   currentUserLiked?: boolean;
-  user?: { id?: string; name: string | null; picture: string | null };
+  user?: { id?: string; name: string | null; picture: string | null; subscriptionTier?: string | null; subscriptionStatus?: string | null };
 }
 
 type Tab = "public" | "mine";
@@ -355,7 +356,12 @@ function MediaCard({
         {/* Author + Follow */}
         {item.user?.name && (
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-gray-400 truncate">{t.by} {item.user.name}</p>
+            <p className="text-xs text-gray-400 truncate flex items-center gap-1">
+              {t.by} {item.user.name}
+              {isVerifiedMember(item.user.subscriptionTier, item.user.subscriptionStatus) && (
+                <span className="text-blue-500 font-bold" title={item.user.subscriptionTier ?? ""}>✓</span>
+              )}
+            </p>
             {authorId && !isOwnContent && (
               <button
                 onClick={() => handleFollow(authorId)}

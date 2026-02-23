@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: {
-        user: { select: { id: true, name: true, picture: true } },
+        user: { select: { id: true, name: true, picture: true, subscriptionTier: true, subscriptionStatus: true } },
         _count: { select: { likes: true, comments: true } },
       },
     });
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       include: {
-        user: { select: { id: true, name: true, picture: true } },
+        user: { select: { id: true, name: true, picture: true, subscriptionTier: true, subscriptionStatus: true } },
       },
     });
     const hasMore = items.length > limit;

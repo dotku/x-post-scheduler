@@ -5,6 +5,13 @@ import { useUser } from "@auth0/nextjs-auth0/client";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useRouter, usePathname } from "next/navigation";
+import {
+  TIERS,
+  TIER_ORDER,
+  isVerifiedMember,
+  getTierInfo,
+} from "@/lib/subscription";
+import type { TierKey } from "@/lib/subscription";
 
 interface XAccount {
   id: string;
@@ -70,11 +77,16 @@ export default function SettingsPage() {
   const pathname = usePathname();
   const [accounts, setAccounts] = useState<XAccount[]>([]);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
-  const [credits, setCredits] = useState<CreditData>({ balanceCents: 0, transactions: [] });
+  const [credits, setCredits] = useState<CreditData>({
+    balanceCents: 0,
+    transactions: [],
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [topupLoading, setTopupLoading] = useState<number | null>(null);
-  const [verifyStatus, setVerifyStatus] = useState<Record<string, VerifyStatus>>({});
+  const [verifyStatus, setVerifyStatus] = useState<
+    Record<string, VerifyStatus>
+  >({});
   const [verifyError, setVerifyError] = useState<Record<string, string>>({});
   const [editState, setEditState] = useState<EditState | null>(null);
   const [updating, setUpdating] = useState(false);
@@ -91,6 +103,16 @@ export default function SettingsPage() {
   const [setAsDefault, setSetAsDefault] = useState(true);
   const [appLanguage, setAppLanguage] = useState<AppLanguage>("en");
 
+  // Subscription
+  const [subTier, setSubTier] = useState<string | null>(null);
+  const [subStatus, setSubStatus] = useState<string | null>(null);
+  const [subPeriodEnd, setSubPeriodEnd] = useState<string | null>(null);
+  const [accountLimit, setAccountLimit] = useState<number>(1);
+  const [subLoading, setSubLoading] = useState<string | null>(null);
+  const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">(
+    "monthly",
+  );
+
   useEffect(() => {
     if (!authLoading && user) {
       void fetchData();
@@ -101,6 +123,16 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    // Handle subscription success redirect
+    if (params.get("sub") === "success") {
+      setMessage({
+        type: "success",
+        text: "Subscription activated! Credits will be added shortly.",
+      });
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+
     const topup = params.get("topup");
     const sessionId = params.get("session_id");
 
@@ -132,7 +164,10 @@ export default function SettingsPage() {
           const data = await res.json().catch(() => ({}));
           if (res.ok) {
             await fetchData();
-            setMessage({ type: "success", text: "Credits added successfully!" });
+            setMessage({
+              type: "success",
+              text: "Credits added successfully!",
+            });
             return;
           }
 
@@ -143,7 +178,8 @@ export default function SettingsPage() {
 
           setMessage({
             type: "error",
-            text: data.error || "Payment succeeded, but credit fulfillment failed.",
+            text:
+              data.error || "Payment succeeded, but credit fulfillment failed.",
           });
           return;
         }
@@ -162,10 +198,11 @@ export default function SettingsPage() {
 
   async function fetchData() {
     try {
-      const [settingsRes, usageRes, creditsRes] = await Promise.all([
+      const [settingsRes, usageRes, creditsRes, subRes] = await Promise.all([
         fetch("/api/settings"),
         fetch("/api/usage?days=30"),
         fetch("/api/credits"),
+        fetch("/api/me/subscription"),
       ]);
       if (!settingsRes.ok) return;
       const data = await settingsRes.json();
@@ -181,6 +218,13 @@ export default function SettingsPage() {
       }
       if (creditsRes.ok) {
         setCredits(await creditsRes.json());
+      }
+      if (subRes.ok) {
+        const subData = await subRes.json();
+        setSubTier(subData.tier);
+        setSubStatus(subData.status);
+        setSubPeriodEnd(subData.periodEnd);
+        setAccountLimit(subData.accountLimit ?? 1);
       }
     } finally {
       setLoading(false);
@@ -200,7 +244,10 @@ export default function SettingsPage() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        setMessage({ type: "error", text: data.error || "Failed to start checkout" });
+        setMessage({
+          type: "error",
+          text: data.error || "Failed to start checkout",
+        });
       }
     } catch {
       setMessage({ type: "error", text: "Failed to start checkout" });
@@ -209,17 +256,87 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleSubscribe(
+    tier: string,
+    intervalOverride?: "monthly" | "yearly",
+  ) {
+    setSubLoading(tier);
+    setMessage(null);
+    try {
+      const interval = intervalOverride ?? billingInterval;
+      const res = await fetch("/api/stripe/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier, interval }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        setMessage({
+          type: "error",
+          text: data.error || "Failed to start subscription",
+        });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to start subscription" });
+    } finally {
+      setSubLoading(null);
+    }
+  }
+
+  async function handleCancelSubscription() {
+    if (
+      !confirm(
+        "Cancel subscription? You will keep access until the end of the billing period.",
+      )
+    )
+      return;
+    setSubLoading("cancel");
+    setMessage(null);
+    try {
+      const res = await fetch("/api/stripe/subscribe/cancel", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSubStatus("cancelled");
+        const end = data.periodEnd
+          ? format(new Date(data.periodEnd), "MMM d, yyyy")
+          : "";
+        setMessage({
+          type: "success",
+          text: `Subscription cancelled. Access continues until ${end}.`,
+        });
+      } else {
+        setMessage({
+          type: "error",
+          text: data.error || "Failed to cancel subscription",
+        });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to cancel subscription" });
+    } finally {
+      setSubLoading(null);
+    }
+  }
+
   async function handleVerify(accountId: string) {
     setVerifyStatus((s) => ({ ...s, [accountId]: "checking" }));
     setVerifyError((e) => ({ ...e, [accountId]: "" }));
     try {
-      const res = await fetch(`/api/settings/verify?accountId=${encodeURIComponent(accountId)}`);
+      const res = await fetch(
+        `/api/settings/verify?accountId=${encodeURIComponent(accountId)}`,
+      );
       const data = await res.json();
       if (data.valid) {
         setVerifyStatus((s) => ({ ...s, [accountId]: "ok" }));
       } else {
         setVerifyStatus((s) => ({ ...s, [accountId]: "error" }));
-        setVerifyError((e) => ({ ...e, [accountId]: data.error || "Verification failed" }));
+        setVerifyError((e) => ({
+          ...e,
+          [accountId]: data.error || "Verification failed",
+        }));
       }
     } catch {
       setVerifyStatus((s) => ({ ...s, [accountId]: "error" }));
@@ -258,13 +375,19 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setMessage({ type: "success", text: `Keys updated — connected as @${data.username || "unknown"}` });
+        setMessage({
+          type: "success",
+          text: `Keys updated — connected as @${data.username || "unknown"}`,
+        });
         setEditState(null);
         // Reset verify status so it shows fresh
         setVerifyStatus((s) => ({ ...s, [editState.accountId]: "idle" }));
         await fetchData();
       } else {
-        setMessage({ type: "error", text: data.error || "Failed to update keys" });
+        setMessage({
+          type: "error",
+          text: data.error || "Failed to update keys",
+        });
       }
     } catch {
       setMessage({ type: "error", text: "Failed to update keys" });
@@ -334,7 +457,7 @@ export default function SettingsPage() {
     setMessage(null);
     const res = await fetch(
       `/api/settings?accountId=${encodeURIComponent(accountId)}`,
-      { method: "DELETE" }
+      { method: "DELETE" },
     );
     if (res.ok) {
       await fetchData();
@@ -355,13 +478,18 @@ export default function SettingsPage() {
       const currentIsZh = pathname.startsWith("/zh");
       const wantZh = appLanguage === "zh";
       if (currentIsZh !== wantZh) {
-        const pathWithoutLocale = currentIsZh ? pathname.slice(3) || "/" : pathname;
+        const pathWithoutLocale = currentIsZh
+          ? pathname.slice(3) || "/"
+          : pathname;
         const newPath = wantZh ? `/zh${pathWithoutLocale}` : pathWithoutLocale;
         router.push(newPath);
       } else {
         setMessage({
           type: "success",
-          text: appLanguage === "zh" ? "语言已更新为中文。" : "Language updated to English.",
+          text:
+            appLanguage === "zh"
+              ? "语言已更新为中文。"
+              : "Language updated to English.",
         });
       }
     } catch {
@@ -474,27 +602,45 @@ export default function SettingsPage() {
                       <div className="min-w-0 flex items-center gap-2">
                         {/* Status dot */}
                         {status === "ok" && (
-                          <span className="shrink-0 w-2 h-2 rounded-full bg-green-500" title="Connected" />
+                          <span
+                            className="shrink-0 w-2 h-2 rounded-full bg-green-500"
+                            title="Connected"
+                          />
                         )}
                         {status === "error" && (
-                          <span className="shrink-0 w-2 h-2 rounded-full bg-red-500" title="Connection error" />
+                          <span
+                            className="shrink-0 w-2 h-2 rounded-full bg-red-500"
+                            title="Connection error"
+                          />
                         )}
                         {status === "checking" && (
-                          <span className="shrink-0 w-2 h-2 rounded-full bg-yellow-400 animate-pulse" title="Checking..." />
+                          <span
+                            className="shrink-0 w-2 h-2 rounded-full bg-yellow-400 animate-pulse"
+                            title="Checking..."
+                          />
                         )}
                         {status === "idle" && (
-                          <span className="shrink-0 w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600" title="Not verified" />
+                          <span
+                            className="shrink-0 w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600"
+                            title="Not verified"
+                          />
                         )}
                         <div className="min-w-0">
                           <p className="font-medium text-gray-900 dark:text-white truncate">
-                            {account.label || account.username || "Unnamed account"}
+                            {account.label ||
+                              account.username ||
+                              "Unnamed account"}
                           </p>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
-                            {account.username ? `@${account.username}` : "No username"}
+                            {account.username
+                              ? `@${account.username}`
+                              : "No username"}
                             {account.isDefault ? " • Default" : ""}
                           </p>
                           {status === "error" && verifyError[account.id] && (
-                            <p className="text-xs text-red-500 mt-0.5">{verifyError[account.id]}</p>
+                            <p className="text-xs text-red-500 mt-0.5">
+                              {verifyError[account.id]}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -507,7 +653,11 @@ export default function SettingsPage() {
                           {status === "checking" ? "Checking..." : "Verify"}
                         </button>
                         <button
-                          onClick={() => isEditing ? setEditState(null) : handleStartEdit(account)}
+                          onClick={() =>
+                            isEditing
+                              ? setEditState(null)
+                              : handleStartEdit(account)
+                          }
                           className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
                         >
                           {isEditing ? "Cancel" : "Update keys"}
@@ -545,7 +695,12 @@ export default function SettingsPage() {
                           <input
                             type="text"
                             value={editState.label}
-                            onChange={(e) => setEditState({ ...editState, label: e.target.value })}
+                            onChange={(e) =>
+                              setEditState({
+                                ...editState,
+                                label: e.target.value,
+                              })
+                            }
                             placeholder="e.g. Brand Main, Personal"
                             className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                           />
@@ -558,7 +713,12 @@ export default function SettingsPage() {
                             <input
                               type="password"
                               value={editState.xApiKey}
-                              onChange={(e) => setEditState({ ...editState, xApiKey: e.target.value })}
+                              onChange={(e) =>
+                                setEditState({
+                                  ...editState,
+                                  xApiKey: e.target.value,
+                                })
+                              }
                               required
                               placeholder="Paste new API Key"
                               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -571,7 +731,12 @@ export default function SettingsPage() {
                             <input
                               type="password"
                               value={editState.xApiSecret}
-                              onChange={(e) => setEditState({ ...editState, xApiSecret: e.target.value })}
+                              onChange={(e) =>
+                                setEditState({
+                                  ...editState,
+                                  xApiSecret: e.target.value,
+                                })
+                              }
                               required
                               placeholder="Paste new API Secret"
                               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -584,7 +749,12 @@ export default function SettingsPage() {
                             <input
                               type="password"
                               value={editState.xAccessToken}
-                              onChange={(e) => setEditState({ ...editState, xAccessToken: e.target.value })}
+                              onChange={(e) =>
+                                setEditState({
+                                  ...editState,
+                                  xAccessToken: e.target.value,
+                                })
+                              }
                               required
                               placeholder="Paste new Access Token"
                               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -597,7 +767,12 @@ export default function SettingsPage() {
                             <input
                               type="password"
                               value={editState.xAccessTokenSecret}
-                              onChange={(e) => setEditState({ ...editState, xAccessTokenSecret: e.target.value })}
+                              onChange={(e) =>
+                                setEditState({
+                                  ...editState,
+                                  xAccessTokenSecret: e.target.value,
+                                })
+                              }
                               required
                               placeholder="Paste new Access Token Secret"
                               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -610,7 +785,9 @@ export default function SettingsPage() {
                             disabled={updating}
                             className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                           >
-                            {updating ? "Verifying & Saving..." : "Save New Keys"}
+                            {updating
+                              ? "Verifying & Saving..."
+                              : "Save New Keys"}
                           </button>
                           <button
                             type="button"
@@ -629,55 +806,254 @@ export default function SettingsPage() {
           )}
         </div>
 
+        {/* Membership / Subscription */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Credits & Billing
-            </h2>
-            <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Current Balance</p>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                  ${(credits.balanceCents / 100).toFixed(2)}
-                </p>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            {appLanguage === "zh" ? "会员订阅" : "Membership"}
+          </h2>
+
+          {isVerifiedMember(subTier, subStatus) && subTier ? (
+            /* Active subscription */
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${
+                    subTier === "gold"
+                      ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                      : subTier === "silver"
+                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                        : subTier === "iron"
+                          ? "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
+                          : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                  }`}
+                >
+                  ✓{" "}
+                  {appLanguage === "zh"
+                    ? getTierInfo(subTier)?.labelZh
+                    : getTierInfo(subTier)?.label}{" "}
+                  {appLanguage === "zh" ? "认证会员" : "Member"}
+                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {appLanguage === "zh" ? "下次续费：" : "Renews: "}
+                  {subPeriodEnd
+                    ? format(new Date(subPeriodEnd), "MMM d, yyyy")
+                    : "—"}
+                </span>
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                {appLanguage === "zh"
+                  ? `账号数量：${accounts.length} / ${accountLimit === Infinity ? "无限" : accountLimit}`
+                  : `Accounts: ${accounts.length} / ${accountLimit === Infinity ? "unlimited" : accountLimit}`}
               </div>
               <div className="flex flex-wrap gap-2">
-                {([500, 1000, 2500] as const).map((amount) => (
+                {/* Upgrade/downgrade to other tiers */}
+                {TIER_ORDER.filter((t) => t !== subTier).map((tier) => {
+                  const info = TIERS[tier as TierKey];
+                  return (
+                    <button
+                      key={tier}
+                      onClick={() => handleSubscribe(tier)}
+                      disabled={subLoading !== null}
+                      className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                    >
+                      {subLoading === tier
+                        ? "…"
+                        : appLanguage === "zh"
+                          ? `切换至${info.labelZh} $${(info.priceMonthly / 100).toFixed(0)}/月`
+                          : `Switch to ${info.label} $${(info.priceMonthly / 100).toFixed(0)}/mo`}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={subLoading !== null}
+                  className="px-3 py-1.5 text-sm text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
+                >
+                  {subLoading === "cancel"
+                    ? "…"
+                    : appLanguage === "zh"
+                      ? "取消订阅"
+                      : "Cancel Subscription"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* No active subscription — show tier cards */
+            <div>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                {appLanguage === "zh"
+                  ? "订阅会员即可获得认证标识、更多账号配额，以及按周期自动信用额度充值。"
+                  : "Subscribe for a Verified badge, more account slots, and automatic credit top-ups each cycle."}
+              </p>
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                   <button
-                    key={amount}
-                    onClick={() => handleTopup(amount)}
-                    disabled={topupLoading !== null}
-                    className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    type="button"
+                    onClick={() => setBillingInterval("monthly")}
+                    className={`px-3 py-1.5 text-sm font-medium ${
+                      billingInterval === "monthly"
+                        ? "bg-blue-600 text-white"
+                        : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+                    }`}
                   >
-                    {topupLoading === amount ? "Loading..." : `Add $${(amount / 100).toFixed(2)}`}
+                    {appLanguage === "zh" ? "按月" : "Monthly"}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setBillingInterval("yearly")}
+                    className={`px-3 py-1.5 text-sm font-medium ${
+                      billingInterval === "yearly"
+                        ? "bg-blue-600 text-white"
+                        : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+                    }`}
+                  >
+                    {appLanguage === "zh" ? "按年" : "Yearly"}
+                  </button>
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {appLanguage === "zh"
+                    ? "年付免 2 个月"
+                    : "Yearly saves 2 months"}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {TIER_ORDER.map((tier) => {
+                  const info = TIERS[tier as TierKey];
+                  const isYearly = billingInterval === "yearly";
+                  const priceCents = isYearly
+                    ? info.priceYearly
+                    : info.priceMonthly;
+                  const priceLabel = isYearly
+                    ? `$${(priceCents / 100).toFixed(0)}/yr`
+                    : `$${(priceCents / 100).toFixed(0)}/mo`;
+                  const accountLabel =
+                    info.accountLimit === Infinity
+                      ? appLanguage === "zh"
+                        ? "无限账号"
+                        : "Unlimited accounts"
+                      : appLanguage === "zh"
+                        ? `${info.accountLimit} 个账号`
+                        : `${info.accountLimit} account${info.accountLimit > 1 ? "s" : ""}`;
+                  const creditLabel =
+                    appLanguage === "zh"
+                      ? isYearly
+                        ? `年度充值 $${(priceCents / 100).toFixed(0)}`
+                        : `每月充值 $${(priceCents / 100).toFixed(0)}`
+                      : isYearly
+                        ? `$${(priceCents / 100).toFixed(0)} yearly credit`
+                        : `$${(priceCents / 100).toFixed(0)} monthly credit`;
+                  return (
+                    <div
+                      key={tier}
+                      className={`rounded-xl border-2 p-4 flex flex-col gap-2 ${
+                        tier === "silver"
+                          ? "border-blue-400 dark:border-blue-500"
+                          : "border-gray-200 dark:border-gray-700"
+                      }`}
+                    >
+                      {tier === "silver" && (
+                        <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">
+                          {appLanguage === "zh" ? "热门" : "Popular"}
+                        </span>
+                      )}
+                      <p className="font-bold text-gray-900 dark:text-white">
+                        {appLanguage === "zh" ? info.labelZh : info.label}
+                      </p>
+                      <p className="text-2xl font-extrabold text-gray-900 dark:text-white">
+                        {priceLabel}
+                      </p>
+                      <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 flex-1">
+                        <li>✓ {accountLabel}</li>
+                        <li>✓ {creditLabel}</li>
+                        <li>
+                          ✓{" "}
+                          {appLanguage === "zh"
+                            ? "认证会员标识"
+                            : "Verified badge"}
+                        </li>
+                      </ul>
+                      <button
+                        onClick={() => handleSubscribe(tier, billingInterval)}
+                        disabled={subLoading !== null}
+                        className="mt-1 w-full py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      >
+                        {subLoading === tier
+                          ? "…"
+                          : appLanguage === "zh"
+                            ? billingInterval === "yearly"
+                              ? "年付订阅"
+                              : "订阅"
+                            : billingInterval === "yearly"
+                              ? "Subscribe yearly"
+                              : "Subscribe"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Credits & Billing
+          </h2>
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
+            <div>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Current Balance
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                ${(credits.balanceCents / 100).toFixed(2)}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {([500, 1000, 2500] as const).map((amount) => (
+                <button
+                  key={amount}
+                  onClick={() => handleTopup(amount)}
+                  disabled={topupLoading !== null}
+                  className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {topupLoading === amount
+                    ? "Loading..."
+                    : `Add $${(amount / 100).toFixed(2)}`}
+                </button>
+              ))}
+            </div>
+          </div>
+          {credits.transactions.length > 0 && (
+            <div className="mt-4">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Recent Transactions
+              </p>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                {credits.transactions.map((tx) => (
+                  <div
+                    key={tx.id}
+                    className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-sm py-1"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={`font-mono font-medium shrink-0 ${tx.amountCents >= 0 ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}
+                      >
+                        {tx.amountCents >= 0 ? "+" : ""}$
+                        {(tx.amountCents / 100).toFixed(2)}
+                      </span>
+                      <span className="text-gray-600 dark:text-gray-400 truncate">
+                        {tx.description || tx.type}
+                      </span>
+                    </div>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 ml-2">
+                      {format(new Date(tx.createdAt), "MMM d, h:mm a")}
+                    </span>
+                  </div>
                 ))}
               </div>
             </div>
-            {credits.transactions.length > 0 && (
-              <div className="mt-4">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Recent Transactions
-                </p>
-                <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                  {credits.transactions.map((tx) => (
-                    <div key={tx.id} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-sm py-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={`font-mono font-medium shrink-0 ${tx.amountCents >= 0 ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}>
-                          {tx.amountCents >= 0 ? "+" : ""}${(tx.amountCents / 100).toFixed(2)}
-                        </span>
-                        <span className="text-gray-600 dark:text-gray-400 truncate">
-                          {tx.description || tx.type}
-                        </span>
-                      </div>
-                      <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 ml-2">
-                        {format(new Date(tx.createdAt), "MMM d, h:mm a")}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          )}
+        </div>
 
         {usage && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
@@ -689,19 +1065,25 @@ export default function SettingsPage() {
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Requests</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Requests
+                </p>
                 <p className="text-xl font-semibold text-gray-900 dark:text-white">
                   {usage.window.requests}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Prompt tokens</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Prompt tokens
+                </p>
                 <p className="text-xl font-semibold text-gray-900 dark:text-white">
                   {usage.window.promptTokens.toLocaleString()}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">Completion tokens</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Completion tokens
+                </p>
                 <p className="text-xl font-semibold text-gray-900 dark:text-white">
                   {usage.window.completionTokens.toLocaleString()}
                 </p>
@@ -740,7 +1122,8 @@ export default function SettingsPage() {
                         </p>
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {item.requests.toLocaleString()} req • {item.totalTokens.toLocaleString()} tokens
+                        {item.requests.toLocaleString()} req •{" "}
+                        {item.totalTokens.toLocaleString()} tokens
                       </p>
                     </div>
                   ))}

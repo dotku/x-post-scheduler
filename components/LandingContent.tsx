@@ -73,9 +73,14 @@ function detectProvider(modelId: string): string {
   return "Other";
 }
 
-export default function LandingContent() {
+export default function LandingContent({
+  isLoggedIn = false,
+}: {
+  isLoggedIn?: boolean;
+}) {
   const t = useTranslations("landing");
   const locale = useLocale();
+  const lang = locale;
   const prefix = locale === "zh" ? "/zh" : "";
 
   const [userAgent] = useState(() =>
@@ -86,56 +91,83 @@ export default function LandingContent() {
   const [statsLoading, setStatsLoading] = useState(true);
   const browserEnv = useMemo(() => detectInAppBrowser(userAgent), [userAgent]);
 
-  const features = useMemo(() => [
-    {
-      icon: (
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-      ),
-      title: t("feature1Title"),
-      description: t("feature1Desc"),
-    },
-    {
-      icon: (
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M13 10V3L4 14h7v7l9-11h-7z" />
-      ),
-      title: t("feature2Title"),
-      description: t("feature2Desc"),
-    },
-    {
-      icon: (
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-      ),
-      title: t("feature3Title"),
-      description: t("feature3Desc"),
-    },
-    {
-      icon: (
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-      ),
-      title: t("feature4Title"),
-      description: t("feature4Desc"),
-    },
-    {
-      icon: (
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-      ),
-      title: t("feature5Title"),
-      description: t("feature5Desc"),
-    },
-    {
-      icon: (
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-          d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-      ),
-      title: t("feature6Title"),
-      description: t("feature6Desc"),
-    },
-  ], [t]);
+  const features = useMemo(
+    () => [
+      {
+        icon: (
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        ),
+        title: t("feature1Title"),
+        description: t("feature1Desc"),
+      },
+      {
+        icon: (
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M13 10V3L4 14h7v7l9-11h-7z"
+          />
+        ),
+        title: t("feature2Title"),
+        description: t("feature2Desc"),
+      },
+      {
+        icon: (
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+          />
+        ),
+        title: t("feature3Title"),
+        description: t("feature3Desc"),
+      },
+      {
+        icon: (
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+          />
+        ),
+        title: t("feature4Title"),
+        description: t("feature4Desc"),
+      },
+      {
+        icon: (
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
+          />
+        ),
+        title: t("feature5Title"),
+        description: t("feature5Desc"),
+      },
+      {
+        icon: (
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
+          />
+        ),
+        title: t("feature6Title"),
+        description: t("feature6Desc"),
+      },
+    ],
+    [t],
+  );
 
   const providerInfo = useMemo<ProviderInfo[]>(() => {
     const map = new Map<string, ProviderInfo>();
@@ -147,13 +179,27 @@ export default function LandingContent() {
       return created;
     };
     for (const model of IMAGE_MODELS) {
-      ensure(detectProvider(model.id), "Image/Video").models.push({ id: model.id, label: model.label, mode: "image" });
+      ensure(detectProvider(model.id), "Image/Video").models.push({
+        id: model.id,
+        label: model.label,
+        mode: "image",
+      });
     }
     for (const model of VIDEO_MODELS) {
-      ensure(detectProvider(model.id), "Image/Video").models.push({ id: model.id, label: model.label, mode: "video" });
+      ensure(detectProvider(model.id), "Image/Video").models.push({
+        id: model.id,
+        label: model.label,
+        mode: "video",
+      });
     }
-    ensure("OpenAI", "Text").models.push({ id: "gpt-4o", label: "GPT-4o (tweet generation)", mode: "text" });
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    ensure("OpenAI", "Text").models.push({
+      id: "gpt-4o",
+      label: "GPT-4o (tweet generation)",
+      mode: "text",
+    });
+    return Array.from(map.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
   }, []);
 
   // Aggregate top-models data by actual model vendor instead of API provider
@@ -161,7 +207,8 @@ export default function LandingContent() {
     if (!stats) return [];
     const map = new Map<string, number>();
     for (const item of stats.window30d.topModels) {
-      const vendor = item.provider === "openai" ? "OpenAI" : detectProvider(item.model);
+      const vendor =
+        item.provider === "openai" ? "OpenAI" : detectProvider(item.model);
       map.set(vendor, (map.get(vendor) ?? 0) + item.requests);
     }
     return Array.from(map.entries())
@@ -200,21 +247,41 @@ export default function LandingContent() {
             {t("appName")}
           </h1>
           <div className="flex items-center gap-4 text-sm">
-            <Link href={`${prefix}/gallery`} className="text-gray-600 dark:text-gray-400 hover:underline underline-offset-4">
+            <Link
+              href={`${prefix}/gallery`}
+              className="text-gray-600 dark:text-gray-400 hover:underline underline-offset-4"
+            >
               {t("galleryFeed")}
             </Link>
-            <Link href={`${prefix}/docs`} className="text-gray-600 dark:text-gray-400 hover:underline underline-offset-4">
+            <Link
+              href={`${prefix}/docs`}
+              className="text-gray-600 dark:text-gray-400 hover:underline underline-offset-4"
+            >
               {t("docs")}
             </Link>
-            <Link href={`${prefix}/invest`} className="text-gray-600 dark:text-gray-400 hover:underline underline-offset-4">
+            <Link
+              href={`${prefix}/invest`}
+              className="text-gray-600 dark:text-gray-400 hover:underline underline-offset-4"
+            >
               {t("investor")}
             </Link>
             <LanguageSwitcher />
-            {!browserEnv.isInAppBrowser && (
-              <Link href={`${prefix}/login`} className="text-blue-600 dark:text-blue-400 hover:underline underline-offset-4">
-                {t("signIn")}
-              </Link>
-            )}
+            {!browserEnv.isInAppBrowser &&
+              (isLoggedIn ? (
+                <Link
+                  href={`${prefix}/dashboard`}
+                  className="text-blue-600 dark:text-blue-400 hover:underline underline-offset-4"
+                >
+                  {t("dashboard")}
+                </Link>
+              ) : (
+                <Link
+                  href={`${prefix}/login`}
+                  className="text-blue-600 dark:text-blue-400 hover:underline underline-offset-4"
+                >
+                  {t("signIn")}
+                </Link>
+              ))}
           </div>
         </div>
       </header>
@@ -233,7 +300,10 @@ export default function LandingContent() {
           {highlight && (
             <>
               <br className="hidden sm:block" />
-              <span className="text-blue-600 dark:text-blue-400"> {highlight}</span>
+              <span className="text-blue-600 dark:text-blue-400">
+                {" "}
+                {highlight}
+              </span>
             </>
           )}
         </h2>
@@ -245,7 +315,9 @@ export default function LandingContent() {
           {browserEnv.isInAppBrowser ? (
             <div className="w-full max-w-md rounded-lg border border-amber-300 bg-amber-50 text-amber-900 p-4 text-sm text-left">
               <p className="font-semibold text-base">
-                {browserEnv.isWeChat ? t("wechatDetected") : t("embeddedBrowser")}
+                {browserEnv.isWeChat
+                  ? t("wechatDetected")
+                  : t("embeddedBrowser")}
               </p>
               <p className="mt-2">
                 {browserEnv.isWeChat ? t("wechatHint") : t("embeddedHint")}
@@ -258,6 +330,13 @@ export default function LandingContent() {
                 {copied ? t("linkCopied") : t("copyLink")}
               </button>
             </div>
+          ) : isLoggedIn ? (
+            <Link
+              href={`${prefix}/dashboard`}
+              className="inline-flex items-center px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors text-lg"
+            >
+              {t("goToDashboard")}
+            </Link>
           ) : (
             <>
               <Link
@@ -282,14 +361,26 @@ export default function LandingContent() {
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
             {features.map((feature) => (
-              <div key={feature.title} className="p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div
+                key={feature.title}
+                className="p-6 rounded-lg border border-gray-200 dark:border-gray-700"
+              >
                 <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900 mb-4">
-                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg
+                    className="w-5 h-5 text-blue-600 dark:text-blue-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
                     {feature.icon}
                   </svg>
                 </div>
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{feature.title}</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{feature.description}</p>
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  {feature.title}
+                </h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
@@ -315,7 +406,9 @@ export default function LandingContent() {
         </div>
 
         {statsLoading ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400">{t("loadingMetrics")}</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {t("loadingMetrics")}
+          </div>
         ) : stats ? (
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -326,9 +419,16 @@ export default function LandingContent() {
                 { label: t("statGallery"), value: stats.totals.galleryItems },
                 { label: t("statWebVisits"), value: stats.totals.webVisits },
               ].map((item) => (
-                <div key={item.label} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-                  <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{item.label}</p>
-                  <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{item.value.toLocaleString()}</p>
+                <div
+                  key={item.label}
+                  className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4"
+                >
+                  <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {item.label}
+                  </p>
+                  <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                    {item.value.toLocaleString()}
+                  </p>
                 </div>
               ))}
             </div>
@@ -336,24 +436,42 @@ export default function LandingContent() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {byModelVendor.length > 0 && (
                 <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-                  <p className="text-sm font-medium text-gray-900 dark:text-white mb-3">{t("last30ByProvider")}</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                    {t("last30ByProvider")}
+                  </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {byModelVendor.map((item) => (
-                      <div key={item.vendor} className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm">
-                        <span className="text-gray-700 dark:text-gray-300">{item.vendor}</span>
-                        <span className="text-gray-900 dark:text-white">{item.requests.toLocaleString()} {t("req")}</span>
+                      <div
+                        key={item.vendor}
+                        className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm"
+                      >
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {item.vendor}
+                        </span>
+                        <span className="text-gray-900 dark:text-white">
+                          {item.requests.toLocaleString()} {t("req")}
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
               <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-                <p className="text-sm font-medium text-gray-900 dark:text-white mb-3">{t("topPages")}</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                  {t("topPages")}
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {stats.window30d.topPages.slice(0, 6).map((item) => (
-                    <div key={item.path} className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm">
-                      <span className="text-gray-700 dark:text-gray-300 truncate pr-2">{item.path}</span>
-                      <span className="text-gray-900 dark:text-white">{item.visits.toLocaleString()} {t("visits")}</span>
+                    <div
+                      key={item.path}
+                      className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm"
+                    >
+                      <span className="text-gray-700 dark:text-gray-300 truncate pr-2">
+                        {item.path}
+                      </span>
+                      <span className="text-gray-900 dark:text-white">
+                        {item.visits.toLocaleString()} {t("visits")}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -361,29 +479,47 @@ export default function LandingContent() {
             </div>
           </div>
         ) : (
-          <div className="text-sm text-gray-500 dark:text-gray-400">{t("metricsUnavailable")}</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {t("metricsUnavailable")}
+          </div>
         )}
       </section>
 
       {/* Providers & Models */}
       <section className="bg-white dark:bg-gray-800 py-16 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">{t("modelsTitle")}</h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">{t("modelsSubtitle")}</p>
+          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">
+            {t("modelsTitle")}
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
+            {t("modelsSubtitle")}
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {providerInfo.map((provider) => (
-              <div key={provider.name} className="rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+              <div
+                key={provider.name}
+                className="rounded-xl border border-gray-200 dark:border-gray-700 p-4"
+              >
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white">{provider.name}</h4>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {provider.name}
+                  </h4>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                     {provider.badge}
                   </span>
                 </div>
                 <div className="space-y-2">
                   {provider.models.map((model) => (
-                    <div key={model.id} className="flex items-center justify-between gap-2 rounded-md border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm">
-                      <span className="text-gray-700 dark:text-gray-300 truncate">{model.label}</span>
-                      <span className="shrink-0 text-xs text-gray-400 uppercase">{model.mode}</span>
+                    <div
+                      key={model.id}
+                      className="flex items-center justify-between gap-2 rounded-md border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm"
+                    >
+                      <span className="text-gray-700 dark:text-gray-300 truncate">
+                        {model.label}
+                      </span>
+                      <span className="shrink-0 text-xs text-gray-400 uppercase">
+                        {model.mode}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -399,17 +535,23 @@ export default function LandingContent() {
           {t("howItWorksTitle")}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 text-center">
-          {([
-            { n: "1", title: t("step1Title"), desc: t("step1Desc") },
-            { n: "2", title: t("step2Title"), desc: t("step2Desc") },
-            { n: "3", title: t("step3Title"), desc: t("step3Desc") },
-          ] as const).map((step) => (
+          {(
+            [
+              { n: "1", title: t("step1Title"), desc: t("step1Desc") },
+              { n: "2", title: t("step2Title"), desc: t("step2Desc") },
+              { n: "3", title: t("step3Title"), desc: t("step3Desc") },
+            ] as const
+          ).map((step) => (
             <div key={step.n}>
               <div className="w-12 h-12 mx-auto flex items-center justify-center rounded-full bg-blue-600 text-white font-bold text-lg mb-4">
                 {step.n}
               </div>
-              <h4 className="font-semibold text-gray-900 dark:text-white mb-2">{step.title}</h4>
-              <p className="text-sm text-gray-600 dark:text-gray-400">{step.desc}</p>
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                {step.title}
+              </h4>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {step.desc}
+              </p>
             </div>
           ))}
         </div>
@@ -418,21 +560,143 @@ export default function LandingContent() {
       {/* Pricing */}
       <section className="bg-white dark:bg-gray-800 py-16 sm:py-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-4">{t("pricingTitle")}</h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-8 max-w-xl mx-auto">{t("pricingSubtitle")}</p>
-          <div className="inline-flex flex-col items-center bg-gray-50 dark:bg-gray-900 rounded-xl p-8 border border-gray-200 dark:border-gray-700">
-            <p className="text-4xl font-extrabold text-gray-900 dark:text-white">{t("pricingAmount")}</p>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">{t("pricingLabel")}</p>
-            <ul className="mt-6 space-y-2 text-sm text-gray-600 dark:text-gray-400 text-left">
-              {([t("pricing1"), t("pricing2"), t("pricing3"), t("pricing4")] as const).map((item) => (
-                <li key={item} className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  {item}
-                </li>
-              ))}
-            </ul>
+          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">
+            {t("pricingTitle")}
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-10 max-w-xl mx-auto">
+            {t("pricingSubtitle")}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {(["bronze", "iron", "silver", "gold"] as const).map((tier) => {
+              const tiers = {
+                bronze: {
+                  labelEn: "Bronze",
+                  labelZh: "青铜",
+                  price: 1,
+                  accounts: "1",
+                  accountsZh: "1 个账号",
+                  popular: false,
+                  color: "amber",
+                },
+                iron: {
+                  labelEn: "Iron",
+                  labelZh: "钢铁",
+                  price: 3,
+                  accounts: "3",
+                  accountsZh: "3 个账号",
+                  popular: false,
+                  color: "slate",
+                },
+                silver: {
+                  labelEn: "Silver",
+                  labelZh: "白银",
+                  price: 8,
+                  accounts: "100",
+                  accountsZh: "100 个账号",
+                  popular: true,
+                  color: "blue",
+                },
+                gold: {
+                  labelEn: "Gold",
+                  labelZh: "黄金",
+                  price: 100,
+                  accounts: lang === "zh" ? "无限" : "Unlimited",
+                  accountsZh: "无限账号",
+                  popular: false,
+                  color: "yellow",
+                },
+              }[tier];
+              const isPopular = tiers.popular;
+              return (
+                <div
+                  key={tier}
+                  className={`relative rounded-2xl border-2 p-6 flex flex-col text-left ${
+                    isPopular
+                      ? "border-blue-500 shadow-lg"
+                      : "border-gray-200 dark:border-gray-700"
+                  }`}
+                >
+                  {isPopular && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                      {lang === "zh" ? "最受欢迎" : "Most Popular"}
+                    </span>
+                  )}
+                  <p className="text-base font-bold text-gray-900 dark:text-white mb-1">
+                    {lang === "zh" ? tiers.labelZh : tiers.labelEn}
+                  </p>
+                  <p className="text-3xl font-extrabold text-gray-900 dark:text-white">
+                    ${tiers.price}
+                    <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                      /mo
+                    </span>
+                  </p>
+                  <ul className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-400 flex-1">
+                    <li className="flex items-center gap-2">
+                      <svg
+                        className="w-4 h-4 text-green-500 shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                      {lang === "zh"
+                        ? tiers.accountsZh
+                        : `${tiers.accounts} account${tiers.accounts === "1" ? "" : "s"}`}
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <svg
+                        className="w-4 h-4 text-green-500 shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                      {lang === "zh"
+                        ? `每月充值 $${tiers.price}`
+                        : `$${tiers.price} monthly credit`}
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <svg
+                        className="w-4 h-4 text-green-500 shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                      {lang === "zh" ? "✓ 认证会员标识" : "✓ Verified badge"}
+                    </li>
+                  </ul>
+                  <Link
+                    href={isLoggedIn ? `${prefix}/settings` : `${prefix}/login`}
+                    className={`mt-5 block text-center py-2 rounded-lg text-sm font-semibold transition-colors ${
+                      isPopular
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    {lang === "zh" ? "立即订阅" : "Get Started"}
+                  </Link>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -440,12 +704,14 @@ export default function LandingContent() {
       {/* CTA */}
       {!browserEnv.isInAppBrowser && (
         <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-          <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">{t("ctaTitle")}</h3>
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            {t("ctaTitle")}
+          </h3>
           <Link
-            href={`${prefix}/login`}
+            href={isLoggedIn ? `${prefix}/dashboard` : `${prefix}/login`}
             className="inline-flex items-center px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors text-lg"
           >
-            {t("ctaButton")}
+            {isLoggedIn ? t("goToDashboard") : t("ctaButton")}
           </Link>
         </section>
       )}
@@ -454,7 +720,10 @@ export default function LandingContent() {
       <footer className="border-t border-gray-200 dark:border-gray-700 py-8">
         <div className="flex flex-col items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
           <p>{t("footerName")}</p>
-          <Link href={`${prefix}/invest`} className="hover:underline underline-offset-4">
+          <Link
+            href={`${prefix}/invest`}
+            className="hover:underline underline-offset-4"
+          >
             {t("investorMemo")}
           </Link>
         </div>

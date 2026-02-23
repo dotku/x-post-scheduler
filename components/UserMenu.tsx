@@ -4,12 +4,19 @@ import { useUser } from "@auth0/nextjs-auth0/client";
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
+import { isVerifiedMember, getTierInfo } from "@/lib/subscription";
+
+interface SubInfo {
+  tier: string | null;
+  status: string | null;
+}
 
 export default function UserMenu() {
   const t = useTranslations("userMenu");
   const locale = useLocale();
   const { user, isLoading } = useUser();
   const [isOpen, setIsOpen] = useState(false);
+  const [sub, setSub] = useState<SubInfo | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const prefix = locale === "zh" ? "/zh" : "";
@@ -23,6 +30,17 @@ export default function UserMenu() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/me/subscription")
+      .then((r) => r.json())
+      .then((d) => setSub({ tier: d.tier, status: d.status }))
+      .catch(() => {});
+  }, [user]);
+
+  const verified = isVerifiedMember(sub?.tier, sub?.status);
+  const tierInfo = sub?.tier ? getTierInfo(sub.tier) : null;
 
   if (isLoading) {
     return <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse" />;
@@ -48,16 +66,29 @@ export default function UserMenu() {
           </div>
         )}
         <span className="hidden sm:block text-sm text-gray-700 dark:text-gray-300">{user.name || user.email}</span>
+        {verified && (
+          <span
+            className="hidden sm:inline-flex items-center text-xs font-bold text-blue-500"
+            title={locale === "zh" ? `${tierInfo?.labelZh ?? ""}认证会员` : `${tierInfo?.label ?? ""} Member`}
+          >
+            ✓
+          </span>
+        )}
         <svg className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-1 z-50">
+        <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-1 z-50">
           <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{user.name}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+            {verified && tierInfo && (
+              <p className="text-xs text-blue-500 font-medium mt-0.5">
+                ✓ {locale === "zh" ? tierInfo.labelZh : tierInfo.label} {locale === "zh" ? "认证会员" : "Member"}
+              </p>
+            )}
           </div>
           <Link href={`${prefix}/settings`} className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
             {t("settings")}

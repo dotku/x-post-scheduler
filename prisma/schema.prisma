@@ -20,10 +20,16 @@ model User {
   xApiSecret         String?
   xAccessToken       String?
   xAccessTokenSecret String?
-  creditBalanceCents Int       @default(500) // $5.00 initial free credit
-  language           String    @default("en")
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  creditBalanceCents    Int       @default(500) // $5.00 initial free credit
+  language              String    @default("en")
+  // Subscription
+  subscriptionTier      String?   // "bronze" | "iron" | "silver" | "gold"
+  subscriptionStatus    String?   // "active" | "cancelled" | "past_due"
+  stripeCustomerId      String?   @unique
+  stripeSubscriptionId  String?   @unique
+  subscriptionPeriodEnd DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   posts              Post[]
   recurringSchedules RecurringSchedule[]

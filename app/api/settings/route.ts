@@ -4,6 +4,7 @@ import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { encrypt } from "@/lib/encryption";
 import { verifyCredentials } from "@/lib/x-client";
 import { listUserXAccounts } from "@/lib/user-credentials";
+import { getAccountLimit } from "@/lib/subscription";
 
 function parseBool(value: unknown) {
   if (typeof value === "boolean") return value;
@@ -80,7 +81,19 @@ async function createAccount(request: NextRequest) {
     );
   }
 
-  const existingCount = await prisma.xAccount.count({ where: { userId: user.id } });
+  const [existingCount, dbUser] = await Promise.all([
+    prisma.xAccount.count({ where: { userId: user.id } }),
+    prisma.user.findUnique({ where: { id: user.id }, select: { subscriptionTier: true, subscriptionStatus: true } }),
+  ]);
+
+  const accountLimit = getAccountLimit(dbUser?.subscriptionTier);
+  if (existingCount >= accountLimit) {
+    return NextResponse.json(
+      { error: "ACCOUNT_LIMIT_REACHED", limit: accountLimit },
+      { status: 403 }
+    );
+  }
+
   const shouldBeDefault = setAsDefault || existingCount === 0;
 
   const account = await prisma.$transaction(async (tx) => {
