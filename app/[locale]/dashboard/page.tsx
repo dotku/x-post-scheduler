@@ -8,9 +8,10 @@ import { format } from "date-fns";
 import PostList from "@/components/PostList";
 import UserMenu from "@/components/UserMenu";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import AccountStats from "@/components/AccountStats";
 import { redirect } from "next/navigation";
 import { headers as nextHeaders } from "next/headers";
-import { getTranslations, getLocale } from "next-intl/server";
+import { getTranslations, getLocale, setRequestLocale } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,7 @@ async function getPosts(userId: string, origin: string) {
     resolvedMediaUrl: p.mediaAssetId
       ? `/api/media/${p.mediaAssetId}`
       : resolvePostMediaUrl(p.mediaUrls, origin),
+    impressionCount: p.impressions ?? null,
   }));
 
   if (dbPosts.length >= MAX_POSTS) {
@@ -99,13 +101,26 @@ async function getRecurringSchedules(userId: string) {
   return schedules;
 }
 
-export default async function Dashboard() {
+export default async function Dashboard({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: localeParam } = await params;
+  setRequestLocale(localeParam);
+
   const t = await getTranslations("dashboard");
   const tNav = await getTranslations("nav");
   const locale = await getLocale();
   const user = await getAuthenticatedUser();
   if (!user) {
     redirect(locale === "zh" ? "/zh/login" : "/login");
+  }
+
+  // Redirect to user's preferred locale if different from current URL locale
+  const preferredLocale = user.language || "en";
+  if (preferredLocale !== locale) {
+    redirect(preferredLocale === "zh" ? "/zh/dashboard" : "/dashboard");
   }
 
   const headersList = await nextHeaders();
@@ -115,11 +130,6 @@ export default async function Dashboard() {
 
   const { dbPosts, mergedPosts } = await getPosts(user.id, origin);
   const schedules = await getRecurringSchedules(user.id);
-
-  type DbPost = (typeof dbPosts)[number];
-  const scheduledCount = dbPosts.filter((p: DbPost) => p.status === "scheduled").length;
-  const postedCount = dbPosts.filter((p: DbPost) => p.status === "posted").length;
-  const failedCount = dbPosts.filter((p: DbPost) => p.status === "failed").length;
 
   const prefix = locale === "zh" ? "/zh" : "";
 
@@ -135,7 +145,6 @@ export default async function Dashboard() {
               <Link href={`${prefix}/gallery`} className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4">{tNav("gallery")}</Link>
               <Link href={`${prefix}/toolbox`} className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4">{tNav("toolbox")}</Link>
               <Link href={`${prefix}/generate`} className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4">{tNav("generate")}</Link>
-              <Link href={`${prefix}/schedule`} className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4">{tNav("compose")}</Link>
               <Link href={`${prefix}/recurring`} className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4">{tNav("autoPost")}</Link>
               <Link href={`${prefix}/knowledge`} className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4">{tNav("knowledge")}</Link>
               <div className="border-l border-gray-300 dark:border-gray-600 h-5 mx-1 hidden sm:block" />
@@ -147,48 +156,8 @@ export default async function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-yellow-100 dark:bg-yellow-900">
-                <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t("scheduled")}</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{scheduledCount}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-green-100 dark:bg-green-900">
-                <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t("posted")}</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{postedCount}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="p-3 rounded-full bg-red-100 dark:bg-red-900">
-                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t("failed")}</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{failedCount}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Post Activity Stats */}
+        <AccountStats />
 
         {/* Active Recurring Schedules */}
         {schedules.length > 0 && (
@@ -210,7 +179,7 @@ export default async function Dashboard() {
                     </p>
                   </div>
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                    Active
+                    {t("active")}
                   </span>
                 </div>
               ))}

@@ -4,7 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Auth0Provider } from "@auth0/nextjs-auth0/client";
 import { Analytics } from "@vercel/analytics/next";
 import { NextIntlClientProvider } from "next-intl";
-import { getMessages } from "next-intl/server";
+import { getMessages, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import PageviewTracker from "@/components/PageviewTracker";
@@ -37,6 +37,9 @@ export default async function LocaleLayout({
   if (!routing.locales.includes(locale as "en" | "zh")) {
     notFound();
   }
+
+  // Must be called before any next-intl server functions (getTranslations, getMessages, etc.)
+  setRequestLocale(locale);
 
   const messages = await getMessages();
 

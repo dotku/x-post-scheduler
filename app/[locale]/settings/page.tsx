@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import Link from "next/link";
 import { format } from "date-fns";
+import { useRouter, usePathname } from "next/navigation";
 
 interface XAccount {
   id: string;
@@ -65,6 +66,8 @@ type AppLanguage = "en" | "zh";
 
 export default function SettingsPage() {
   const { user, isLoading: authLoading } = useUser();
+  const router = useRouter();
+  const pathname = usePathname();
   const [accounts, setAccounts] = useState<XAccount[]>([]);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [credits, setCredits] = useState<CreditData>({ balanceCents: 0, transactions: [] });
@@ -94,16 +97,7 @@ export default function SettingsPage() {
     }
   }, [authLoading, user]);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("app-lang") || localStorage.getItem("gallery-lang");
-    if (saved === "zh" || saved === "en") {
-      setAppLanguage(saved);
-      return;
-    }
-    if (navigator.language.toLowerCase().startsWith("zh")) {
-      setAppLanguage("zh");
-    }
-  }, []);
+  // Language is loaded from the API (DB) in fetchData
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -178,6 +172,9 @@ export default function SettingsPage() {
       setAccounts(Array.isArray(data.accounts) ? data.accounts : []);
       if ((data.accounts?.length ?? 0) > 0) {
         setSetAsDefault(false);
+      }
+      if (data.language === "zh" || data.language === "en") {
+        setAppLanguage(data.language);
       }
       if (usageRes.ok) {
         setUsage(await usageRes.json());
@@ -345,13 +342,31 @@ export default function SettingsPage() {
     }
   }
 
-  function handleSaveLanguage() {
-    localStorage.setItem("app-lang", appLanguage);
-    localStorage.setItem("gallery-lang", appLanguage);
-    setMessage({
-      type: "success",
-      text: appLanguage === "zh" ? "语言已更新为中文。" : "Language updated to English.",
-    });
+  async function handleSaveLanguage() {
+    setMessage(null);
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language: appLanguage }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      // Navigate to the correct locale URL
+      const currentIsZh = pathname.startsWith("/zh");
+      const wantZh = appLanguage === "zh";
+      if (currentIsZh !== wantZh) {
+        const pathWithoutLocale = currentIsZh ? pathname.slice(3) || "/" : pathname;
+        const newPath = wantZh ? `/zh${pathWithoutLocale}` : pathWithoutLocale;
+        router.push(newPath);
+      } else {
+        setMessage({
+          type: "success",
+          text: appLanguage === "zh" ? "语言已更新为中文。" : "Language updated to English.",
+        });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to save language preference" });
+    }
   }
 
   if (authLoading || loading) {
@@ -389,10 +404,10 @@ export default function SettingsPage() {
               Settings
             </h1>
             <Link
-              href="/dashboard"
+              href={pathname.startsWith("/zh") ? "/zh/dashboard" : "/dashboard"}
               className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             >
-              Back to Dashboard
+              ← Dashboard
             </Link>
           </div>
         </div>

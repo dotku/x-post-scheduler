@@ -145,6 +145,56 @@ export async function postTweetWithMedia(
   }
 }
 
+export interface TweetMetricsResult {
+  tweetId: string;
+  impressions: number;
+  likes: number;
+  retweets: number;
+  replies: number;
+}
+
+/**
+ * Batch-fetch public metrics for up to 100 tweet IDs at once.
+ * Returns a map of tweetId → metrics. Missing/failed tweets are omitted.
+ */
+export async function batchTweetMetrics(
+  tweetIds: string[],
+  credentials: XCredentials
+): Promise<Map<string, TweetMetricsResult>> {
+  const result = new Map<string, TweetMetricsResult>();
+  if (tweetIds.length === 0) return result;
+
+  const client = createXClient(credentials);
+  // Twitter API v2 supports up to 100 IDs per request
+  const chunks: string[][] = [];
+  for (let i = 0; i < tweetIds.length; i += 100) {
+    chunks.push(tweetIds.slice(i, i + 100));
+  }
+
+  for (const chunk of chunks) {
+    try {
+      const response = await client.v2.tweets(chunk, {
+        "tweet.fields": ["public_metrics"],
+      });
+      const tweets = Array.isArray(response.data) ? response.data : (response.data ? [response.data] : []);
+      for (const tweet of tweets) {
+        const m = tweet.public_metrics;
+        result.set(tweet.id, {
+          tweetId: tweet.id,
+          impressions: m?.impression_count ?? 0,
+          likes: m?.like_count ?? 0,
+          retweets: m?.retweet_count ?? 0,
+          replies: m?.reply_count ?? 0,
+        });
+      }
+    } catch {
+      // Silently skip failed chunks (rate limit, permissions, etc.)
+    }
+  }
+
+  return result;
+}
+
 export async function verifyCredentials(credentials: XCredentials): Promise<{
   valid: boolean;
   username?: string;

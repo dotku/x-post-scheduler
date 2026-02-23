@@ -21,6 +21,7 @@ model User {
   xAccessToken       String?
   xAccessTokenSecret String?
   creditBalanceCents Int       @default(500) // $5.00 initial free credit
+  language           String    @default("en")
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -35,6 +36,10 @@ model User {
   galleryItems       GalleryItem[]
   webVisits          WebVisit[]
   videoJobs          VideoJob[]
+  galleryLikes       GalleryLike[]
+  galleryComments    GalleryComment[]
+  followers          UserFollow[] @relation("Following")
+  following          UserFollow[] @relation("Follower")
 }
 
 model CronRunEvent {
@@ -63,6 +68,7 @@ model Post {
   scheduledAt DateTime?
   postedAt    DateTime?
   tweetId     String?   // ID returned from X API after posting
+  impressions Int?      // Fetched from X API public_metrics
   error       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -219,9 +225,48 @@ model GalleryItem {
 
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes       GalleryLike[]
+  comments    GalleryComment[]
 
   @@index([userId, createdAt])
   @@index([isPublic, createdAt])
+}
+
+model GalleryLike {
+  id        String      @id @default(cuid())
+  itemId    String
+  userId    String
+  createdAt DateTime    @default(now())
+  item      GalleryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, userId])
+  @@index([itemId])
+}
+
+model GalleryComment {
+  id        String      @id @default(cuid())
+  itemId    String
+  userId    String
+  content   String
+  createdAt DateTime    @default(now())
+  item      GalleryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, createdAt])
+}
+
+model UserFollow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+  follower    User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
 }
 
 model WebVisit {

@@ -17,7 +17,7 @@ export async function GET() {
     take: 100,
   });
 
-  return NextResponse.json({ items });
+  return NextResponse.json({ items, userId: user.id });
 }
 
 export async function POST(request: NextRequest) {

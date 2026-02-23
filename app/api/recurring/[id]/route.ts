@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { addDays, addWeeks, addMonths } from "date-fns";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { getUserXCredentials } from "@/lib/user-credentials";
 import { IMAGE_MODELS } from "@/lib/wavespeed";
 import { decodeRecurringAiPrompt, encodeRecurringAiPrompt } from "@/lib/recurring-ai";
+
+function calculateNextRun(frequency: string, cronExpr: string): Date {
+  const now = new Date();
+  const [hours, minutes] = cronExpr.split(":").map(Number);
+  let nextRun = new Date(now);
+  nextRun.setHours(hours, minutes, 0, 0);
+  if (nextRun <= now) {
+    switch (frequency) {
+      case "daily": nextRun = addDays(nextRun, 1); break;
+      case "weekly": nextRun = addWeeks(nextRun, 1); break;
+      case "monthly": nextRun = addMonths(nextRun, 1); break;
+    }
+  }
+  return nextRun;
+}
 
 export async function DELETE(
   request: NextRequest,
@@ -51,6 +67,9 @@ export async function PATCH(
     aiLanguage?: string | null;
     imageModelId?: string | null;
     xAccountId?: string | null;
+    cronExpr?: string;
+    frequency?: string;
+    nextRunAt?: Date;
   } = {};
 
   if ("isActive" in body) {
@@ -126,6 +145,22 @@ export async function PATCH(
     updateData.xAccountId = resolved.accountId;
   }
 
+  if ("frequency" in body) {
+    const freq = typeof body.frequency === "string" ? body.frequency : "";
+    if (!["daily", "weekly", "monthly"].includes(freq)) {
+      return NextResponse.json({ error: "Invalid frequency" }, { status: 400 });
+    }
+    updateData.frequency = freq;
+  }
+
+  if ("cronExpr" in body) {
+    const expr = typeof body.cronExpr === "string" ? body.cronExpr.trim() : "";
+    if (!/^\d{1,2}:\d{2}$/.test(expr)) {
+      return NextResponse.json({ error: "Invalid time format" }, { status: 400 });
+    }
+    updateData.cronExpr = expr;
+  }
+
   const existing = await prisma.recurringSchedule.findFirst({
     where: { id, userId: user.id },
   });
@@ -187,6 +222,13 @@ export async function PATCH(
   }
 
   delete updateData.imageModelId;
+
+  // Recalculate nextRunAt if time or frequency changed
+  if ("cronExpr" in updateData || "frequency" in updateData) {
+    const nextFrequency = updateData.frequency ?? existing.frequency;
+    const nextCronExpr = updateData.cronExpr ?? existing.cronExpr;
+    updateData.nextRunAt = calculateNextRun(nextFrequency, nextCronExpr);
+  }
 
   const schedule = await prisma.recurringSchedule.update({
     where: { id },

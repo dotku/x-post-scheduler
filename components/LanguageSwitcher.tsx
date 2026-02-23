@@ -18,6 +18,12 @@ export default function LanguageSwitcher() {
       ? pathname.slice(3) || "/"
       : pathname;
     const newPath = nextLocale === "zh" ? `/zh${pathWithoutLocale}` : pathWithoutLocale;
+    // Persist preference to DB (fire-and-forget)
+    void fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language: nextLocale }),
+    });
     startTransition(() => {
       router.push(newPath);
     });

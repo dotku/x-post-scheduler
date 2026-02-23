@@ -28,6 +28,7 @@ export async function GET() {
         xApiSecret: true,
         xAccessToken: true,
         xAccessTokenSecret: true,
+        language: true,
       },
     }),
   ]);
@@ -42,6 +43,7 @@ export async function GET() {
   return NextResponse.json({
     hasCredentials: accounts.length > 0 || hasLegacyCredentials,
     accounts,
+    language: legacyUser?.language ?? "en",
   });
 }
 
@@ -135,6 +137,20 @@ export async function PATCH(request: NextRequest) {
   }
 
   const body = await request.json();
+
+  // Handle language preference update
+  if (body.language !== undefined && !body.accountId) {
+    const lang = body.language;
+    if (lang !== "en" && lang !== "zh") {
+      return NextResponse.json({ error: "Invalid language" }, { status: 400 });
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { language: lang },
+    });
+    return NextResponse.json({ success: true });
+  }
+
   const accountId = typeof body.accountId === "string" ? body.accountId : "";
   if (!accountId) {
     return NextResponse.json(

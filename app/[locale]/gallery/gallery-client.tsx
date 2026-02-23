@@ -4,6 +4,19 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import type React from "react";
 import Link from "next/link";
 
+interface CommentUser {
+  name: string | null;
+  picture: string | null;
+}
+
+interface GalleryCommentItem {
+  id: string;
+  content: string;
+  createdAt: string;
+  userId: string;
+  user: CommentUser;
+}
+
 interface GalleryItem {
   id: string;
   type: "image" | "video";
@@ -18,7 +31,10 @@ interface GalleryItem {
   mimeType: string;
   isPublic: boolean;
   createdAt: string;
-  user?: { name: string | null; picture: string | null };
+  likeCount?: number;
+  commentCount?: number;
+  currentUserLiked?: boolean;
+  user?: { id?: string; name: string | null; picture: string | null };
 }
 
 type Tab = "public" | "mine";
@@ -26,12 +42,12 @@ type Lang = "en" | "zh";
 
 const TEXT = {
   en: {
-    title: "AI Gallery",
-    subtitle: "Community-generated images & videos",
+    title: "Community",
+    subtitle: "Community-created images & videos",
     create: "+ Create",
     dashboard: "<- Dashboard",
     signIn: "Sign in",
-    publicTab: "Public Gallery",
+    publicTab: "Community Feed",
     mineTab: "My Items",
     loadFailed: "Failed to load gallery. Please try again.",
     retry: "Retry",
@@ -51,16 +67,25 @@ const TEXT = {
     noMine: "You haven't generated anything yet.",
     toToolbox: "Go to AI Toolbox ->",
     loadMore: "Load more",
+    like: "Like",
+    liked: "Liked",
+    follow: "Follow",
+    following: "Following",
+    addComment: "Add a comment...",
+    postComment: "Post",
+    signInToInteract: "Sign in to interact",
+    noComments: "No comments yet",
+    deleteComment: "Delete",
   },
   zh: {
-    title: "AI 画廊",
+    title: "作品社区",
     subtitle: "社区创作的图片与视频",
     create: "+ 去创作",
     dashboard: "<- 返回仪表盘",
     signIn: "登录",
-    publicTab: "公开画廊",
+    publicTab: "社区作品",
     mineTab: "我的作品",
-    loadFailed: "加载画廊失败，请重试。",
+    loadFailed: "加载失败，请重试。",
     retry: "重试",
     hidden: "未公开",
     video: "视频",
@@ -78,10 +103,18 @@ const TEXT = {
     noMine: "你还没有生成任何作品。",
     toToolbox: "前往 AI 工具箱 ->",
     loadMore: "加载更多",
+    like: "点赞",
+    liked: "已赞",
+    follow: "关注",
+    following: "已关注",
+    addComment: "添加评论...",
+    postComment: "发布",
+    signInToInteract: "登录后互动",
+    noComments: "暂无评论",
+    deleteComment: "删除",
   },
 } as const;
 
-/** Responsive masonry column count tracked via ResizeObserver / window resize. */
 function useMasonryColumns(): number {
   const [cols, setCols] = useState(2);
   useEffect(() => {
@@ -99,7 +132,6 @@ function useMasonryColumns(): number {
   return cols;
 }
 
-/** Convert "16:9" → { aspectRatio: "16/9" } for inline style */
 function aspectRatioStyle(ratio: string | null | undefined): React.CSSProperties {
   if (!ratio) return {};
   const [w, h] = ratio.split(":").map(Number);
@@ -111,18 +143,36 @@ function MediaCard({
   item,
   isOwner,
   lang,
+  isLoggedIn,
+  currentUserId,
   onToggle,
   onDelete,
 }: {
   item: GalleryItem;
   isOwner: boolean;
   lang: Lang;
+  isLoggedIn: boolean;
+  currentUserId: string | null;
   onToggle?: (id: string, isPublic: boolean) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
 }) {
   const [toggling, setToggling] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [toggleError, setToggleError] = useState("");
+
+  const [likeCount, setLikeCount] = useState(item.likeCount ?? 0);
+  const [liked, setLiked] = useState(item.currentUserLiked ?? false);
+  const [likingBusy, setLikingBusy] = useState(false);
+
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [comments, setComments] = useState<GalleryCommentItem[]>([]);
+  const [commentCount, setCommentCount] = useState(item.commentCount ?? 0);
+  const [commentText, setCommentText] = useState("");
+  const [commentLoading, setCommentLoading] = useState(false);
+  const [postingComment, setPostingComment] = useState(false);
+
+  const [following, setFollowing] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
 
   const t = TEXT[lang];
 
@@ -148,6 +198,101 @@ function MediaCard({
     }
   };
 
+  const handleLike = async () => {
+    if (!isLoggedIn || likingBusy) return;
+    setLikingBusy(true);
+    const prevLiked = liked;
+    const prevCount = likeCount;
+    setLiked(!prevLiked);
+    setLikeCount(prevCount + (prevLiked ? -1 : 1));
+    try {
+      const res = await fetch(`/api/gallery/${item.id}/like`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setLiked(data.liked);
+        setLikeCount(data.count);
+      } else {
+        setLiked(prevLiked);
+        setLikeCount(prevCount);
+      }
+    } catch {
+      setLiked(prevLiked);
+      setLikeCount(prevCount);
+    } finally {
+      setLikingBusy(false);
+    }
+  };
+
+  const loadComments = async () => {
+    setCommentLoading(true);
+    try {
+      const res = await fetch(`/api/gallery/${item.id}/comments`);
+      const data = await res.json();
+      if (res.ok) setComments(data.comments ?? []);
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+
+  const handleToggleComments = () => {
+    if (!commentOpen) {
+      setCommentOpen(true);
+      void loadComments();
+    } else {
+      setCommentOpen(false);
+    }
+  };
+
+  const handlePostComment = async () => {
+    if (!commentText.trim() || postingComment) return;
+    setPostingComment(true);
+    try {
+      const res = await fetch(`/api/gallery/${item.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: commentText.trim() }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setComments((prev) => [...prev, data.comment]);
+        setCommentCount((prev) => prev + 1);
+        setCommentText("");
+      }
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    const res = await fetch(`/api/gallery/${item.id}/comments/${commentId}`, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      setCommentCount((prev) => Math.max(0, prev - 1));
+    }
+  };
+
+  const handleFollow = async (authorId: string) => {
+    if (!isLoggedIn || followBusy) return;
+    setFollowBusy(true);
+    const prev = following;
+    setFollowing(!prev);
+    try {
+      const res = await fetch(`/api/users/${authorId}/follow`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) setFollowing(data.following);
+      else setFollowing(prev);
+    } catch {
+      setFollowing(prev);
+    } finally {
+      setFollowBusy(false);
+    }
+  };
+
+  const authorId = item.user?.id;
+  const isOwnContent = currentUserId && authorId === currentUserId;
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
       <div className="relative bg-gray-100 dark:bg-gray-700">
@@ -159,11 +304,16 @@ function MediaCard({
             muted
             loop
             playsInline
-            onMouseEnter={(e) => (e.currentTarget as HTMLVideoElement).play()}
+            onMouseEnter={(e) => {
+              const v = e.currentTarget as HTMLVideoElement & { _playP?: Promise<void> };
+              v._playP = v.play() ?? Promise.resolve();
+            }}
             onMouseLeave={(e) => {
-              const v = e.currentTarget as HTMLVideoElement;
-              v.pause();
-              v.currentTime = 0;
+              const v = e.currentTarget as HTMLVideoElement & { _playP?: Promise<void> };
+              void (v._playP ?? Promise.resolve()).catch(() => {}).then(() => {
+                v.pause();
+                v.currentTime = 0;
+              });
             }}
           />
         ) : (
@@ -201,12 +351,52 @@ function MediaCard({
             {new Date(item.createdAt).toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US")}
           </span>
         </div>
+
+        {/* Author + Follow */}
         {item.user?.name && (
-          <p className="text-xs text-gray-400 truncate">{t.by} {item.user.name}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-gray-400 truncate">{t.by} {item.user.name}</p>
+            {authorId && !isOwnContent && (
+              <button
+                onClick={() => handleFollow(authorId)}
+                disabled={followBusy || !isLoggedIn}
+                className={`shrink-0 text-xs px-2 py-0.5 rounded-full border transition-colors disabled:opacity-50 ${
+                  following
+                    ? "bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300"
+                    : "border-blue-500 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                }`}
+              >
+                {following ? t.following : t.follow}
+              </button>
+            )}
+          </div>
         )}
+
+        {/* Like + Comment row */}
+        <div className="flex items-center gap-3 pt-0.5">
+          <button
+            onClick={handleLike}
+            disabled={!isLoggedIn || likingBusy}
+            title={isLoggedIn ? (liked ? t.liked : t.like) : t.signInToInteract}
+            className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-50 ${
+              liked ? "text-red-500" : "text-gray-400 hover:text-red-400"
+            }`}
+          >
+            <span>{liked ? "❤️" : "🤍"}</span>
+            <span>{likeCount}</span>
+          </button>
+          <button
+            onClick={handleToggleComments}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-500 transition-colors"
+          >
+            <span>💬</span>
+            <span>{commentCount}</span>
+          </button>
+        </div>
 
         {toggleError && <p className="text-xs text-red-400">{toggleError}</p>}
 
+        {/* Owner controls */}
         {isOwner && (
           <div className="flex gap-2 pt-1">
             <button
@@ -225,6 +415,71 @@ function MediaCard({
             </button>
           </div>
         )}
+
+        {/* Comment section */}
+        {commentOpen && (
+          <div className="border-t border-gray-100 dark:border-gray-700 pt-2 space-y-2">
+            {commentLoading ? (
+              <p className="text-xs text-gray-400 text-center py-2">{t.loading}</p>
+            ) : comments.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-1">{t.noComments}</p>
+            ) : (
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {comments.map((c) => (
+                  <div key={c.id} className="flex items-start gap-2 text-xs">
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-gray-700 dark:text-gray-300 mr-1">
+                        {c.user?.name ?? "?"}
+                      </span>
+                      <span className="text-gray-600 dark:text-gray-400 break-words">
+                        {c.content}
+                      </span>
+                    </div>
+                    {currentUserId === c.userId && (
+                      <button
+                        onClick={() => handleDeleteComment(c.id)}
+                        className="shrink-0 text-gray-300 hover:text-red-400 transition-colors"
+                        title={t.deleteComment}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {isLoggedIn ? (
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void handlePostComment();
+                    }
+                  }}
+                  placeholder={t.addComment}
+                  maxLength={280}
+                  className="flex-1 text-xs px-2 py-1.5 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400"
+                />
+                <button
+                  onClick={handlePostComment}
+                  disabled={!commentText.trim() || postingComment}
+                  className="text-xs px-2 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors shrink-0"
+                >
+                  {postingComment ? "..." : t.postComment}
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-center text-gray-400">
+                <Link href="/login" className="text-blue-500 hover:underline">{t.signIn}</Link>
+                {" "}{t.signInToInteract}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -240,6 +495,7 @@ export default function GalleryClientPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [publicError, setPublicError] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [myError, setMyError] = useState("");
 
   const t = TEXT[lang];
@@ -276,6 +532,7 @@ export default function GalleryClientPage() {
         setIsLoggedIn(true);
         const d = await r.json();
         setMyItems(d.items ?? []);
+        if (d.userId) setCurrentUserId(d.userId);
       })
       .catch(() => {
         setIsLoggedIn(false);
@@ -353,7 +610,6 @@ export default function GalleryClientPage() {
 
   const displayedItems = tab === "public" ? publicItems : myItems;
   const masonryCols = useMasonryColumns();
-  // Distribute items left-to-right: item[0]→col0, item[1]→col1, …, item[N]→col0, …
   const masonryColumns = useMemo(
     () =>
       Array.from({ length: masonryCols }, (_, ci) =>
@@ -369,9 +625,7 @@ export default function GalleryClientPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{t.title}</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                {t.subtitle}
-              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t.subtitle}</p>
             </div>
             <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               <div className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden">
@@ -396,17 +650,11 @@ export default function GalleryClientPage() {
                   中文
                 </button>
               </div>
-              <Link
-                href="/toolbox"
-                className="text-sm text-purple-600 dark:text-purple-400 hover:underline"
-              >
+              <Link href="/toolbox" className="text-sm text-purple-600 dark:text-purple-400 hover:underline">
                 {t.create}
               </Link>
               {isLoggedIn && (
-                <Link
-                  href="/dashboard"
-                  className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-                >
+                <Link href="/dashboard" className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
                   {t.dashboard}
                 </Link>
               )}
@@ -490,6 +738,8 @@ export default function GalleryClientPage() {
                       item={item}
                       isOwner={tab === "mine"}
                       lang={lang}
+                      isLoggedIn={!!isLoggedIn}
+                      currentUserId={currentUserId}
                       onToggle={handleToggle}
                       onDelete={handleDelete}
                     />

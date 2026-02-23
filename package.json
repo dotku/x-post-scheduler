@@ -28,6 +28,7 @@
     "prisma": "^6.19.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "recharts": "^3.7.0",
     "stripe": "^20.3.1",
     "twitter-api-v2": "^1.29.0"
   },
@@ -44,5 +45,8 @@
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"
+  },
+  "optionalDependencies": {
+    "@parcel/watcher-darwin-arm64": "^2.5.6"
   }
 }

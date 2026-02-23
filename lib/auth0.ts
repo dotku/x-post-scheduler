@@ -7,6 +7,7 @@ export interface AuthenticatedUser {
   email: string | null;
   name: string | null;
   picture: string | null;
+  language: string;
 }
 
 export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
@@ -22,6 +23,14 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
     where: { auth0Sub: sub },
     update: { email, name, picture },
     create: { auth0Sub: sub, email, name, picture },
+    select: {
+      id: true,
+      auth0Sub: true,
+      email: true,
+      name: true,
+      picture: true,
+      language: true,
+    },
   });
 
   return {
@@ -30,6 +39,7 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
     email: user.email,
     name: user.name,
     picture: user.picture,
+    language: user.language,
   };
 }
 
