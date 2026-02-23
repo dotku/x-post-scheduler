@@ -16,7 +16,8 @@ const hasExpectedDelegates = (client: PrismaClient | undefined) =>
   "usageEvent" in client &&
   "creditTransaction" in client &&
   "cronRunEvent" in client &&
-  "webVisit" in client;
+  "webVisit" in client &&
+  "videoJob" in client;
 
 const cachedClient = globalForPrisma.prisma;
 const prismaClient = hasExpectedDelegates(cachedClient)

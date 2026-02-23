@@ -18,7 +18,8 @@ function trimOrNull(value: string | undefined, max = 512) {
 function isMissingWebVisitRelationError(error: unknown) {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { message?: unknown; meta?: unknown };
-  const message = typeof candidate.message === "string" ? candidate.message : "";
+  const message =
+    typeof candidate.message === "string" ? candidate.message : "";
   const meta = JSON.stringify(candidate.meta ?? {});
   return (
     message.includes("42P01") ||
@@ -37,12 +38,15 @@ export async function POST(request: NextRequest) {
   const path = normalizePath(body.path);
   const referrer = trimOrNull(body.referrer, 1024);
   const sessionId = trimOrNull(body.sessionId, 128);
-  const userAgent = trimOrNull(request.headers.get("user-agent") ?? undefined, 512);
+  const userAgent = trimOrNull(
+    request.headers.get("user-agent") ?? undefined,
+    512,
+  );
   const country = trimOrNull(
     request.headers.get("x-vercel-ip-country") ??
       request.headers.get("cf-ipcountry") ??
       undefined,
-    8
+    8,
   );
 
   let userId: string | null = null;

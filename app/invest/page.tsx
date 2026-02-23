@@ -55,17 +55,20 @@ const TEXT = {
     disclaimer:
       "This is an internal indicative estimate, not investment advice or a formal valuation report.",
     updatedAt: "Updated at",
-    kpiVisits30d: "30d Visitors",
-    kpiVisits7d: "7d visitors",
-    kpiVisitsUnavailable: "tracking initializing (client-side pageview events not received yet)",
+    kpiVisits30d: "30d Web Visits",
+    kpiVisits7d: "7d visits",
+    kpiVisitsUnavailable:
+      "tracking initializing (client-side pageview events not received yet)",
     kpiActiveCreators: "Active Creators (30d)",
     kpiActiveCreatorsNote: "distinct users with AI usage events",
     kpiRequests: "AI Requests (30d)",
     kpiCashTopup: "Cash Top-up (30d)",
     kpiCashTopupNote: "actual paid credit purchases",
-    calcRevenue: "Estimated Revenue (30d) = billed model usage across text, image, video, and voice",
+    calcRevenue:
+      "Estimated Revenue (30d) = billed model usage across text, image, video, and voice",
     calcArr: "Implied ARR = 12 x 30d estimated revenue",
-    calcMultiple: "Multiple bands adjust with active creators, web traffic, and request volume.",
+    calcMultiple:
+      "Multiple bands adjust with active creators, web traffic, and request volume.",
     calcRatio: "Observed cash top-up (30d)",
     calcRatioSuffix: "Cash/estimated usage revenue ratio",
     fundingTitle: "Funding Need Model",
@@ -131,8 +134,8 @@ const TEXT = {
     viewStats: "查看实时数据",
     disclaimer: "本页面为内部测算估值，不构成投资建议或正式估值报告。",
     updatedAt: "更新时间",
-    kpiVisits30d: "30天访客",
-    kpiVisits7d: "7天访客",
+    kpiVisits30d: "30天网站访问",
+    kpiVisits7d: "7天访问",
     kpiVisitsUnavailable: "访问埋点初始化中（暂未收到前端 pageview 事件）",
     kpiActiveCreators: "活跃创作者（30天）",
     kpiActiveCreatorsNote: "30天内有 AI 使用记录的去重用户",
@@ -145,7 +148,8 @@ const TEXT = {
     calcRatio: "观察到的现金充值（30天）",
     calcRatioSuffix: "现金/估算使用收入比",
     fundingTitle: "融资需求模型",
-    fundingSubtitle: "除使用数据外，模型还纳入产品功能深度、路线图执行强度、市场动能。",
+    fundingSubtitle:
+      "除使用数据外，模型还纳入产品功能深度、路线图执行强度、市场动能。",
     fundingRange: "建议融资规模",
     fundingLow: "保守方案",
     fundingBase: "推荐方案",
@@ -155,8 +159,10 @@ const TEXT = {
     featureScore: "产品成熟度",
     roadmapScore: "路线图强度",
     marketScore: "市场动能",
-    modelAssumption: "模型假设：精简团队人力成本 + 基础设施成本 + 市场投入 + 路线图一次性投入 + 风险缓冲。",
-    marketBenchmark: "市场基准约束：保守/平衡/激进三档目标稀释比例分别为 12% / 18% / 25%。",
+    modelAssumption:
+      "模型假设：精简团队人力成本 + 基础设施成本 + 市场投入 + 路线图一次性投入 + 风险缓冲。",
+    marketBenchmark:
+      "市场基准约束：保守/平衡/激进三档目标稀释比例分别为 12% / 18% / 25%。",
     monthlyBurn: "月度成本估算",
     roadmapBudget: "路线图预算",
     gtmBudget: "市场增长预算",
@@ -190,14 +196,33 @@ const MOAT_TEXT = {
 
 const USE_OF_FUNDS_TEXT = {
   en: [
-    { title: "Growth", detail: "Creator acquisition, referral loops, and channel-specific conversion optimization." },
-    { title: "Product", detail: "Platform-native content formats and one-click distribution for major social networks." },
-    { title: "AI Engine", detail: "Broader mainstream model coverage and multi-agent workflows for viral content generation." },
+    {
+      title: "Growth",
+      detail:
+        "Creator acquisition, referral loops, and channel-specific conversion optimization.",
+    },
+    {
+      title: "Product",
+      detail:
+        "Platform-native content formats and one-click distribution for major social networks.",
+    },
+    {
+      title: "AI Engine",
+      detail:
+        "Broader mainstream model coverage and multi-agent workflows for viral content generation.",
+    },
   ],
   zh: [
     { title: "增长", detail: "创作者增长体系、推荐裂变与按平台的转化优化。" },
-    { title: "产品", detail: "面向主流社交平台的内容模板、差异化编排与一键分发能力。" },
-    { title: "AI 引擎", detail: "覆盖主流媒体创作模型，并通过多智能体工作流提升爆款内容生成能力。" },
+    {
+      title: "产品",
+      detail: "面向主流社交平台的内容模板、差异化编排与一键分发能力。",
+    },
+    {
+      title: "AI 引擎",
+      detail:
+        "覆盖主流媒体创作模型，并通过多智能体工作流提升爆款内容生成能力。",
+    },
   ],
 } as const;
 
@@ -281,34 +306,52 @@ export default async function InvestPage({
   let webVisits30d = 0;
   let webVisits7d = 0;
   try {
-    const hasWebVisitTable = await prisma.$queryRaw<Array<{ exists: string | null }>>`
+    const preferVercelAnalytics =
+      (process.env.ANALYTICS_PREFER_VERCEL ?? "true") === "true";
+    const vercelDrainLike = "vercel-drain:%";
+    const hasWebVisitTable = await prisma.$queryRaw<
+      Array<{ exists: string | null }>
+    >`
       SELECT to_regclass('public."WebVisit"')::text AS exists
     `;
     if (hasWebVisitTable[0]?.exists) {
-      const [visits30dResult, visits7dResult] = await Promise.all([
+      const [
+        visits30dResult,
+        visits7dResult,
+        vercelVisits30dResult,
+        vercelVisits7dResult,
+      ] = await Promise.all([
         prisma.$queryRaw<Array<{ count: bigint }>>`
-          SELECT COUNT(
-            DISTINCT COALESCE(
-              NULLIF("sessionId", ''),
-              CASE WHEN "userId" IS NOT NULL THEN ('u:' || "userId") ELSE ('v:' || "id") END
-            )
-          )::bigint AS count
+          SELECT COUNT(*)::bigint AS count
           FROM "WebVisit"
           WHERE "createdAt" >= ${since30d}
         `,
         prisma.$queryRaw<Array<{ count: bigint }>>`
-          SELECT COUNT(
-            DISTINCT COALESCE(
-              NULLIF("sessionId", ''),
-              CASE WHEN "userId" IS NOT NULL THEN ('u:' || "userId") ELSE ('v:' || "id") END
-            )
-          )::bigint AS count
+          SELECT COUNT(*)::bigint AS count
           FROM "WebVisit"
           WHERE "createdAt" >= ${since7d}
         `,
+        prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*)::bigint AS count
+          FROM "WebVisit"
+          WHERE "createdAt" >= ${since30d}
+            AND "userAgent" LIKE ${vercelDrainLike}
+        `,
+        prisma.$queryRaw<Array<{ count: bigint }>>`
+          SELECT COUNT(*)::bigint AS count
+          FROM "WebVisit"
+          WHERE "createdAt" >= ${since7d}
+            AND "userAgent" LIKE ${vercelDrainLike}
+        `,
       ]);
-      webVisits30d = Number(visits30dResult[0]?.count ?? BigInt(0));
-      webVisits7d = Number(visits7dResult[0]?.count ?? BigInt(0));
+      const all30d = Number(visits30dResult[0]?.count ?? BigInt(0));
+      const all7d = Number(visits7dResult[0]?.count ?? BigInt(0));
+      const vercel30d = Number(vercelVisits30dResult[0]?.count ?? BigInt(0));
+      const vercel7d = Number(vercelVisits7dResult[0]?.count ?? BigInt(0));
+      const useVercel = preferVercelAnalytics && vercel30d > 0;
+
+      webVisits30d = useVercel ? vercel30d : all30d;
+      webVisits7d = useVercel ? vercel7d : all7d;
     }
   } catch {
     // Keep valuation page usable if WebVisit table is missing.
@@ -319,12 +362,16 @@ export default async function InvestPage({
   const openAiCharge30dCents = Math.max(
     0,
     Math.ceil(
-      ((openAiPromptTokens30d / 1_000_000) * 250 + (openAiCompletionTokens30d / 1_000_000) * 1000) *
-        60
-    )
+      ((openAiPromptTokens30d / 1_000_000) * 250 +
+        (openAiCompletionTokens30d / 1_000_000) * 1000) *
+        60,
+    ),
   );
   const wavespeedCharge30dCents = (
-    wavespeedByModel30d as Array<{ model: string | null; _count: { _all: number } }>
+    wavespeedByModel30d as Array<{
+      model: string | null;
+      _count: { _all: number };
+    }>
   ).reduce((sum, row) => {
     const modelId = row.model ?? "";
     if (!modelId) return sum;
@@ -336,7 +383,9 @@ export default async function InvestPage({
 
   const paidRevenue30dCents = topup30dAgg._sum.amountCents ?? 0;
   const revenueCoverage =
-    estRevenue30dCents > 0 ? Math.max(0, Math.min(5, paidRevenue30dCents / estRevenue30dCents)) : 0;
+    estRevenue30dCents > 0
+      ? Math.max(0, Math.min(5, paidRevenue30dCents / estRevenue30dCents))
+      : 0;
 
   const activeCreators30d = usageUsers30d.length;
   const baseMultiple =
@@ -348,33 +397,61 @@ export default async function InvestPage({
   const highMultiple = Math.min(10, baseMultiple + 1);
 
   const isSeedStageLike =
-    activeCreators30d >= 30 || paidRevenue30dCents >= 2_000_00 || usageAgg30d._count._all >= 1000;
+    activeCreators30d >= 30 ||
+    paidRevenue30dCents >= 2_000_00 ||
+    usageAgg30d._count._all >= 1000;
   const valuationFloor = isSeedStageLike
     ? { low: 500_000_000, base: 900_000_000, high: 1_500_000_000 }
     : { low: 200_000_000, base: 350_000_000, high: 600_000_000 };
-  const valuationLowCents = Math.max(valuationFloor.low, Math.round(estArrCents * lowMultiple));
-  const valuationBaseCents = Math.max(valuationFloor.base, Math.round(estArrCents * baseMultiple));
-  const valuationHighCents = Math.max(valuationFloor.high, Math.round(estArrCents * highMultiple));
-  const markupMultiplier = Number(process.env.MARKUP_MULTIPLIER ?? "60") || 60;
+  const valuationLowCents = Math.max(
+    valuationFloor.low,
+    Math.round(estArrCents * lowMultiple),
+  );
+  const valuationBaseCents = Math.max(
+    valuationFloor.base,
+    Math.round(estArrCents * baseMultiple),
+  );
+  const valuationHighCents = Math.max(
+    valuationFloor.high,
+    Math.round(estArrCents * highMultiple),
+  );
+  // Note: markupMultiplier here is for reverse-calculating provider costs from charged amounts
+  // Use OPENAI multiplier for OpenAI costs, WAVESPEED multiplier for Wavespeed costs
+  const openaiMarkupMultiplier =
+    Number(process.env.NEXT_PUBLIC_OPENAI_CHARGE_MULTIPLIER ?? "60") || 60;
+  const wavespeedMarkupMultiplier =
+    Number(process.env.NEXT_PUBLIC_WAVESPEED_CHARGE_MULTIPLIER ?? "2") || 2;
   const openAiProviderCost30dCents = Math.max(
     0,
     Math.ceil(
-      (openAiPromptTokens30d / 1_000_000) * 250 + (openAiCompletionTokens30d / 1_000_000) * 1000
-    )
+      (openAiPromptTokens30d / 1_000_000) * 250 +
+        (openAiCompletionTokens30d / 1_000_000) * 1000,
+    ),
   );
   const wavespeedProviderCost30dCents = Math.max(
     0,
-    Math.round(wavespeedCharge30dCents / Math.max(1, markupMultiplier))
+    Math.round(
+      wavespeedCharge30dCents / Math.max(1, wavespeedMarkupMultiplier),
+    ),
   );
 
   const featureScore = Math.min(
     10,
-    (usageAgg30d._count._all >= 5000 ? 4 : usageAgg30d._count._all >= 1000 ? 3 : 2) +
+    (usageAgg30d._count._all >= 5000
+      ? 4
+      : usageAgg30d._count._all >= 1000
+        ? 3
+        : 2) +
       (activeCreators30d >= 200 ? 3 : activeCreators30d >= 50 ? 2 : 1) +
-      (paidRevenue30dCents >= 5_000_00 ? 3 : paidRevenue30dCents >= 1_000_00 ? 2 : 1)
+      (paidRevenue30dCents >= 5_000_00
+        ? 3
+        : paidRevenue30dCents >= 1_000_00
+          ? 2
+          : 1),
   );
   const roadmapScore = 7 + (estRevenue30dCents > 10_000_00 ? 1 : 0);
-  const trafficMomentum = webVisits30d > 0 ? (webVisits7d * 4) / webVisits30d : 1;
+  const trafficMomentum =
+    webVisits30d > 0 ? (webVisits7d * 4) / webVisits30d : 1;
   const marketScore = Math.max(
     3,
     Math.min(
@@ -383,9 +460,9 @@ export default async function InvestPage({
         3 +
           Math.min(3, activeCreators30d / 80) +
           Math.min(2, revenueCoverage) +
-          Math.min(2, trafficMomentum)
-      )
-    )
+          Math.min(2, trafficMomentum),
+      ),
+    ),
   );
 
   const targetDilutionConservative = 0.12;
@@ -393,37 +470,64 @@ export default async function InvestPage({
   const targetDilutionAggressive = 0.25;
 
   const targetRunwayMonths = marketScore >= 7 ? 18 : 12;
-  const leanTeamSize = Math.max(3, Math.min(6, 3 + Math.round((featureScore + roadmapScore - 8) / 4)));
+  const leanTeamSize = Math.max(
+    3,
+    Math.min(6, 3 + Math.round((featureScore + roadmapScore - 8) / 4)),
+  );
   const monthlyTeamBurnCents = leanTeamSize * 18_000_00;
   const monthlyInfraBurnCents = Math.max(
     2_000_00,
-    Math.round((openAiProviderCost30dCents + wavespeedProviderCost30dCents) * 4)
+    Math.round(
+      (openAiProviderCost30dCents + wavespeedProviderCost30dCents) * 4,
+    ),
   );
   const monthlyGtmBurnCents = (3 + marketScore) * 2_500_00;
-  const monthlyBurnCents = monthlyTeamBurnCents + monthlyInfraBurnCents + monthlyGtmBurnCents;
+  const monthlyBurnCents =
+    monthlyTeamBurnCents + monthlyInfraBurnCents + monthlyGtmBurnCents;
 
   const roadmapOneOffBudgetCents = roadmapScore * 3_000_00;
   const marketExpansionBudgetCents = marketScore * 2_000_00;
-  const contingencyCents = Math.round((monthlyBurnCents * targetRunwayMonths + roadmapOneOffBudgetCents) * 0.1);
+  const contingencyCents = Math.round(
+    (monthlyBurnCents * targetRunwayMonths + roadmapOneOffBudgetCents) * 0.1,
+  );
   const runwayDrivenRaiseCents =
     monthlyBurnCents * targetRunwayMonths +
     roadmapOneOffBudgetCents +
     marketExpansionBudgetCents +
     contingencyCents;
 
-  const dilutionDrivenRaiseCents = (preMoneyCents: number, targetDilution: number) =>
-    Math.round((preMoneyCents * targetDilution) / (1 - targetDilution));
+  const dilutionDrivenRaiseCents = (
+    preMoneyCents: number,
+    targetDilution: number,
+  ) => Math.round((preMoneyCents * targetDilution) / (1 - targetDilution));
 
-  const raiseLowCapCents = dilutionDrivenRaiseCents(valuationHighCents, targetDilutionConservative);
-  const raiseBaseCapCents = dilutionDrivenRaiseCents(valuationBaseCents, targetDilutionBalanced);
-  const raiseHighCapCents = dilutionDrivenRaiseCents(valuationLowCents, targetDilutionAggressive);
+  const raiseLowCapCents = dilutionDrivenRaiseCents(
+    valuationHighCents,
+    targetDilutionConservative,
+  );
+  const raiseBaseCapCents = dilutionDrivenRaiseCents(
+    valuationBaseCents,
+    targetDilutionBalanced,
+  );
+  const raiseHighCapCents = dilutionDrivenRaiseCents(
+    valuationLowCents,
+    targetDilutionAggressive,
+  );
 
-  const raiseLowCents = Math.min(Math.round(runwayDrivenRaiseCents * 0.8), raiseLowCapCents);
+  const raiseLowCents = Math.min(
+    Math.round(runwayDrivenRaiseCents * 0.8),
+    raiseLowCapCents,
+  );
   const raiseBaseCents = Math.min(runwayDrivenRaiseCents, raiseBaseCapCents);
-  const raiseHighCents = Math.min(Math.round(runwayDrivenRaiseCents * 1.2), raiseHighCapCents);
-  const equityConservative = raiseLowCents / (valuationHighCents + raiseLowCents);
+  const raiseHighCents = Math.min(
+    Math.round(runwayDrivenRaiseCents * 1.2),
+    raiseHighCapCents,
+  );
+  const equityConservative =
+    raiseLowCents / (valuationHighCents + raiseLowCents);
   const equityBalanced = raiseBaseCents / (valuationBaseCents + raiseBaseCents);
-  const equityAggressive = raiseHighCents / (valuationLowCents + raiseHighCents);
+  const equityAggressive =
+    raiseHighCents / (valuationLowCents + raiseHighCents);
 
   const kpis = [
     {
@@ -451,7 +555,8 @@ export default async function InvestPage({
     },
   ] as const;
 
-  const withLang = (path: string) => `${path}${path.includes("?") ? "&" : "?"}lang=${lang}`;
+  const withLang = (path: string) =>
+    `${path}${path.includes("?") ? "&" : "?"}lang=${lang}`;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#071320] text-[#E6EDF5]">
@@ -497,14 +602,18 @@ export default async function InvestPage({
 
         <section className="mt-8 grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
           <div className="space-y-5">
-            <h1 className={`${heading.className} text-4xl leading-[1.02] sm:text-6xl`}>
+            <h1
+              className={`${heading.className} text-4xl leading-[1.02] sm:text-6xl`}
+            >
               {t.title1}
               <br />
               {t.title2}
               <br />
               {t.title3}
             </h1>
-            <p className="max-w-2xl text-sm leading-7 text-[#BDD2E5] sm:text-base">{t.intro}</p>
+            <p className="max-w-2xl text-sm leading-7 text-[#BDD2E5] sm:text-base">
+              {t.intro}
+            </p>
             <div className="flex flex-wrap items-center gap-3">
               <a
                 href="mailto:founders@xpostscheduler.com?subject=Investment%20Inquiry"
@@ -522,65 +631,126 @@ export default async function InvestPage({
           </div>
 
           <aside className="rounded-2xl border border-white/15 bg-white/5 p-5 backdrop-blur-sm">
-            <p className={`${mono.className} text-xs uppercase tracking-[0.16em] text-[#A3BED3]`}>{t.valuationLabel}</p>
-            <p className={`${heading.className} mt-2 text-4xl text-[#6CFFA3]`}>{usd(valuationBaseCents)}</p>
+            <p
+              className={`${mono.className} text-xs uppercase tracking-[0.16em] text-[#A3BED3]`}
+            >
+              {t.valuationLabel}
+            </p>
+            <p className={`${heading.className} mt-2 text-4xl text-[#6CFFA3]`}>
+              {usd(valuationBaseCents)}
+            </p>
             <div className="mt-4 space-y-2 text-sm text-[#D4E3F1]">
-              <p>{t.impliedArr}: {usd(estArrCents)}</p>
-              <p>{t.range}: {usd(valuationLowCents)} - {usd(valuationHighCents)}</p>
-              <p>{t.method}: {lowMultiple}x - {highMultiple}x ARR</p>
+              <p>
+                {t.impliedArr}: {usd(estArrCents)}
+              </p>
+              <p>
+                {t.range}: {usd(valuationLowCents)} - {usd(valuationHighCents)}
+              </p>
+              <p>
+                {t.method}: {lowMultiple}x - {highMultiple}x ARR
+              </p>
             </div>
           </aside>
         </section>
 
         <section className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map((kpi) => (
-            <article key={kpi.label} className="rounded-xl border border-white/15 bg-white/5 p-4">
+            <article
+              key={kpi.label}
+              className="rounded-xl border border-white/15 bg-white/5 p-4"
+            >
               <p className="text-xs text-[#9CB8CF]">{kpi.label}</p>
-              <p className={`${heading.className} mt-2 text-3xl text-white`}>{kpi.value}</p>
-              <p className="mt-2 text-xs leading-5 text-[#C2D5E6]">{kpi.note}</p>
+              <p className={`${heading.className} mt-2 text-3xl text-white`}>
+                {kpi.value}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-[#C2D5E6]">
+                {kpi.note}
+              </p>
             </article>
           ))}
         </section>
 
         <section className="mt-10 grid gap-4 lg:grid-cols-3">
           <article className="rounded-2xl border border-[#6CFFA3]/45 bg-[#0f2234]/70 p-5">
-            <p className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#9ac8e7]`}>{t.valuationLow}</p>
-            <p className={`${heading.className} mt-2 text-4xl text-[#c9f8de]`}>{usd(valuationLowCents)}</p>
-            <p className="mt-2 text-xs text-[#b5d2e7]">{lowMultiple}x {t.basedOn}</p>
+            <p
+              className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#9ac8e7]`}
+            >
+              {t.valuationLow}
+            </p>
+            <p className={`${heading.className} mt-2 text-4xl text-[#c9f8de]`}>
+              {usd(valuationLowCents)}
+            </p>
+            <p className="mt-2 text-xs text-[#b5d2e7]">
+              {lowMultiple}x {t.basedOn}
+            </p>
           </article>
           <article className="rounded-2xl border border-[#43C9FF]/50 bg-[#10253a]/80 p-5">
-            <p className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#9ac8e7]`}>{t.valuationBase}</p>
-            <p className={`${heading.className} mt-2 text-4xl text-white`}>{usd(valuationBaseCents)}</p>
-            <p className="mt-2 text-xs text-[#b5d2e7]">{baseMultiple}x {t.baseAdj}</p>
+            <p
+              className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#9ac8e7]`}
+            >
+              {t.valuationBase}
+            </p>
+            <p className={`${heading.className} mt-2 text-4xl text-white`}>
+              {usd(valuationBaseCents)}
+            </p>
+            <p className="mt-2 text-xs text-[#b5d2e7]">
+              {baseMultiple}x {t.baseAdj}
+            </p>
           </article>
           <article className="rounded-2xl border border-[#F7B267]/50 bg-[#2a1d1a]/60 p-5">
-            <p className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#f8cca6]`}>{t.valuationHigh}</p>
-            <p className={`${heading.className} mt-2 text-4xl text-[#ffe8cf]`}>{usd(valuationHighCents)}</p>
-            <p className="mt-2 text-xs text-[#f1d6bb]">{highMultiple}x {t.basedOn}</p>
+            <p
+              className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#f8cca6]`}
+            >
+              {t.valuationHigh}
+            </p>
+            <p className={`${heading.className} mt-2 text-4xl text-[#ffe8cf]`}>
+              {usd(valuationHighCents)}
+            </p>
+            <p className="mt-2 text-xs text-[#f1d6bb]">
+              {highMultiple}x {t.basedOn}
+            </p>
           </article>
         </section>
 
         <section className="mt-6 rounded-2xl border border-[#43C9FF]/35 bg-[#0f2132]/70 p-5">
-          <h2 className={`${heading.className} text-2xl text-[#F6FBFF]`}>{t.fundingTitle}</h2>
+          <h2 className={`${heading.className} text-2xl text-[#F6FBFF]`}>
+            {t.fundingTitle}
+          </h2>
           <p className="mt-2 text-sm text-[#c4d9ea]">{t.fundingSubtitle}</p>
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-              <p className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#9ac8e7]`}>
+              <p
+                className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#9ac8e7]`}
+              >
                 {t.fundingLow}
               </p>
-              <p className={`${heading.className} mt-2 text-3xl text-[#c9f8de]`}>{usd(raiseLowCents)}</p>
+              <p
+                className={`${heading.className} mt-2 text-3xl text-[#c9f8de]`}
+              >
+                {usd(raiseLowCents)}
+              </p>
             </article>
             <article className="rounded-xl border border-[#43C9FF]/40 bg-white/5 p-4">
-              <p className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#9ac8e7]`}>
+              <p
+                className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#9ac8e7]`}
+              >
                 {t.fundingBase}
               </p>
-              <p className={`${heading.className} mt-2 text-3xl text-white`}>{usd(raiseBaseCents)}</p>
+              <p className={`${heading.className} mt-2 text-3xl text-white`}>
+                {usd(raiseBaseCents)}
+              </p>
             </article>
             <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-              <p className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#f8cca6]`}>
+              <p
+                className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#f8cca6]`}
+              >
                 {t.fundingHigh}
               </p>
-              <p className={`${heading.className} mt-2 text-3xl text-[#ffe8cf]`}>{usd(raiseHighCents)}</p>
+              <p
+                className={`${heading.className} mt-2 text-3xl text-[#ffe8cf]`}
+              >
+                {usd(raiseHighCents)}
+              </p>
             </article>
           </div>
           <div className="mt-4 grid gap-3 text-sm text-[#d6e4ef] lg:grid-cols-3">
@@ -614,43 +784,85 @@ export default async function InvestPage({
         </section>
 
         <section className="mt-6 rounded-2xl border border-[#F7B267]/35 bg-[#241b1a]/70 p-5">
-          <h2 className={`${heading.className} text-2xl text-[#F6FBFF]`}>{t.equityTitle}</h2>
+          <h2 className={`${heading.className} text-2xl text-[#F6FBFF]`}>
+            {t.equityTitle}
+          </h2>
           <p className="mt-2 text-sm text-[#e5d8cf]">{t.equitySubtitle}</p>
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-              <p className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#f8cca6]`}>
+              <p
+                className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#f8cca6]`}
+              >
                 {t.scenarioConservative}
               </p>
-              <p className={`${heading.className} mt-2 text-3xl text-[#ffe8cf]`}>{pct(equityConservative)}</p>
+              <p
+                className={`${heading.className} mt-2 text-3xl text-[#ffe8cf]`}
+              >
+                {pct(equityConservative)}
+              </p>
               <div className="mt-2 space-y-1 text-xs text-[#e6d6c9]">
-                <p>{t.raiseAmount}: {usd(raiseLowCents)}</p>
-                <p>{t.targetDilution}: {pct(targetDilutionConservative)}</p>
-                <p>{t.preMoney}: {usd(valuationHighCents)}</p>
-                <p>{t.postMoney}: {usd(valuationHighCents + raiseLowCents)}</p>
+                <p>
+                  {t.raiseAmount}: {usd(raiseLowCents)}
+                </p>
+                <p>
+                  {t.targetDilution}: {pct(targetDilutionConservative)}
+                </p>
+                <p>
+                  {t.preMoney}: {usd(valuationHighCents)}
+                </p>
+                <p>
+                  {t.postMoney}: {usd(valuationHighCents + raiseLowCents)}
+                </p>
               </div>
             </article>
             <article className="rounded-xl border border-white/20 bg-white/5 p-4">
-              <p className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#f8cca6]`}>
+              <p
+                className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#f8cca6]`}
+              >
                 {t.scenarioBalanced}
               </p>
-              <p className={`${heading.className} mt-2 text-3xl text-white`}>{pct(equityBalanced)}</p>
+              <p className={`${heading.className} mt-2 text-3xl text-white`}>
+                {pct(equityBalanced)}
+              </p>
               <div className="mt-2 space-y-1 text-xs text-[#e6d6c9]">
-                <p>{t.raiseAmount}: {usd(raiseBaseCents)}</p>
-                <p>{t.targetDilution}: {pct(targetDilutionBalanced)}</p>
-                <p>{t.preMoney}: {usd(valuationBaseCents)}</p>
-                <p>{t.postMoney}: {usd(valuationBaseCents + raiseBaseCents)}</p>
+                <p>
+                  {t.raiseAmount}: {usd(raiseBaseCents)}
+                </p>
+                <p>
+                  {t.targetDilution}: {pct(targetDilutionBalanced)}
+                </p>
+                <p>
+                  {t.preMoney}: {usd(valuationBaseCents)}
+                </p>
+                <p>
+                  {t.postMoney}: {usd(valuationBaseCents + raiseBaseCents)}
+                </p>
               </div>
             </article>
             <article className="rounded-xl border border-white/15 bg-white/5 p-4">
-              <p className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#f8cca6]`}>
+              <p
+                className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#f8cca6]`}
+              >
                 {t.scenarioAggressive}
               </p>
-              <p className={`${heading.className} mt-2 text-3xl text-[#ffe8cf]`}>{pct(equityAggressive)}</p>
+              <p
+                className={`${heading.className} mt-2 text-3xl text-[#ffe8cf]`}
+              >
+                {pct(equityAggressive)}
+              </p>
               <div className="mt-2 space-y-1 text-xs text-[#e6d6c9]">
-                <p>{t.raiseAmount}: {usd(raiseHighCents)}</p>
-                <p>{t.targetDilution}: {pct(targetDilutionAggressive)}</p>
-                <p>{t.preMoney}: {usd(valuationLowCents)}</p>
-                <p>{t.postMoney}: {usd(valuationLowCents + raiseHighCents)}</p>
+                <p>
+                  {t.raiseAmount}: {usd(raiseHighCents)}
+                </p>
+                <p>
+                  {t.targetDilution}: {pct(targetDilutionAggressive)}
+                </p>
+                <p>
+                  {t.preMoney}: {usd(valuationLowCents)}
+                </p>
+                <p>
+                  {t.postMoney}: {usd(valuationLowCents + raiseHighCents)}
+                </p>
               </div>
             </article>
           </div>
@@ -658,7 +870,9 @@ export default async function InvestPage({
         </section>
 
         <section className="mt-6 rounded-2xl border border-white/15 bg-[#101f31]/70 p-5">
-          <h2 className={`${heading.className} text-2xl text-[#F6FBFF]`}>{t.calcTitle}</h2>
+          <h2 className={`${heading.className} text-2xl text-[#F6FBFF]`}>
+            {t.calcTitle}
+          </h2>
           <div className="mt-4 grid gap-3 text-sm text-[#d6e4ef] lg:grid-cols-2">
             <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
               {t.calcRevenue}: {usd(estRevenue30dCents)}
@@ -666,9 +880,12 @@ export default async function InvestPage({
             <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
               {t.calcArr}: {usd(estArrCents)}
             </p>
-            <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">{t.calcMultiple}</p>
             <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-              {t.calcRatio}: {usd(paidRevenue30dCents)}. {t.calcRatioSuffix}: {(revenueCoverage * 100).toFixed(1)}%.
+              {t.calcMultiple}
+            </p>
+            <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+              {t.calcRatio}: {usd(paidRevenue30dCents)}. {t.calcRatioSuffix}:{" "}
+              {(revenueCoverage * 100).toFixed(1)}%.
             </p>
           </div>
           <p className="mt-3 text-xs text-[#9fb9cc]">
@@ -678,10 +895,15 @@ export default async function InvestPage({
 
         <section className="mt-10 grid gap-4 lg:grid-cols-2">
           <article className="rounded-2xl border border-white/15 bg-[#0C1A2A]/75 p-5">
-            <h2 className={`${heading.className} text-2xl text-[#F6FBFF]`}>{t.whyWin}</h2>
+            <h2 className={`${heading.className} text-2xl text-[#F6FBFF]`}>
+              {t.whyWin}
+            </h2>
             <ul className="mt-4 space-y-3 text-sm leading-6 text-[#C7D8E8]">
               {moat.map((item) => (
-                <li key={item} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                <li
+                  key={item}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+                >
                   {item}
                 </li>
               ))}
@@ -689,11 +911,20 @@ export default async function InvestPage({
           </article>
 
           <article className="rounded-2xl border border-white/15 bg-[#111F31]/70 p-5">
-            <h2 className={`${heading.className} text-2xl text-[#F6FBFF]`}>{t.useOfFunds}</h2>
+            <h2 className={`${heading.className} text-2xl text-[#F6FBFF]`}>
+              {t.useOfFunds}
+            </h2>
             <div className="mt-4 space-y-3">
               {useOfFunds.map((item) => (
-                <div key={item.title} className="rounded-lg border border-white/10 bg-white/5 px-3 py-3">
-                  <p className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#8CB0CC]`}>{item.title}</p>
+                <div
+                  key={item.title}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-3"
+                >
+                  <p
+                    className={`${mono.className} text-xs uppercase tracking-[0.14em] text-[#8CB0CC]`}
+                  >
+                    {item.title}
+                  </p>
                   <p className="mt-1 text-sm text-[#D1E1EE]">{item.detail}</p>
                 </div>
               ))}
@@ -702,8 +933,12 @@ export default async function InvestPage({
         </section>
 
         <section className="mt-10 rounded-2xl border border-[#6CFFA3]/40 bg-linear-to-r from-[#6CFFA3]/15 via-[#43C9FF]/10 to-[#F7B267]/20 p-6">
-          <h2 className={`${heading.className} text-2xl text-white`}>{t.ctaTitle}</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-7 text-[#D2E2F0]">{t.ctaText}</p>
+          <h2 className={`${heading.className} text-2xl text-white`}>
+            {t.ctaTitle}
+          </h2>
+          <p className="mt-2 max-w-3xl text-sm leading-7 text-[#D2E2F0]">
+            {t.ctaText}
+          </p>
           <div className="mt-4 flex flex-wrap gap-3">
             <a
               href="mailto:founders@xpostscheduler.com?subject=Investor%20Intro"

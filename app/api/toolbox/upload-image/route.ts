@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { buildSignedBlobProxyUrl } from "@/lib/blob-proxy";
+import {
+  getBlobToken,
+  isLocalhost,
+  checkBlobPublicAccess,
+} from "@/lib/blob-config";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB
 
@@ -29,22 +34,22 @@ function getExtensionFromMime(mimeType: string): string {
 }
 
 function resolvePublicOrigin(requestOrigin: string) {
+  // For external provider access (Wavespeed), MUST use NEXT_PUBLIC_APP_URL (public domain)
+  // Never use localhost, as external APIs cannot reach it
   const configured =
-    process.env.APP_BASE_URL ||
     process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_BASE_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
   const origin = configured.trim() || requestOrigin;
   const isLocal =
-    origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("0.0.0.0");
+    origin.includes("localhost") ||
+    origin.includes("127.0.0.1") ||
+    origin.includes("0.0.0.0");
   return { origin, isLocal };
 }
 
 function getPublicBlobReadWriteToken() {
-  return (
-    process.env.TOOLBOX_PUBLIC_BLOB_READ_WRITE_TOKEN ||
-    process.env.PUBLIC_BLOB_READ_WRITE_TOKEN ||
-    process.env.BLOB_READ_WRITE_TOKEN
-  );
+  return getBlobToken("public");
 }
 
 export async function POST(request: NextRequest) {
@@ -61,12 +66,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing image file" }, { status: 400 });
   }
   if (!file.type.startsWith("image/")) {
-    return NextResponse.json({ error: "Only image files are supported" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Only image files are supported" },
+      { status: 400 },
+    );
   }
   if (file.size <= 0 || file.size > MAX_IMAGE_BYTES) {
     return NextResponse.json(
-      { error: `Image must be between 1 byte and ${MAX_IMAGE_BYTES / (1024 * 1024)}MB` },
-      { status: 400 }
+      {
+        error: `Image must be between 1 byte and ${MAX_IMAGE_BYTES / (1024 * 1024)}MB`,
+      },
+      { status: 400 },
     );
   }
 
@@ -76,13 +86,16 @@ export async function POST(request: NextRequest) {
   const publicBlobToken = getPublicBlobReadWriteToken();
 
   try {
+    // Upload with public access for external provider access
     const uploaded = await put(blobPath, buffer, {
       access: "public",
       addRandomSuffix: true,
       contentType: file.type,
       token: publicBlobToken,
     });
-    return NextResponse.json({ url: uploaded.url });
+    // Use NEXT_PUBLIC_APP_URL for external provider access
+    const publicUrl = uploaded.url;
+    return NextResponse.json({ url: publicUrl });
   } catch (error) {
     if (isPrivateStoreAccessError(error)) {
       try {
@@ -93,12 +106,18 @@ export async function POST(request: NextRequest) {
         });
         const { origin, isLocal } = resolvePublicOrigin(request.nextUrl.origin);
         if (isLocal) {
+          const diagnostics = checkBlobPublicAccess();
           return NextResponse.json(
             {
               error:
-                "Current blob store is private and localhost proxy is unreachable by external model providers. Use a public blob token (TOOLBOX_PUBLIC_BLOB_READ_WRITE_TOKEN) or set APP_BASE_URL to a public deployed domain.",
+                "Cannot upload for external provider access on localhost. " +
+                "Blob store is private and localhost proxy is unreachable by external APIs like Wavespeed. " +
+                (diagnostics.diagnostics.recommendations?.[0]
+                  ? "Recommendation: " +
+                    diagnostics.diagnostics.recommendations[0]
+                  : "Deploy to production for public blob access."),
             },
-            { status: 400 }
+            { status: 400 },
           );
         }
         const proxyUrl = buildSignedBlobProxyUrl(origin, uploadedPrivate.url);
@@ -111,13 +130,16 @@ export async function POST(request: NextRequest) {
                 ? privateError.message
                 : "Failed to upload private image",
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
     }
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to upload image" },
-      { status: 500 }
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to upload image",
+      },
+      { status: 500 },
     );
   }
 }

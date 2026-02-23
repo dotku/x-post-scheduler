@@ -31,8 +31,17 @@ export async function GET(request: NextRequest) {
     return unauthorizedResponse();
   }
 
-  const days = Math.min(toPositiveInt(request.nextUrl.searchParams.get("days"), 30), 365);
+  const days = Math.min(
+    toPositiveInt(request.nextUrl.searchParams.get("days"), 30),
+    365,
+  );
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  // Get current credit balance
+  const currentUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { creditBalanceCents: true },
+  });
 
   const [windowAgg, allTimeAgg, bySource, byModel, recent] = await Promise.all([
     prisma.usageEvent.aggregate({
@@ -90,6 +99,7 @@ export async function GET(request: NextRequest) {
   ]);
 
   return NextResponse.json({
+    creditBalance: currentUser?.creditBalanceCents ?? 0,
     rangeDays: days,
     window: {
       requests: windowAgg._count._all,
@@ -126,11 +136,12 @@ export async function GET(request: NextRequest) {
       if (provider === "openai") {
         estimatedCostCents = calculateCostCents(
           { promptTokens, completionTokens, totalTokens },
-          model
+          model,
         );
       } else if (provider === "wavespeed" && model !== "unknown") {
         estimatedCostCents =
-          getWavespeedFeeCents(model, inferWavespeedMediaType(model)) * requests;
+          getWavespeedFeeCents(model, inferWavespeedMediaType(model)) *
+          requests;
       }
 
       return {

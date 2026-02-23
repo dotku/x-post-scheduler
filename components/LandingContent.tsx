@@ -147,7 +147,7 @@ function detectProvider(modelId: string) {
 
 export default function LandingContent() {
   const [userAgent] = useState(() =>
-    typeof window === "undefined" ? "" : window.navigator.userAgent || ""
+    typeof window === "undefined" ? "" : window.navigator.userAgent || "",
   );
   const [copied, setCopied] = useState(false);
   const [stats, setStats] = useState<PublicStatsResponse | null>(null);
@@ -187,7 +187,9 @@ export default function LandingContent() {
       mode: "text",
     });
 
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(map.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
   }, []);
 
   useEffect(() => {
@@ -252,7 +254,8 @@ export default function LandingContent() {
       {/* Beta Notice */}
       <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-2 text-center text-sm text-amber-800 dark:text-amber-200">
-          This project is currently in beta testing. Please do not use it in production environments. / 本项目目前处于内测阶段，请勿用于生产环境。
+          This project is currently in beta testing. Please do not use it in
+          production environments. / 本项目目前处于内测阶段，请勿用于生产环境。
         </div>
       </div>
 
@@ -278,7 +281,7 @@ export default function LandingContent() {
               </p>
               <p className="mt-2">
                 {browserEnv.isWeChat
-                  ? '微信内置浏览器不支持登录，请点击右上角「...」菜单，选择「在默认浏览器中打开」。'
+                  ? "微信内置浏览器不支持登录，请点击右上角「...」菜单，选择「在默认浏览器中打开」。"
                   : "Sign-in is not supported in embedded browsers. Please open this page in Safari or Chrome."}
               </p>
               {browserEnv.isWeChat && (
@@ -364,36 +367,48 @@ export default function LandingContent() {
         </div>
 
         {statsLoading ? (
-          <div className="text-sm text-gray-500 dark:text-gray-400">Loading usage metrics...</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            Loading usage metrics...
+          </div>
         ) : stats ? (
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Users</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Users
+                </p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
                   {stats.totals.users.toLocaleString()}
                 </p>
               </div>
               <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">AI Requests (All-time)</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  AI Requests (All-time)
+                </p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
                   {stats.totals.requests.toLocaleString()}
                 </p>
               </div>
               <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Tokens (All-time)</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Tokens (All-time)
+                </p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
                   {stats.totals.tokens.toLocaleString()}
                 </p>
               </div>
               <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Gallery Items</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Gallery Items
+                </p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
                   {stats.totals.galleryItems.toLocaleString()}
                 </p>
               </div>
               <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">Web Visits (All-time)</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  Web Visits (All-time)
+                </p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
                   {stats.totals.webVisits.toLocaleString()}
                 </p>
@@ -412,7 +427,9 @@ export default function LandingContent() {
                         key={item.provider}
                         className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm"
                       >
-                        <span className="text-gray-700 dark:text-gray-300">{item.provider}</span>
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {item.provider}
+                        </span>
                         <span className="text-gray-900 dark:text-white">
                           {item.requests.toLocaleString()} req
                         </span>
@@ -432,7 +449,9 @@ export default function LandingContent() {
                       key={item.path}
                       className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm"
                     >
-                      <span className="text-gray-700 dark:text-gray-300 truncate pr-2">{item.path}</span>
+                      <span className="text-gray-700 dark:text-gray-300 truncate pr-2">
+                        {item.path}
+                      </span>
                       <span className="text-gray-900 dark:text-white">
                         {item.visits.toLocaleString()} visits
                       </span>
@@ -478,8 +497,12 @@ export default function LandingContent() {
                       key={model.id}
                       className="flex items-center justify-between gap-2 rounded-md border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm"
                     >
-                      <span className="text-gray-700 dark:text-gray-300 truncate">{model.label}</span>
-                      <span className="shrink-0 text-xs text-gray-400 uppercase">{model.mode}</span>
+                      <span className="text-gray-700 dark:text-gray-300 truncate">
+                        {model.label}
+                      </span>
+                      <span className="shrink-0 text-xs text-gray-400 uppercase">
+                        {model.mode}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -515,8 +538,8 @@ export default function LandingContent() {
               Build your knowledge base
             </h4>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Import your website content so AI can generate relevant,
-              on-brand posts.
+              Import your website content so AI can generate relevant, on-brand
+              posts.
             </p>
           </div>
           <div>
@@ -527,8 +550,8 @@ export default function LandingContent() {
               Schedule & automate
             </h4>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Create one-time or auto posts. Let AI generate and post
-              content automatically.
+              Create one-time or auto posts. Let AI generate and post content
+              automatically.
             </p>
           </div>
         </div>
@@ -553,26 +576,66 @@ export default function LandingContent() {
             </p>
             <ul className="mt-6 space-y-2 text-sm text-gray-600 dark:text-gray-400 text-left">
               <li className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg
+                  className="w-4 h-4 text-green-500 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
                 Unlimited scheduled posts
               </li>
               <li className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg
+                  className="w-4 h-4 text-green-500 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
                 AI content generation
               </li>
               <li className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg
+                  className="w-4 h-4 text-green-500 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
                 Top up $5 / $10 / $25 anytime
               </li>
               <li className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg
+                  className="w-4 h-4 text-green-500 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
                 No monthly subscription
               </li>

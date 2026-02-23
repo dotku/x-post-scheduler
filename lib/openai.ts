@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import type { TokenUsage } from "./usage-tracking";
 
-function getOpenAIClient() {
+export function getOpenAIClient() {
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {

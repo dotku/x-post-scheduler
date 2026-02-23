@@ -34,6 +34,7 @@ model User {
   creditTransactions CreditTransaction[]
   galleryItems       GalleryItem[]
   webVisits          WebVisit[]
+  videoJobs          VideoJob[]
 }
 
 model CronRunEvent {
@@ -240,3 +241,41 @@ model WebVisit {
   @@index([sessionId, createdAt])
   @@index([userId, createdAt])
 }
+
+model VideoJob {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Job configuration
+  modelId       String
+  modelLabel    String
+  videoMode     String   // "t2v" | "i2v"
+  prompt        String
+  segmentCount  Int
+  duration      Int      @default(5)
+  aspectRatio   String   @default("16:9")
+  generateAudio Boolean  @default(false)
+  i2vImageUrl   String?
+  
+  // Job state
+  status        String   @default("pending") // "pending" | "processing" | "completed" | "failed"
+  
+  // Progress tracking (JSON array of segment objects)
+  // [{index: 1, status: "completed", outputUrl: "...", error: null}, ...]
+  segments      String   @default("[]") // JSON stringified
+  
+  // Final results
+  completedUrls String?  // JSON stringified
+  stitchedUrl   String?
+  error         String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  startedAt     DateTime?
+  completedAt   DateTime?
+  
+  @@index([userId, status])
+  @@index([createdAt])
+}
+

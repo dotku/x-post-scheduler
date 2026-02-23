@@ -17,7 +17,8 @@ const I2V_MODELS: StudioModel[] = [
   {
     id: "wavespeed-ai/wan-2.2/i2v-480p-ultra-fast",
     label: "Wan 2.2 i2v — 480p Fast",
-    description: "Fast & cheap · final charge follows current pricing multiplier",
+    description:
+      "Fast & cheap · final charge follows current pricing multiplier",
     tier: "fast",
     supportsAudio: false,
     durations: [5, 8],
@@ -25,7 +26,8 @@ const I2V_MODELS: StudioModel[] = [
   {
     id: "wavespeed-ai/wan-2.2/i2v-720p",
     label: "Wan 2.2 i2v — 720p",
-    description: "Higher resolution · final charge follows current pricing multiplier",
+    description:
+      "Higher resolution · final charge follows current pricing multiplier",
     tier: "standard",
     supportsAudio: false,
     durations: [5, 8],
@@ -53,7 +55,8 @@ const VIDEO_MODELS: StudioModel[] = [
   {
     id: "wavespeed-ai/wan-2.2/t2v-720p",
     label: "Wan 2.2 — 720p",
-    description: "Higher resolution · final charge follows current pricing multiplier",
+    description:
+      "Higher resolution · final charge follows current pricing multiplier",
     tier: "standard",
     supportsAudio: false,
     durations: [5, 8],
@@ -173,22 +176,23 @@ interface LongVideoSegment {
 const TIER_COLORS: Record<string, string> = {
   fast: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   standard: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-  premium: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  premium:
+    "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
 };
 
-const CLIENT_DEFAULT_MARKUP_MULTIPLIER = 60;
+const CLIENT_DEFAULT_MARKUP_MULTIPLIER = 60; // For OpenAI
+const CLIENT_DEFAULT_WAVESPEED_MULTIPLIER = 2; // For Wavespeed
 const CLIENT_WAVESPEED_CHARGE_MULTIPLIER = Number(
   process.env.NEXT_PUBLIC_WAVESPEED_CHARGE_MULTIPLIER ??
-    process.env.NEXT_PUBLIC_MARKUP_MULTIPLIER ??
-    CLIENT_DEFAULT_MARKUP_MULTIPLIER
+    CLIENT_DEFAULT_WAVESPEED_MULTIPLIER,
 );
 const CLIENT_WAVESPEED_IMAGE_CHARGE_MULTIPLIER = Number(
   process.env.NEXT_PUBLIC_WAVESPEED_IMAGE_CHARGE_MULTIPLIER ??
-    CLIENT_WAVESPEED_CHARGE_MULTIPLIER
+    CLIENT_WAVESPEED_CHARGE_MULTIPLIER,
 );
 const CLIENT_WAVESPEED_VIDEO_CHARGE_MULTIPLIER = Number(
   process.env.NEXT_PUBLIC_WAVESPEED_VIDEO_CHARGE_MULTIPLIER ??
-    CLIENT_WAVESPEED_CHARGE_MULTIPLIER
+    CLIENT_WAVESPEED_CHARGE_MULTIPLIER,
 );
 
 const CLIENT_WAVESPEED_MODEL_BASE_COST_CENTS: Record<string, number> = {
@@ -227,14 +231,20 @@ function inferMediaTypeFromModelId(modelId: string): "image" | "video" {
   return "image";
 }
 
-function getEstimatedBaseCostCents(modelId: string, mediaType: "image" | "video") {
+function getEstimatedBaseCostCents(
+  modelId: string,
+  mediaType: "image" | "video",
+) {
   return (
     CLIENT_WAVESPEED_MODEL_BASE_COST_CENTS[modelId] ??
     (mediaType === "video" ? 30 : 5)
   );
 }
 
-function getEstimatedChargeCents(modelId: string, mediaType: "image" | "video") {
+function getEstimatedChargeCents(
+  modelId: string,
+  mediaType: "image" | "video",
+) {
   const baseCostCents = getEstimatedBaseCostCents(modelId, mediaType);
   const multiplier =
     mediaType === "video"
@@ -250,15 +260,20 @@ function formatUsdFromCents(cents: number) {
 const DEFAULT_INPUT_CLEANUP_DELAY_MINUTES = 15;
 const INPUT_CLEANUP_DELAY_MINUTES = Math.max(
   1,
-  Number(process.env.NEXT_PUBLIC_INPUT_CLEANUP_DELAY_MINUTES ?? DEFAULT_INPUT_CLEANUP_DELAY_MINUTES)
+  Number(
+    process.env.NEXT_PUBLIC_INPUT_CLEANUP_DELAY_MINUTES ??
+      DEFAULT_INPUT_CLEANUP_DELAY_MINUTES,
+  ),
 );
 const INPUT_CLEANUP_DELAY_MS = INPUT_CLEANUP_DELAY_MINUTES * 60 * 1000;
 
 /** Maps t2v model IDs to their i2v counterparts for seamless segment continuity. */
 const T2V_TO_I2V: Record<string, string> = {
-  "wavespeed-ai/wan-2.2/t2v-480p-ultra-fast": "wavespeed-ai/wan-2.2/i2v-480p-ultra-fast",
+  "wavespeed-ai/wan-2.2/t2v-480p-ultra-fast":
+    "wavespeed-ai/wan-2.2/i2v-480p-ultra-fast",
   "wavespeed-ai/wan-2.2/t2v-720p": "wavespeed-ai/wan-2.2/i2v-720p",
-  "bytedance/seedance-v1.5-pro/text-to-video": "bytedance/seedance-v1.5-pro/image-to-video",
+  "bytedance/seedance-v1.5-pro/text-to-video":
+    "bytedance/seedance-v1.5-pro/image-to-video",
 };
 
 /** Extracts the last frame of a video URL as a JPEG Blob (client-side, via canvas). */
@@ -266,12 +281,17 @@ async function extractLastFrame(proxyUrl: string): Promise<Blob> {
   const video = document.createElement("video");
   video.crossOrigin = "anonymous";
   video.muted = true;
-  video.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px";
+  video.style.cssText =
+    "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px";
   document.body.appendChild(video);
   try {
     await new Promise<void>((resolve, reject) => {
       video.addEventListener("loadedmetadata", () => resolve(), { once: true });
-      video.addEventListener("error", () => reject(new Error("Failed to load video for frame extraction")), { once: true });
+      video.addEventListener(
+        "error",
+        () => reject(new Error("Failed to load video for frame extraction")),
+        { once: true },
+      );
       video.src = proxyUrl;
       video.load();
     });
@@ -287,7 +307,7 @@ async function extractLastFrame(proxyUrl: string): Promise<Blob> {
       canvas.toBlob(
         (b) => (b ? resolve(b) : reject(new Error("Canvas toBlob failed"))),
         "image/jpeg",
-        0.92
+        0.92,
       );
     });
   } finally {
@@ -311,7 +331,7 @@ function getImageModePath(mode: "t2i" | "i2i" | "i2i_text") {
 function getToolboxVisitingPath(
   tab: Tab,
   videoMode: "t2v" | "i2v",
-  imageMode: "t2i" | "i2i" | "i2i_text"
+  imageMode: "t2i" | "i2i" | "i2i_text",
 ) {
   if (tab === "video") {
     return `/toolbox?tab=video&mode=${videoMode}`;
@@ -321,6 +341,10 @@ function getToolboxVisitingPath(
 
 export default function ToolboxPage() {
   const [tab, setTab] = useState<Tab>("image");
+
+  // Credit balance
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
+  const [creditLoading, setCreditLoading] = useState(true);
 
   // shared
   const [prompt, setPrompt] = useState("");
@@ -351,15 +375,24 @@ export default function ToolboxPage() {
   const [generateAudio, setGenerateAudio] = useState(false);
   const [enableLongVideo, setEnableLongVideo] = useState(false);
   const [longVideoSegmentsCount, setLongVideoSegmentsCount] = useState(3);
-  const [longVideoSegments, setLongVideoSegments] = useState<LongVideoSegment[]>([]);
+  const [longVideoSegments, setLongVideoSegments] = useState<
+    LongVideoSegment[]
+  >([]);
   const [stitchedVideoUrl, setStitchedVideoUrl] = useState<string | null>(null);
   const [isStitching, setIsStitching] = useState(false);
-  const [stitchProgress, setStitchProgress] = useState<{ current: number; total: number } | null>(null);
+  const [stitchProgress, setStitchProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
 
   // audio mixing
-  const [audioMode, setAudioMode] = useState<"voiceover" | "bgm" | "both" | null>(null);
+  const [audioMode, setAudioMode] = useState<
+    "voiceover" | "bgm" | "both" | null
+  >(null);
   const [voiceoverText, setVoiceoverText] = useState("");
-  const [ttsVoice, setTtsVoice] = useState<"alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer">("nova");
+  const [ttsVoice, setTtsVoice] = useState<
+    "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer"
+  >("nova");
   const [voiceoverVolume, setVoiceoverVolume] = useState(90);
   const [bgmFile, setBgmFile] = useState<File | null>(null);
   const [bgmVolume, setBgmVolume] = useState(30);
@@ -421,6 +454,24 @@ export default function ToolboxPage() {
     };
   }, []);
 
+  // Fetch credit balance
+  useEffect(() => {
+    const fetchBalance = async () => {
+      try {
+        const res = await fetch("/api/usage");
+        const data = await res.json();
+        if (res.ok && data.creditBalance !== undefined) {
+          setCreditBalance(data.creditBalance);
+        }
+      } catch (err) {
+        console.error("Failed to fetch credit balance:", err);
+      } finally {
+        setCreditLoading(false);
+      }
+    };
+    fetchBalance();
+  }, []);
+
   const startTimer = () => {
     setElapsed(0);
     timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
@@ -451,7 +502,7 @@ export default function ToolboxPage() {
     id: string,
     pollUrl?: string,
     onComplete?: (url: string) => void,
-    cleanupInputUrl?: string | null
+    cleanupInputUrl?: string | null,
   ) => {
     pollRef.current = setTimeout(async () => {
       try {
@@ -492,7 +543,10 @@ export default function ToolboxPage() {
       method: "POST",
       body: form,
     });
-    const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+    const data = (await res.json().catch(() => ({}))) as {
+      url?: string;
+      error?: string;
+    };
     if (!res.ok || !data.url) {
       throw new Error(data.error || "Failed to upload image");
     }
@@ -510,7 +564,9 @@ export default function ToolboxPage() {
         setImageInputUrl(url);
       }
     } catch (err) {
-      setImageUploadError(err instanceof Error ? err.message : "Failed to upload image");
+      setImageUploadError(
+        err instanceof Error ? err.message : "Failed to upload image",
+      );
     } finally {
       setImageUploadLoading(false);
     }
@@ -518,9 +574,11 @@ export default function ToolboxPage() {
 
   const onPasteImageForTarget = async (
     e: React.ClipboardEvent<HTMLDivElement>,
-    target: "i2v" | "i2i"
+    target: "i2v" | "i2i",
   ) => {
-    const item = Array.from(e.clipboardData.items).find((it) => it.type.startsWith("image/"));
+    const item = Array.from(e.clipboardData.items).find((it) =>
+      it.type.startsWith("image/"),
+    );
     if (!item) return;
     e.preventDefault();
     const file = item.getAsFile();
@@ -530,7 +588,7 @@ export default function ToolboxPage() {
 
   const onFilePickedForTarget = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    target: "i2v" | "i2i"
+    target: "i2v" | "i2i",
   ) => {
     const input = e.currentTarget;
     const file = input.files?.[0];
@@ -539,7 +597,9 @@ export default function ToolboxPage() {
     input.value = "";
   };
 
-  const onMultiImageFilesPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onMultiImageFilesPicked = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const files = Array.from(e.currentTarget.files ?? []);
     if (!files.length) return;
     e.currentTarget.value = "";
@@ -591,21 +651,195 @@ export default function ToolboxPage() {
     const activeModels = videoMode === "i2v" ? I2V_MODELS : VIDEO_MODELS;
     const activeModel = activeModels.find((m) => m.id === activeModelId);
     const segmentCount = Math.max(2, Math.min(8, longVideoSegmentsCount));
+
+    // Initialize UI state
+    const initialSegments: LongVideoSegment[] = Array.from({
+      length: segmentCount,
+    }).map((_, idx) => ({
+      index: idx + 1,
+      prompt: prompt.trim(),
+      taskId: null,
+      pollUrl: null,
+      status: "queued",
+      outputUrl: null,
+      error: null,
+    }));
+
+    setError("");
+    setStitchedVideoUrl(null);
+    setOutputUrl(null);
+    setTaskId(null);
+    setWsPollUrl(null);
+    setLongVideoSegments(initialSegments);
+    setStatus("generating");
+    startTimer();
+
+    try {
+      // Submit background job
+      const submitRes = await fetch("/api/toolbox/video/long-gen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: activeModelId,
+          modelLabel: activeModel?.label || activeModelId,
+          videoMode,
+          prompt: prompt.trim(),
+          segmentCount,
+          duration,
+          aspectRatio: ASPECT_RATIOS[aspectIdx].value,
+          generateAudio,
+          i2vImageUrl: videoMode === "i2v" ? i2vImageUrl : undefined,
+        }),
+      });
+
+      const submitData = await submitRes.json();
+      if (!submitRes.ok) {
+        throw new Error(submitData.error || "Failed to submit job");
+      }
+
+      const jobId = submitData.jobId;
+      setTaskId(jobId); // Store jobId for reference
+
+      // Poll job status until completion
+      const pollJob = async () => {
+        try {
+          const res = await fetch(`/api/toolbox/video/long-gen/${jobId}`);
+          const jobData = await res.json();
+
+          if (!res.ok) {
+            throw new Error(jobData.error || "Failed to fetch job status");
+          }
+
+          // Update segment states from job
+          const jobSegments = jobData.segments || [];
+          setLongVideoSegments(
+            jobSegments.map((seg: any) => ({
+              index: seg.index,
+              prompt: seg.prompt || prompt.trim(),
+              taskId: seg.taskId,
+              pollUrl: seg.pollUrl,
+              status: seg.status,
+              outputUrl: seg.outputUrl,
+              error: seg.error,
+            })),
+          );
+
+          // Update overall status
+          if (jobData.status === "completed") {
+            stopTimer();
+            setStatus("completed");
+            setOutputUrl(
+              jobData.completedUrls?.[jobData.completedUrls.length - 1] ?? null,
+            );
+
+            // Auto-stitch if we have 2+ completed segments
+            if (jobData.completedUrls?.length >= 2) {
+              setIsStitching(true);
+              try {
+                // Client-side stitch (as before)
+                const proxyUrls = jobData.completedUrls.map(
+                  (url: string) =>
+                    `/api/toolbox/proxy?url=${encodeURIComponent(url)}`,
+                );
+                const stitchedUrl = await stitchProxyUrls(
+                  proxyUrls,
+                  (current, total) => setStitchProgress({ current, total }),
+                );
+                setStitchedVideoUrl((prev) => {
+                  if (prev) URL.revokeObjectURL(prev);
+                  return stitchedUrl;
+                });
+                setOutputUrl(stitchedUrl);
+              } catch (stitchErr) {
+                setError(
+                  stitchErr instanceof Error
+                    ? stitchErr.message
+                    : "Auto-stitch failed",
+                );
+              } finally {
+                setIsStitching(false);
+                setStitchProgress(null);
+              }
+            }
+
+            // Save to gallery
+            if (jobData.completedUrls?.length > 0 && activeModel) {
+              saveToGallery(
+                "video",
+                activeModelId,
+                `${activeModel.label} (long-video segment)`,
+                jobData.completedUrls[0],
+                ASPECT_RATIOS[aspectIdx].value,
+                {
+                  inputImageUrl:
+                    videoMode === "i2v"
+                      ? (i2vImageUrl ?? undefined)
+                      : undefined,
+                  generationMeta: {
+                    provider: "wavespeed",
+                    kind: "video",
+                    mode: videoMode,
+                    longVideo: true,
+                    segmentCount,
+                    duration,
+                    generateAudio,
+                  },
+                },
+              );
+            }
+          } else if (jobData.status === "processing") {
+            // Continue polling
+            setTimeout(pollJob, 3000);
+          } else if (jobData.status === "failed") {
+            stopTimer();
+            setStatus("failed");
+            setError(jobData.error || "Job failed");
+          } else {
+            // Still pending, keep polling
+            setTimeout(pollJob, 3000);
+          }
+        } catch (err) {
+          stopTimer();
+          setStatus("failed");
+          setError(err instanceof Error ? err.message : "Polling error");
+        }
+      };
+
+      // Start polling
+      pollJob();
+    } catch (err) {
+      stopTimer();
+      setStatus("failed");
+      const message =
+        err instanceof Error ? err.message : "Failed to start job";
+      setError(message);
+    }
+  };
+
+  // Legacy method - kept for reference but not used
+  const _legacyHandleGenerateLongVideo = async () => {
+    if (!prompt.trim()) return;
+    if (videoMode === "i2v" && !i2vImageUrl) return;
+
+    const activeModelId = videoMode === "i2v" ? i2vModelId : videoModelId;
+    const activeModels = videoMode === "i2v" ? I2V_MODELS : VIDEO_MODELS;
+    const activeModel = activeModels.find((m) => m.id === activeModelId);
+    const segmentCount = Math.max(2, Math.min(8, longVideoSegmentsCount));
     const basePrompt = prompt.trim();
     // i2v equivalent for seamless chaining; null means no visual handoff available
     const i2vContinuityModelId = T2V_TO_I2V[activeModelId] ?? null;
 
-    const initialSegments: LongVideoSegment[] = Array.from({ length: segmentCount }).map(
-      (_, idx) => ({
-        index: idx + 1,
-        prompt: basePrompt,
-        taskId: null,
-        pollUrl: null,
-        status: "queued",
-        outputUrl: null,
-        error: null,
-      })
-    );
+    const initialSegments: LongVideoSegment[] = Array.from({
+      length: segmentCount,
+    }).map((_, idx) => ({
+      index: idx + 1,
+      prompt: basePrompt,
+      taskId: null,
+      pollUrl: null,
+      status: "queued",
+      outputUrl: null,
+      error: null,
+    }));
 
     setError("");
     setStitchedVideoUrl(null);
@@ -619,107 +853,166 @@ export default function ToolboxPage() {
     try {
       const completedUrls: string[] = [];
       // prevFrameUrl: the uploaded URL of the last frame from the previous segment
-      let prevFrameUrl: string | null = videoMode === "i2v" ? i2vImageUrl : null;
+      let prevFrameUrl: string | null =
+        videoMode === "i2v" ? i2vImageUrl : null;
 
       for (const segment of initialSegments) {
         setLongVideoSegments((prev) =>
           prev.map((item) =>
-            item.index === segment.index ? { ...item, status: "generating", error: null } : item
-          )
-        );
-
-        // For segments after the first: use i2v model with last frame for visual continuity
-        const isFirstSeg = segment.index === 1;
-        const segModelId =
-          !isFirstSeg && prevFrameUrl && i2vContinuityModelId
-            ? i2vContinuityModelId
-            : activeModelId;
-        const segImageUrl =
-          !isFirstSeg && prevFrameUrl
-            ? prevFrameUrl
-            : videoMode === "i2v"
-            ? i2vImageUrl
-            : undefined;
-
-        const submitRes = await fetch("/api/toolbox/video", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            modelId: segModelId,
-            prompt: segment.prompt,
-            duration,
-            aspectRatio: ASPECT_RATIOS[aspectIdx].value,
-            ...(segImageUrl ? { imageUrl: segImageUrl } : {}),
-            ...(generateAudio ? { generateAudio: true } : {}),
-          }),
-        });
-        const submitData = await submitRes.json();
-        if (!submitRes.ok) {
-          throw new Error(submitData.error || `Segment ${segment.index} submission failed`);
-        }
-
-        const segTaskId: string = submitData.task.id;
-        const segPollUrl: string | null = submitData.task?.urls?.get ?? null;
-        setLongVideoSegments((prev) =>
-          prev.map((item) =>
             item.index === segment.index
-              ? { ...item, taskId: segTaskId, pollUrl: segPollUrl, status: "generating" }
-              : item
-          )
-        );
-        setTaskId(segTaskId);
-        setWsPollUrl(segPollUrl);
-        setStatus("processing");
-
-        const segOutputUrl = await pollVideoSync(segTaskId, segPollUrl ?? undefined);
-        completedUrls.push(segOutputUrl);
-        setLongVideoSegments((prev) =>
-          prev.map((item) =>
-            item.index === segment.index
-              ? { ...item, status: "completed", outputUrl: segOutputUrl, error: null }
-              : item
-          )
+              ? { ...item, status: "generating", error: null }
+              : item,
+          ),
         );
 
-        // Extract last frame for next segment's visual handoff (skip for the last segment)
-        if (segment.index < segmentCount) {
-          try {
-            const proxyUrl = `/api/toolbox/proxy?url=${encodeURIComponent(segOutputUrl)}`;
-            const frameBlob = await extractLastFrame(proxyUrl);
-            const form = new FormData();
-            form.append("file", frameBlob, "frame.jpg");
-            const uploadRes = await fetch("/api/toolbox/upload-image", { method: "POST", body: form });
-            if (uploadRes.ok) {
-              const uploadData = (await uploadRes.json()) as { url?: string };
-              prevFrameUrl = uploadData.url ?? null;
-            }
-          } catch {
-            // Non-fatal: fall back to text-only continuity for next segment
-            prevFrameUrl = null;
+        try {
+          // For segments after the first: use i2v model with last frame for visual continuity
+          const isFirstSeg = segment.index === 1;
+          const segModelId =
+            !isFirstSeg && prevFrameUrl && i2vContinuityModelId
+              ? i2vContinuityModelId
+              : activeModelId;
+          const segImageUrl =
+            !isFirstSeg && prevFrameUrl
+              ? prevFrameUrl
+              : videoMode === "i2v"
+                ? i2vImageUrl
+                : undefined;
+
+          const submitRes = await fetch("/api/toolbox/video", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              modelId: segModelId,
+              prompt: segment.prompt,
+              duration,
+              aspectRatio: ASPECT_RATIOS[aspectIdx].value,
+              ...(segImageUrl ? { imageUrl: segImageUrl } : {}),
+              ...(generateAudio ? { generateAudio: true } : {}),
+            }),
+          });
+          const submitData = await submitRes.json();
+          if (!submitRes.ok) {
+            throw new Error(
+              submitData.error || `Segment ${segment.index} submission failed`,
+            );
           }
+
+          const segTaskId: string = submitData.task.id;
+          const segPollUrl: string | null = submitData.task?.urls?.get ?? null;
+          setLongVideoSegments((prev) =>
+            prev.map((item) =>
+              item.index === segment.index
+                ? {
+                    ...item,
+                    taskId: segTaskId,
+                    pollUrl: segPollUrl,
+                    status: "generating",
+                  }
+                : item,
+            ),
+          );
+          setTaskId(segTaskId);
+          setWsPollUrl(segPollUrl);
+          setStatus("processing");
+
+          const segOutputUrl = await pollVideoSync(
+            segTaskId,
+            segPollUrl ?? undefined,
+          );
+          completedUrls.push(segOutputUrl);
+          setLongVideoSegments((prev) =>
+            prev.map((item) =>
+              item.index === segment.index
+                ? {
+                    ...item,
+                    status: "completed",
+                    outputUrl: segOutputUrl,
+                    error: null,
+                  }
+                : item,
+            ),
+          );
+
+          // Extract last frame for next segment's visual handoff (skip for the last segment)
+          if (segment.index < segmentCount) {
+            try {
+              const proxyUrl = `/api/toolbox/proxy?url=${encodeURIComponent(segOutputUrl)}`;
+              const frameBlob = await extractLastFrame(proxyUrl);
+              const form = new FormData();
+              form.append("file", frameBlob, "frame.jpg");
+              const uploadRes = await fetch("/api/toolbox/upload-image", {
+                method: "POST",
+                body: form,
+              });
+              if (uploadRes.ok) {
+                const uploadData = (await uploadRes.json()) as { url?: string };
+                prevFrameUrl = uploadData.url ?? null;
+              }
+            } catch {
+              // Non-fatal: fall back to text-only continuity for next segment
+              prevFrameUrl = null;
+            }
+          }
+        } catch (segErr) {
+          const segError =
+            segErr instanceof Error
+              ? segErr.message
+              : `Segment ${segment.index} generation failed`;
+          console.error(`Segment ${segment.index} failed:`, segErr);
+          setLongVideoSegments((prev) =>
+            prev.map((item) =>
+              item.index === segment.index
+                ? { ...item, status: "failed", error: segError }
+                : item,
+            ),
+          );
+          // Continue to next segment instead of aborting entire generation
         }
       }
 
       stopTimer();
-      setStatus("completed");
+      // Mark as completed only if we have at least 2 completed segments to stitch
+      if (completedUrls.length >= 2) {
+        setStatus("completed");
+      } else if (completedUrls.length === 1) {
+        setStatus("completed");
+      } else {
+        setStatus("failed");
+        setError("No segments completed successfully. Please try again.");
+      }
       setOutputUrl(completedUrls[completedUrls.length - 1] ?? null);
 
       // Auto-stitch all segments into one long video
       if (completedUrls.length >= 2) {
+        const failedCount = segmentCount - completedUrls.length;
+        if (failedCount > 0) {
+          setError(
+            `⚠️ ${failedCount} segment(s) failed, but stitching ${completedUrls.length} successful ones.`,
+          );
+        }
         setIsStitching(true);
         setStitchProgress({ current: 0, total: completedUrls.length });
         try {
           const proxyUrls = completedUrls.map(
-            (url) => `/api/toolbox/proxy?url=${encodeURIComponent(url)}`
+            (url) => `/api/toolbox/proxy?url=${encodeURIComponent(url)}`,
           );
-          const stitchedUrl = await stitchProxyUrls(proxyUrls, (current, total) =>
-            setStitchProgress({ current, total })
+          const stitchedUrl = await stitchProxyUrls(
+            proxyUrls,
+            (current, total) => setStitchProgress({ current, total }),
           );
-          setStitchedVideoUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return stitchedUrl; });
+          setStitchedVideoUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return stitchedUrl;
+          });
           setOutputUrl(stitchedUrl);
         } catch (stitchErr) {
           // Non-fatal: segments are still accessible individually
-          setError(stitchErr instanceof Error ? stitchErr.message : "Auto-stitch failed");
+          setError(
+            stitchErr instanceof Error
+              ? stitchErr.message
+              : "Auto-stitch failed",
+          );
         } finally {
           setIsStitching(false);
           setStitchProgress(null);
@@ -734,7 +1027,8 @@ export default function ToolboxPage() {
           completedUrls[0],
           ASPECT_RATIOS[aspectIdx].value,
           {
-            inputImageUrl: videoMode === "i2v" ? (i2vImageUrl ?? undefined) : undefined,
+            inputImageUrl:
+              videoMode === "i2v" ? (i2vImageUrl ?? undefined) : undefined,
             generationMeta: {
               provider: "wavespeed",
               kind: "video",
@@ -744,22 +1038,16 @@ export default function ToolboxPage() {
               duration,
               generateAudio,
             },
-          }
+          },
         );
       }
       cleanupTempInput(videoMode === "i2v" ? i2vImageUrl : null);
     } catch (err) {
       stopTimer();
       setStatus("failed");
-      const message = err instanceof Error ? err.message : "Long video generation failed";
+      const message =
+        err instanceof Error ? err.message : "Long video generation failed";
       setError(message);
-      setLongVideoSegments((prev) => {
-        const active = prev.find((item) => item.status === "generating");
-        if (!active) return prev;
-        return prev.map((item) =>
-          item.index === active.index ? { ...item, status: "failed", error: message } : item
-        );
-      });
       cleanupTempInput(videoMode === "i2v" ? i2vImageUrl : null);
     }
   };
@@ -767,13 +1055,14 @@ export default function ToolboxPage() {
   /** Core stitch logic: plays proxy URLs sequentially through a hidden video and records to WebM. */
   const stitchProxyUrls = async (
     proxyUrls: string[],
-    onProgress?: (current: number, total: number) => void
+    onProgress?: (current: number, total: number) => void,
   ): Promise<string> => {
     const video = document.createElement("video");
     video.crossOrigin = "anonymous";
     video.playsInline = true;
     video.muted = true;
-    video.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px";
+    video.style.cssText =
+      "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px";
     document.body.appendChild(video);
 
     try {
@@ -783,8 +1072,14 @@ export default function ToolboxPage() {
       };
 
       await new Promise<void>((resolve, reject) => {
-        video.addEventListener("loadedmetadata", () => resolve(), { once: true });
-        video.addEventListener("error", () => reject(new Error("Failed to load first segment")), { once: true });
+        video.addEventListener("loadedmetadata", () => resolve(), {
+          once: true,
+        });
+        video.addEventListener(
+          "error",
+          () => reject(new Error("Failed to load first segment")),
+          { once: true },
+        );
         video.src = proxyUrls[0];
         video.load();
       });
@@ -793,20 +1088,33 @@ export default function ToolboxPage() {
         typeof captureVideo.captureStream === "function"
           ? captureVideo.captureStream()
           : captureVideo.mozCaptureStream?.();
-      if (!stream) throw new Error("captureStream is not supported (Chrome required).");
+      if (!stream)
+        throw new Error("captureStream is not supported (Chrome required).");
 
-      const candidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
-      const mimeType = candidates.find((c) => MediaRecorder.isTypeSupported(c)) || "";
-      if (!mimeType) throw new Error("MediaRecorder webm not supported in this browser.");
+      const candidates = [
+        "video/webm;codecs=vp9,opus",
+        "video/webm;codecs=vp8,opus",
+        "video/webm",
+      ];
+      const mimeType =
+        candidates.find((c) => MediaRecorder.isTypeSupported(c)) || "";
+      if (!mimeType)
+        throw new Error("MediaRecorder webm not supported in this browser.");
 
       const chunks: BlobPart[] = [];
       const recorder = new MediaRecorder(stream, { mimeType });
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
 
       const waitForEnd = () =>
         new Promise<void>((resolve, reject) => {
           video.addEventListener("ended", () => resolve(), { once: true });
-          video.addEventListener("error", () => reject(new Error("Failed while playing segment")), { once: true });
+          video.addEventListener(
+            "error",
+            () => reject(new Error("Failed while playing segment")),
+            { once: true },
+          );
         });
 
       recorder.start(100);
@@ -815,8 +1123,14 @@ export default function ToolboxPage() {
           video.src = proxyUrls[i];
           video.load();
           await new Promise<void>((resolve, reject) => {
-            video.addEventListener("loadedmetadata", () => resolve(), { once: true });
-            video.addEventListener("error", () => reject(new Error(`Failed to load segment ${i + 1}`)), { once: true });
+            video.addEventListener("loadedmetadata", () => resolve(), {
+              once: true,
+            });
+            video.addEventListener(
+              "error",
+              () => reject(new Error(`Failed to load segment ${i + 1}`)),
+              { once: true },
+            );
           });
         }
         const endPromise = waitForEnd();
@@ -827,10 +1141,15 @@ export default function ToolboxPage() {
 
       const blob = await new Promise<Blob>((resolve, reject) => {
         recorder.addEventListener("stop", () => {
-          if (chunks.length === 0) { reject(new Error("No recorded data generated.")); return; }
+          if (chunks.length === 0) {
+            reject(new Error("No recorded data generated."));
+            return;
+          }
           resolve(new Blob(chunks, { type: mimeType }));
         });
-        recorder.addEventListener("error", () => reject(new Error("Recorder error")));
+        recorder.addEventListener("error", () =>
+          reject(new Error("Recorder error")),
+        );
         recorder.stop();
       });
 
@@ -842,7 +1161,7 @@ export default function ToolboxPage() {
 
   const handleStitch = async () => {
     const completedSegments = longVideoSegments.filter(
-      (s) => s.status === "completed" && s.outputUrl
+      (s) => s.status === "completed" && s.outputUrl,
     );
     if (completedSegments.length < 2) {
       setError("Need at least 2 completed segments to stitch.");
@@ -853,16 +1172,49 @@ export default function ToolboxPage() {
     setError("");
     try {
       const proxyUrls = completedSegments.map(
-        (s) => `/api/toolbox/proxy?url=${encodeURIComponent(s.outputUrl!)}`
+        (s) => `/api/toolbox/proxy?url=${encodeURIComponent(s.outputUrl!)}`,
       );
       const objectUrl = await stitchProxyUrls(proxyUrls, (current, total) =>
-        setStitchProgress({ current, total })
+        setStitchProgress({ current, total }),
       );
-      setStitchedVideoUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return objectUrl; });
+      setStitchedVideoUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return objectUrl;
+      });
       setOutputUrl(objectUrl);
       setStatus("completed");
+
+      // Save stitched video to gallery
+      const activeModelId = videoMode === "i2v" ? i2vModelId : videoModelId;
+      const activeModels = videoMode === "i2v" ? I2V_MODELS : VIDEO_MODELS;
+      const activeModel = activeModels.find((m) => m.id === activeModelId);
+      if (activeModel && objectUrl) {
+        saveToGallery(
+          "video",
+          activeModelId,
+          `${activeModel.label} (stitched ${completedSegments.length} segments)`,
+          objectUrl,
+          ASPECT_RATIOS[aspectIdx].value,
+          {
+            inputImageUrl:
+              videoMode === "i2v" ? (i2vImageUrl ?? undefined) : undefined,
+            generationMeta: {
+              provider: "wavespeed",
+              kind: "video",
+              mode: videoMode,
+              longVideo: true,
+              segmentCount: completedSegments.length,
+              duration,
+              generateAudio,
+              stitched: true,
+            },
+          },
+        );
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to stitch segments");
+      setError(
+        err instanceof Error ? err.message : "Failed to stitch segments",
+      );
     } finally {
       setIsStitching(false);
       setStitchProgress(null);
@@ -874,9 +1226,18 @@ export default function ToolboxPage() {
     if (!sourceUrl) return;
     const needsVoiceover = audioMode === "voiceover" || audioMode === "both";
     const needsBgm = audioMode === "bgm" || audioMode === "both";
-    if (needsVoiceover && !voiceoverText.trim()) { setAudioError("请输入旁白文字"); return; }
-    if (needsBgm && bgmSource === "upload" && !bgmFile) { setAudioError("请选择背景音乐文件"); return; }
-    if (needsBgm && bgmSource === "ai" && !bgmAudioUrl) { setAudioError("请先点击「AI 生成背景音乐」"); return; }
+    if (needsVoiceover && !voiceoverText.trim()) {
+      setAudioError("请输入旁白文字");
+      return;
+    }
+    if (needsBgm && bgmSource === "upload" && !bgmFile) {
+      setAudioError("请选择背景音乐文件");
+      return;
+    }
+    if (needsBgm && bgmSource === "ai" && !bgmAudioUrl) {
+      setAudioError("请先点击「AI 生成背景音乐」");
+      return;
+    }
 
     setIsMixing(true);
     setAudioError("");
@@ -900,7 +1261,9 @@ export default function ToolboxPage() {
         });
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
-          throw new Error((j as { error?: string }).error || "TTS generation failed");
+          throw new Error(
+            (j as { error?: string }).error || "TTS generation failed",
+          );
         }
         ttsBlob = await res.blob();
       }
@@ -914,13 +1277,20 @@ export default function ToolboxPage() {
       const videoEl = document.createElement("video");
       videoEl.playsInline = true;
       videoEl.muted = true; // required for captureStream autoplay
-      videoEl.style.cssText = "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px";
+      videoEl.style.cssText =
+        "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px";
       document.body.appendChild(videoEl);
       cleanupEls.push(videoEl);
 
       await new Promise<void>((resolve, reject) => {
-        videoEl.addEventListener("loadedmetadata", () => resolve(), { once: true });
-        videoEl.addEventListener("error", () => reject(new Error("视频加载失败")), { once: true });
+        videoEl.addEventListener("loadedmetadata", () => resolve(), {
+          once: true,
+        });
+        videoEl.addEventListener(
+          "error",
+          () => reject(new Error("视频加载失败")),
+          { once: true },
+        );
         videoEl.src = videoSrc;
         videoEl.load();
       });
@@ -929,7 +1299,11 @@ export default function ToolboxPage() {
       const dest = audioCtx.createMediaStreamDestination();
       const audioPlayEls: HTMLAudioElement[] = [];
 
-      const addAudioTrack = async (blobOrFile: Blob | File, volume: number, loop: boolean) => {
+      const addAudioTrack = async (
+        blobOrFile: Blob | File,
+        volume: number,
+        loop: boolean,
+      ) => {
         const objUrl = URL.createObjectURL(blobOrFile);
         blobUrls.push(objUrl);
         const el = document.createElement("audio");
@@ -939,8 +1313,14 @@ export default function ToolboxPage() {
         cleanupEls.push(el);
         // Wait until audio can be decoded
         await new Promise<void>((resolve, reject) => {
-          el.addEventListener("canplaythrough", () => resolve(), { once: true });
-          el.addEventListener("error", () => reject(new Error("音频加载失败")), { once: true });
+          el.addEventListener("canplaythrough", () => resolve(), {
+            once: true,
+          });
+          el.addEventListener(
+            "error",
+            () => reject(new Error("音频加载失败")),
+            { once: true },
+          );
           el.load();
         });
         const source = audioCtx.createMediaElementSource(el);
@@ -962,50 +1342,77 @@ export default function ToolboxPage() {
       }
 
       // 5. Capture video frames + mixed audio tracks
-      const captureVideo = videoEl as HTMLVideoElement & { captureStream?: () => MediaStream };
+      const captureVideo = videoEl as HTMLVideoElement & {
+        captureStream?: () => MediaStream;
+      };
       const videoStream = captureVideo.captureStream?.();
-      if (!videoStream) throw new Error("captureStream 不支持，请使用 Chrome 浏览器");
+      if (!videoStream)
+        throw new Error("captureStream 不支持，请使用 Chrome 浏览器");
 
       const combined = new MediaStream([
         ...videoStream.getVideoTracks(),
         ...dest.stream.getAudioTracks(),
       ]);
 
-      const candidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
-      const mimeType = candidates.find((c) => MediaRecorder.isTypeSupported(c)) || "";
+      const candidates = [
+        "video/webm;codecs=vp9,opus",
+        "video/webm;codecs=vp8,opus",
+        "video/webm",
+      ];
+      const mimeType =
+        candidates.find((c) => MediaRecorder.isTypeSupported(c)) || "";
       if (!mimeType) throw new Error("当前浏览器不支持 WebM 录制");
 
       const chunks: BlobPart[] = [];
       const recorder = new MediaRecorder(combined, { mimeType });
-      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
 
       // 6. Start recording, then play video + all audio simultaneously
       recorder.start(100);
-      await Promise.all([videoEl.play(), ...audioPlayEls.map((el) => el.play())]);
+      await Promise.all([
+        videoEl.play(),
+        ...audioPlayEls.map((el) => el.play()),
+      ]);
 
       await new Promise<void>((resolve, reject) => {
         videoEl.addEventListener("ended", () => resolve(), { once: true });
-        videoEl.addEventListener("error", () => reject(new Error("播放出错")), { once: true });
+        videoEl.addEventListener("error", () => reject(new Error("播放出错")), {
+          once: true,
+        });
       });
 
       for (const el of audioPlayEls) el.pause();
 
       const blob = await new Promise<Blob>((resolve, reject) => {
         recorder.addEventListener("stop", () => {
-          if (chunks.length === 0) { reject(new Error("录制无数据，请检查视频是否可正常播放")); return; }
+          if (chunks.length === 0) {
+            reject(new Error("录制无数据，请检查视频是否可正常播放"));
+            return;
+          }
           resolve(new Blob(chunks, { type: mimeType }));
         });
-        recorder.addEventListener("error", () => reject(new Error("Recorder error")));
+        recorder.addEventListener("error", () =>
+          reject(new Error("Recorder error")),
+        );
         recorder.stop();
       });
 
       const url = URL.createObjectURL(blob);
-      setMixedVideoUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return url; });
+      setMixedVideoUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
     } catch (err) {
       setAudioError(err instanceof Error ? err.message : "Audio mixing failed");
     } finally {
       for (const el of cleanupEls) {
-        try { document.body.removeChild(el); } catch { /* ok */ }
+        try {
+          document.body.removeChild(el);
+        } catch {
+          /* ok */
+        }
       }
       for (const u of blobUrls) URL.revokeObjectURL(u);
       audioCtx.close().catch(() => {});
@@ -1014,7 +1421,10 @@ export default function ToolboxPage() {
   };
 
   const handleTtsPreview = async () => {
-    if (!voiceoverText.trim()) { setAudioError("请输入旁白文字再预览"); return; }
+    if (!voiceoverText.trim()) {
+      setAudioError("请输入旁白文字再预览");
+      return;
+    }
     setIsTtsPreviewing(true);
     setAudioError("");
     try {
@@ -1025,11 +1435,16 @@ export default function ToolboxPage() {
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        throw new Error((j as { error?: string }).error || "TTS preview failed");
+        throw new Error(
+          (j as { error?: string }).error || "TTS preview failed",
+        );
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      setTtsPreviewUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return url; });
+      setTtsPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return url;
+      });
     } catch (err) {
       setAudioError(err instanceof Error ? err.message : "TTS preview failed");
     } finally {
@@ -1039,8 +1454,14 @@ export default function ToolboxPage() {
 
   const handleGenerateBgm = async () => {
     const sourceUrl = mixedVideoUrl || stitchedVideoUrl || outputUrl;
-    if (!sourceUrl) { setAudioError("请先生成视频"); return; }
-    if (!bgmPrompt.trim()) { setAudioError("请输入音乐风格描述"); return; }
+    if (!sourceUrl) {
+      setAudioError("请先生成视频");
+      return;
+    }
+    if (!bgmPrompt.trim()) {
+      setAudioError("请输入音乐风格描述");
+      return;
+    }
     setIsGeneratingBgm(true);
     setAudioError("");
 
@@ -1053,10 +1474,12 @@ export default function ToolboxPage() {
         const form = new FormData();
         // MMAudio accepts video; upload as a dummy "image" endpoint won't work — use a video upload or skip
         // Fallback: use the last WaveSpeed outputUrl if available
-        videoUrl = outputUrl && !outputUrl.startsWith("blob:") ? outputUrl : sourceUrl;
+        videoUrl =
+          outputUrl && !outputUrl.startsWith("blob:") ? outputUrl : sourceUrl;
         void blobData; // unused if we fall back
       } catch {
-        videoUrl = outputUrl && !outputUrl.startsWith("blob:") ? outputUrl : sourceUrl;
+        videoUrl =
+          outputUrl && !outputUrl.startsWith("blob:") ? outputUrl : sourceUrl;
       }
     }
 
@@ -1067,8 +1490,12 @@ export default function ToolboxPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ videoUrl, prompt: bgmPrompt.trim() }),
       });
-      const submitData = await submitRes.json() as { task?: { id: string; urls?: { get?: string } }; error?: string };
-      if (!submitRes.ok) throw new Error(submitData.error ?? "BGM submission failed");
+      const submitData = (await submitRes.json()) as {
+        task?: { id: string; urls?: { get?: string } };
+        error?: string;
+      };
+      if (!submitRes.ok)
+        throw new Error(submitData.error ?? "BGM submission failed");
 
       const taskId = submitData.task!.id;
       const pollUrl = submitData.task!.urls?.get ?? null;
@@ -1076,8 +1503,13 @@ export default function ToolboxPage() {
       // Poll until done
       for (let i = 0; i < 60; i++) {
         await new Promise((r) => setTimeout(r, 3000));
-        const pollRes = await fetch(`/api/toolbox/bgm?taskId=${encodeURIComponent(pollUrl ?? taskId)}`);
-        const pollData = await pollRes.json() as { task?: { status: string; outputs: string[] }; error?: string };
+        const pollRes = await fetch(
+          `/api/toolbox/bgm?taskId=${encodeURIComponent(pollUrl ?? taskId)}`,
+        );
+        const pollData = (await pollRes.json()) as {
+          task?: { status: string; outputs: string[] };
+          error?: string;
+        };
         if (!pollRes.ok) throw new Error(pollData.error ?? "Poll failed");
         const task = pollData.task!;
         if (task.status === "completed" && task.outputs.length > 0) {
@@ -1085,13 +1517,18 @@ export default function ToolboxPage() {
           const proxyUrl = `/api/toolbox/proxy?url=${encodeURIComponent(task.outputs[0])}`;
           const audioBlob = await fetch(proxyUrl).then((r) => r.blob());
           const url = URL.createObjectURL(audioBlob);
-          setBgmAudioUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return url; });
+          setBgmAudioUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return url;
+          });
           break;
         }
         if (task.status === "failed") throw new Error("BGM generation failed");
       }
     } catch (err) {
-      setAudioError(err instanceof Error ? err.message : "BGM generation failed");
+      setAudioError(
+        err instanceof Error ? err.message : "BGM generation failed",
+      );
     } finally {
       setIsGeneratingBgm(false);
     }
@@ -1124,7 +1561,9 @@ export default function ToolboxPage() {
           prompt,
           duration,
           aspectRatio: ASPECT_RATIOS[aspectIdx].value,
-          ...(videoMode === "i2v" && i2vImageUrl ? { imageUrl: i2vImageUrl } : {}),
+          ...(videoMode === "i2v" && i2vImageUrl
+            ? { imageUrl: i2vImageUrl }
+            : {}),
           ...(generateAudio ? { generateAudio: true } : {}),
         }),
       });
@@ -1137,27 +1576,33 @@ export default function ToolboxPage() {
       setWsPollUrl(pollUrl ?? null);
       setStatus("processing");
       const model = activeModels.find((m) => m.id === activeModelId)!;
-      pollVideo(id, pollUrl, (outUrl) => {
-        saveToGallery(
-          "video",
-          activeModelId,
-          model.label,
-          outUrl,
-          ASPECT_RATIOS[aspectIdx].value,
-          {
-            inputImageUrl: videoMode === "i2v" ? (i2vImageUrl ?? undefined) : undefined,
-            generationMeta: {
-              provider: "wavespeed",
-              kind: "video",
-              mode: videoMode,
-              duration,
-              generateAudio,
-              taskId: id,
-              pollUrl: pollUrl ?? null,
+      pollVideo(
+        id,
+        pollUrl,
+        (outUrl) => {
+          saveToGallery(
+            "video",
+            activeModelId,
+            model.label,
+            outUrl,
+            ASPECT_RATIOS[aspectIdx].value,
+            {
+              inputImageUrl:
+                videoMode === "i2v" ? (i2vImageUrl ?? undefined) : undefined,
+              generationMeta: {
+                provider: "wavespeed",
+                kind: "video",
+                mode: videoMode,
+                duration,
+                generateAudio,
+                taskId: id,
+                pollUrl: pollUrl ?? null,
+              },
             },
-          }
-        );
-      }, videoMode === "i2v" ? i2vImageUrl : null);
+          );
+        },
+        videoMode === "i2v" ? i2vImageUrl : null,
+      );
     } catch (err) {
       stopTimer();
       setStatus("failed");
@@ -1166,9 +1611,15 @@ export default function ToolboxPage() {
   };
 
   const handleGenerateImage = async () => {
-    if ((imageMode === "t2i" || imageMode === "i2i_text") && !prompt.trim()) return;
+    if ((imageMode === "t2i" || imageMode === "i2i_text") && !prompt.trim())
+      return;
     const isMultiModel = imageModelId === "wavespeed-ai/flux-kontext-pro/multi";
-    if ((imageMode === "i2i" || imageMode === "i2i_text") && !imageInputUrl && (!isMultiModel || imageInputUrls.length === 0)) return;
+    if (
+      (imageMode === "i2i" || imageMode === "i2i_text") &&
+      !imageInputUrl &&
+      (!isMultiModel || imageInputUrls.length === 0)
+    )
+      return;
     setError("");
     setLongVideoSegments([]);
     if (stitchedVideoUrl) {
@@ -1189,8 +1640,14 @@ export default function ToolboxPage() {
           modelId: imageModelId,
           prompt,
           mode: imageMode,
-          imageUrl: imageModelId === "wavespeed-ai/flux-kontext-pro/multi" ? undefined : imageInputUrl,
-          imageUrls: imageModelId === "wavespeed-ai/flux-kontext-pro/multi" ? imageInputUrls : undefined,
+          imageUrl:
+            imageModelId === "wavespeed-ai/flux-kontext-pro/multi"
+              ? undefined
+              : imageInputUrl,
+          imageUrls:
+            imageModelId === "wavespeed-ai/flux-kontext-pro/multi"
+              ? imageInputUrls
+              : undefined,
           aspectRatio: ASPECT_RATIOS[aspectIdx].value,
         }),
       });
@@ -1203,18 +1660,31 @@ export default function ToolboxPage() {
         stopTimer();
         setStatus("completed");
         setOutputUrl(imgUrl);
-        const model = [...IMAGE_MODELS_T2I, ...IMAGE_MODELS_I2I].find((m) => m.id === imageModelId)!;
-        saveToGallery("image", imageModelId, model.label, imgUrl, ASPECT_RATIOS[aspectIdx].value, {
-          inputImageUrl: imageInputUrl || undefined,
-          generationMeta: {
-            provider: "wavespeed",
-            kind: "image",
-            mode: imageMode,
-            syncMode: true,
-            taskId: data.task?.id ?? null,
+        const model = [...IMAGE_MODELS_T2I, ...IMAGE_MODELS_I2I].find(
+          (m) => m.id === imageModelId,
+        )!;
+        saveToGallery(
+          "image",
+          imageModelId,
+          model.label,
+          imgUrl,
+          ASPECT_RATIOS[aspectIdx].value,
+          {
+            inputImageUrl: imageInputUrl || undefined,
+            generationMeta: {
+              provider: "wavespeed",
+              kind: "image",
+              mode: imageMode,
+              syncMode: true,
+              taskId: data.task?.id ?? null,
+            },
           },
-        });
-        cleanupTempInput((imageMode === "i2i" || imageMode === "i2i_text") ? imageInputUrl : null);
+        );
+        cleanupTempInput(
+          imageMode === "i2i" || imageMode === "i2i_text"
+            ? imageInputUrl
+            : null,
+        );
       } else if (data.task?.urls?.get) {
         // sync mode didn't complete yet — fall back to polling
         const id = data.task.id;
@@ -1222,20 +1692,36 @@ export default function ToolboxPage() {
         setTaskId(id);
         setWsPollUrl(pollUrl);
         setStatus("processing");
-        const model = [...IMAGE_MODELS_T2I, ...IMAGE_MODELS_I2I].find((m) => m.id === imageModelId)!;
-        pollVideo(id, pollUrl, (outUrl) => {
-          saveToGallery("image", imageModelId, model.label, outUrl, ASPECT_RATIOS[aspectIdx].value, {
-            inputImageUrl: imageInputUrl || undefined,
-            generationMeta: {
-              provider: "wavespeed",
-              kind: "image",
-              mode: imageMode,
-              syncMode: false,
-              taskId: id,
-              pollUrl,
-            },
-          });
-        }, (imageMode === "i2i" || imageMode === "i2i_text") ? imageInputUrl : null);
+        const model = [...IMAGE_MODELS_T2I, ...IMAGE_MODELS_I2I].find(
+          (m) => m.id === imageModelId,
+        )!;
+        pollVideo(
+          id,
+          pollUrl,
+          (outUrl) => {
+            saveToGallery(
+              "image",
+              imageModelId,
+              model.label,
+              outUrl,
+              ASPECT_RATIOS[aspectIdx].value,
+              {
+                inputImageUrl: imageInputUrl || undefined,
+                generationMeta: {
+                  provider: "wavespeed",
+                  kind: "image",
+                  mode: imageMode,
+                  syncMode: false,
+                  taskId: id,
+                  pollUrl,
+                },
+              },
+            );
+          },
+          imageMode === "i2i" || imageMode === "i2i_text"
+            ? imageInputUrl
+            : null,
+        );
       } else {
         stopTimer();
         setStatus("failed");
@@ -1257,7 +1743,7 @@ export default function ToolboxPage() {
     options?: {
       inputImageUrl?: string;
       generationMeta?: Record<string, unknown>;
-    }
+    },
   ) => {
     setSaveStatus("saving");
     setSavedItemId(null);
@@ -1279,7 +1765,9 @@ export default function ToolboxPage() {
       }),
     })
       .then(async (r) => {
-        const d = await r.json().catch(() => ({} as { error?: string; item?: { id?: string } }));
+        const d = await r
+          .json()
+          .catch(() => ({}) as { error?: string; item?: { id?: string } });
         if (!r.ok) {
           throw new Error(d.error || "保存失败");
         }
@@ -1354,26 +1842,38 @@ export default function ToolboxPage() {
   };
 
   const isRunning = status === "generating" || status === "processing";
-  const currentImageModels = imageMode === "t2i" ? IMAGE_MODELS_T2I : IMAGE_MODELS_I2I;
-  const currentModels = tab === "video"
-    ? (videoMode === "i2v" ? I2V_MODELS : VIDEO_MODELS)
-    : currentImageModels;
-  const currentModelId = tab === "video"
-    ? (videoMode === "i2v" ? i2vModelId : videoModelId)
-    : imageModelId;
-  const selectedModel = currentModels.find((m) => m.id === currentModelId) ?? currentModels[0];
-  const selectedMediaType: "image" | "video" = tab === "video" ? "video" : "image";
+  const currentImageModels =
+    imageMode === "t2i" ? IMAGE_MODELS_T2I : IMAGE_MODELS_I2I;
+  const currentModels =
+    tab === "video"
+      ? videoMode === "i2v"
+        ? I2V_MODELS
+        : VIDEO_MODELS
+      : currentImageModels;
+  const currentModelId =
+    tab === "video"
+      ? videoMode === "i2v"
+        ? i2vModelId
+        : videoModelId
+      : imageModelId;
+  const selectedModel =
+    currentModels.find((m) => m.id === currentModelId) ?? currentModels[0];
+  const selectedMediaType: "image" | "video" =
+    tab === "video" ? "video" : "image";
   const durationFactor = tab === "video" ? Math.max(1, duration / 5) : 1;
-  const runCount = tab === "video" && enableLongVideo ? longVideoSegmentsCount : 1;
+  const runCount =
+    tab === "video" && enableLongVideo ? longVideoSegmentsCount : 1;
   const estimatedPromptTokens = Math.max(
     0,
-    Math.ceil((prompt.trim().length || 0) / 4) * (tab === "video" && enableLongVideo ? longVideoSegmentsCount : 1)
+    Math.ceil((prompt.trim().length || 0) / 4) *
+      (tab === "video" && enableLongVideo ? longVideoSegmentsCount : 1),
   );
   const estimatedSingleBaseCostCents = Math.round(
-    getEstimatedBaseCostCents(currentModelId, selectedMediaType) * durationFactor
+    getEstimatedBaseCostCents(currentModelId, selectedMediaType) *
+      durationFactor,
   );
   const estimatedSingleChargeCents = Math.round(
-    getEstimatedChargeCents(currentModelId, selectedMediaType) * durationFactor
+    getEstimatedChargeCents(currentModelId, selectedMediaType) * durationFactor,
   );
   const estimatedTotalBaseCostCents = estimatedSingleBaseCostCents * runCount;
   const estimatedTotalChargeCents = estimatedSingleChargeCents * runCount;
@@ -1391,19 +1891,47 @@ export default function ToolboxPage() {
                 Generate images and videos with WaveSpeed
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-              <Link
-                href="/gallery"
-                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-              >
-                Gallery Feed
-              </Link>
-              <Link
-                href="/dashboard"
-                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
-              >
-                ← Dashboard Home
-              </Link>
+            <div className="flex flex-col gap-3 sm:items-end">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                <Link
+                  href="/gallery"
+                  className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                >
+                  Gallery Feed
+                </Link>
+                <Link
+                  href="/toolbox/video-jobs"
+                  className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                >
+                  📊 Video Jobs
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                >
+                  ← Dashboard Home
+                </Link>
+              </div>
+              {creditLoading ? (
+                <div className="text-xs text-gray-400">Loading balance...</div>
+              ) : creditBalance !== null ? (
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Balance:{" "}
+                    <span className="text-green-600 dark:text-green-400">
+                      ${(creditBalance / 100).toFixed(2)}
+                    </span>
+                  </div>
+                  <Link
+                    href="/settings?tab=billing"
+                    className="text-xs px-2 py-1 rounded-md bg-green-600 hover:bg-green-700 text-white transition-colors"
+                  >
+                    + Add
+                  </Link>
+                </div>
+              ) : (
+                <div className="text-xs text-gray-400">Balance unavailable</div>
+              )}
             </div>
           </div>
         </div>
@@ -1439,7 +1967,10 @@ export default function ToolboxPage() {
             {tab === "video" && (
               <div className="flex gap-2">
                 <button
-                  onClick={() => { setVideoMode("t2v"); setI2vImageUrl(null); }}
+                  onClick={() => {
+                    setVideoMode("t2v");
+                    setI2vImageUrl(null);
+                  }}
                   disabled={isRunning}
                   className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${
                     videoMode === "t2v"
@@ -1515,21 +2046,34 @@ export default function ToolboxPage() {
             {/* Model selector */}
             {tab === "image" && (
               <div className="flex flex-wrap gap-2">
-                {([
-                  { key: "t2i", label: "Text to Image", path: "/toolbox?tab=image&mode=t2i" },
-                  { key: "i2i", label: "Image to Image", path: "/toolbox?tab=image&mode=i2i" },
-                  {
-                    key: "i2i_text",
-                    label: "Image + Text to Image",
-                    path: "/toolbox?tab=image&mode=i2i_text",
-                  },
-                ] as const).map((modeOption) => (
+                {(
+                  [
+                    {
+                      key: "t2i",
+                      label: "Text to Image",
+                      path: "/toolbox?tab=image&mode=t2i",
+                    },
+                    {
+                      key: "i2i",
+                      label: "Image to Image",
+                      path: "/toolbox?tab=image&mode=i2i",
+                    },
+                    {
+                      key: "i2i_text",
+                      label: "Image + Text to Image",
+                      path: "/toolbox?tab=image&mode=i2i_text",
+                    },
+                  ] as const
+                ).map((modeOption) => (
                   <button
                     key={modeOption.key}
                     onClick={() => {
                       const nextMode = modeOption.key;
                       setImageMode(nextMode);
-                      const modelList = nextMode === "t2i" ? IMAGE_MODELS_T2I : IMAGE_MODELS_I2I;
+                      const modelList =
+                        nextMode === "t2i"
+                          ? IMAGE_MODELS_T2I
+                          : IMAGE_MODELS_I2I;
                       setImageModelId(modelList[0].id);
                     }}
                     disabled={isRunning}
@@ -1548,97 +2092,118 @@ export default function ToolboxPage() {
               </div>
             )}
 
-            {tab === "image" && (imageMode === "i2i" || imageMode === "i2i_text") && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {imageModelId === "wavespeed-ai/flux-kontext-pro/multi" ? "参考图片（可多张）" : "Input Image URL"}
-                </label>
+            {tab === "image" &&
+              (imageMode === "i2i" || imageMode === "i2i_text") && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    {imageModelId === "wavespeed-ai/flux-kontext-pro/multi"
+                      ? "参考图片（可多张）"
+                      : "Input Image URL"}
+                  </label>
 
-                {imageModelId === "wavespeed-ai/flux-kontext-pro/multi" ? (
-                  /* Multi-image upload UI */
-                  <div className="space-y-3">
-                    <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-3 text-xs text-gray-500 dark:text-gray-400">
-                      选择多张参考图片（最多 4 张）
-                      <div className="mt-2">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={(e) => void onMultiImageFilesPicked(e)}
-                          disabled={isRunning || imageUploadLoading || imageInputUrls.length >= 4}
-                          className="block w-full text-xs text-gray-500 dark:text-gray-300 file:mr-2 file:rounded file:border-0 file:bg-blue-600 file:px-2 file:py-1 file:text-white"
-                        />
+                  {imageModelId === "wavespeed-ai/flux-kontext-pro/multi" ? (
+                    /* Multi-image upload UI */
+                    <div className="space-y-3">
+                      <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-3 text-xs text-gray-500 dark:text-gray-400">
+                        选择多张参考图片（最多 4 张）
+                        <div className="mt-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={(e) => void onMultiImageFilesPicked(e)}
+                            disabled={
+                              isRunning ||
+                              imageUploadLoading ||
+                              imageInputUrls.length >= 4
+                            }
+                            className="block w-full text-xs text-gray-500 dark:text-gray-300 file:mr-2 file:rounded file:border-0 file:bg-blue-600 file:px-2 file:py-1 file:text-white"
+                          />
+                        </div>
                       </div>
+                      {imageInputUrls.length > 0 && (
+                        <div className="grid grid-cols-2 gap-2">
+                          {imageInputUrls.map((url, idx) => (
+                            <div key={idx} className="relative">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={url}
+                                alt={`ref ${idx + 1}`}
+                                className="w-full h-24 object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                              />
+                              <button
+                                onClick={() =>
+                                  setImageInputUrls((prev) =>
+                                    prev.filter((_, i) => i !== idx),
+                                  )
+                                }
+                                disabled={isRunning}
+                                className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {imageInputUrls.length > 0 && (
-                      <div className="grid grid-cols-2 gap-2">
-                        {imageInputUrls.map((url, idx) => (
-                          <div key={idx} className="relative">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={url} alt={`ref ${idx + 1}`} className="w-full h-24 object-cover rounded-lg border border-gray-200 dark:border-gray-700" />
-                            <button
-                              onClick={() => setImageInputUrls((prev) => prev.filter((_, i) => i !== idx))}
-                              disabled={isRunning}
-                              className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
+                  ) : (
+                    /* Single-image upload UI */
+                    <>
+                      <div
+                        onPaste={(e) => void onPasteImageForTarget(e, "i2i")}
+                        className="mb-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-3 text-xs text-gray-500 dark:text-gray-400"
+                      >
+                        Paste image here (Ctrl/Cmd+V), or upload from file.
+                        <div className="mt-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) =>
+                              void onFilePickedForTarget(e, "i2i")
+                            }
+                            disabled={isRunning || imageUploadLoading}
+                            className="block w-full text-xs text-gray-500 dark:text-gray-300 file:mr-2 file:rounded file:border-0 file:bg-blue-600 file:px-2 file:py-1 file:text-white"
+                          />
+                        </div>
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  /* Single-image upload UI */
-                  <>
-                    <div
-                      onPaste={(e) => void onPasteImageForTarget(e, "i2i")}
-                      className="mb-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 p-3 text-xs text-gray-500 dark:text-gray-400"
-                    >
-                      Paste image here (Ctrl/Cmd+V), or upload from file.
-                      <div className="mt-2">
+                      {imageInputUrl ? (
+                        <div className="space-y-2">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={imageInputUrl}
+                            alt="i2i input"
+                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 max-h-48 object-contain"
+                          />
+                          <button
+                            onClick={() => setImageInputUrl(null)}
+                            disabled={isRunning}
+                            className="text-xs text-red-500 hover:text-red-700"
+                          >
+                            Remove image
+                          </button>
+                        </div>
+                      ) : (
                         <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => void onFilePickedForTarget(e, "i2i")}
-                          disabled={isRunning || imageUploadLoading}
-                          className="block w-full text-xs text-gray-500 dark:text-gray-300 file:mr-2 file:rounded file:border-0 file:bg-blue-600 file:px-2 file:py-1 file:text-white"
-                        />
-                      </div>
-                    </div>
-                    {imageInputUrl ? (
-                      <div className="space-y-2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={imageInputUrl}
-                          alt="i2i input"
-                          className="w-full rounded-lg border border-gray-200 dark:border-gray-700 max-h-48 object-contain"
-                        />
-                        <button
-                          onClick={() => setImageInputUrl(null)}
+                          type="url"
+                          placeholder="Paste image URL..."
+                          value={imageInputUrl ?? ""}
+                          onChange={(e) =>
+                            setImageInputUrl(e.target.value || null)
+                          }
                           disabled={isRunning}
-                          className="text-xs text-red-500 hover:text-red-700"
-                        >
-                          Remove image
-                        </button>
-                      </div>
-                    ) : (
-                      <input
-                        type="url"
-                        placeholder="Paste image URL..."
-                        value={imageInputUrl ?? ""}
-                        onChange={(e) => setImageInputUrl(e.target.value || null)}
-                        disabled={isRunning}
-                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
-                      />
-                    )}
-                  </>
-                )}
-              </div>
-            )}
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm"
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
 
             {imageUploadLoading && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">Uploading image...</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Uploading image...
+              </p>
             )}
             {imageUploadError && (
               <p className="text-xs text-red-500">{imageUploadError}</p>
@@ -1654,11 +2219,14 @@ export default function ToolboxPage() {
                     key={m.id}
                     onClick={() => {
                       if (tab === "video") {
-                        videoMode === "i2v" ? setI2vModelId(m.id) : setVideoModelId(m.id);
+                        videoMode === "i2v"
+                          ? setI2vModelId(m.id)
+                          : setVideoModelId(m.id);
                         if (!m.supportsAudio) setGenerateAudio(false);
                         // Clamp duration to what this model supports
                         const supported = m.durations ?? [5, 8];
-                        if (!supported.includes(duration)) setDuration(supported[0]);
+                        if (!supported.includes(duration))
+                          setDuration(supported[0]);
                       } else {
                         setImageModelId(m.id);
                       }
@@ -1671,27 +2239,36 @@ export default function ToolboxPage() {
                     }`}
                   >
                     {(() => {
-                      const mediaType: "image" | "video" = tab === "video" ? "video" : inferMediaTypeFromModelId(m.id);
+                      const mediaType: "image" | "video" =
+                        tab === "video"
+                          ? "video"
+                          : inferMediaTypeFromModelId(m.id);
                       const singleBaseCostCents = Math.round(
-                        getEstimatedBaseCostCents(m.id, mediaType) * (tab === "video" ? Math.max(1, duration / 5) : 1)
+                        getEstimatedBaseCostCents(m.id, mediaType) *
+                          (tab === "video" ? Math.max(1, duration / 5) : 1),
                       );
                       const singleChargeCents = Math.round(
-                        getEstimatedChargeCents(m.id, mediaType) * (tab === "video" ? Math.max(1, duration / 5) : 1)
+                        getEstimatedChargeCents(m.id, mediaType) *
+                          (tab === "video" ? Math.max(1, duration / 5) : 1),
                       );
                       return (
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {m.label}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        {m.description}
-                      </p>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                        Cost est: {formatUsdFromCents(singleChargeCents)} charged ·{" "}
-                        {formatUsdFromCents(singleBaseCostCents)} model cost · token est ~
-                        {Math.max(0, Math.ceil((prompt.trim().length || 0) / 4)).toLocaleString()}
-                      </p>
-                    </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                            {m.label}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            {m.description}
+                          </p>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                            Cost est: {formatUsdFromCents(singleChargeCents)}{" "}
+                            charged · {formatUsdFromCents(singleBaseCostCents)}{" "}
+                            model cost · token est ~
+                            {Math.max(
+                              0,
+                              Math.ceil((prompt.trim().length || 0) / 4),
+                            ).toLocaleString()}
+                          </p>
+                        </div>
                       );
                     })()}
                     <span
@@ -1727,7 +2304,12 @@ export default function ToolboxPage() {
             {/* Prompt */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Prompt {tab === "image" && <span className="text-gray-400 font-normal">（支持中文）</span>}
+                Prompt{" "}
+                {tab === "image" && (
+                  <span className="text-gray-400 font-normal">
+                    （支持中文）
+                  </span>
+                )}
               </label>
               <textarea
                 value={prompt}
@@ -1738,33 +2320,39 @@ export default function ToolboxPage() {
                     ? imageMode === "i2i"
                       ? "可选：描述希望优化方向（不填也可以）"
                       : imageMode === "i2i_text"
-                      ? "描述修改内容，例如：修复图中的中文文字乱码，正确文字应为「…」，保持版式不变"
-                      : "描述你想要的图片，支持中英文..."
+                        ? "描述修改内容，例如：修复图中的中文文字乱码，正确文字应为「…」，保持版式不变"
+                        : "描述你想要的图片，支持中英文..."
                     : "Describe the video you want to generate..."
                 }
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-none"
                 disabled={isRunning}
               />
-              {tab === "image" && imageMode === "i2i_text" && (imageModelId === "wavespeed-ai/flux-kontext-pro" || imageModelId === "wavespeed-ai/flux-kontext-pro/multi") && !prompt && (
-                <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  <span className="font-medium">修复中文文字提示模板：</span>{" "}
-                  <button
-                    type="button"
-                    className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800"
-                    onClick={() =>
-                      setPrompt(
-                        "请修复图片中所有乱码的中文文字，保持原有版式、字体颜色、字号和位置完全不变，只将乱码替换为正确的中文内容。正确的文字应该是：「在此填写正确文字」"
-                      )
-                    }
-                  >
-                    点击填入模板
-                  </button>
-                </div>
-              )}
+              {tab === "image" &&
+                imageMode === "i2i_text" &&
+                (imageModelId === "wavespeed-ai/flux-kontext-pro" ||
+                  imageModelId === "wavespeed-ai/flux-kontext-pro/multi") &&
+                !prompt && (
+                  <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    <span className="font-medium">修复中文文字提示模板：</span>{" "}
+                    <button
+                      type="button"
+                      className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800"
+                      onClick={() =>
+                        setPrompt(
+                          "请修复图片中所有乱码的中文文字，保持原有版式、字体颜色、字号和位置完全不变，只将乱码替换为正确的中文内容。正确的文字应该是：「在此填写正确文字」",
+                        )
+                      }
+                    >
+                      点击填入模板
+                    </button>
+                  </div>
+                )}
             </div>
 
             {/* Aspect ratio + Duration (video only) */}
-            <div className={`grid gap-4 ${tab === "video" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
+            <div
+              className={`grid gap-4 ${tab === "video" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}
+            >
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Aspect Ratio
@@ -1836,10 +2424,14 @@ export default function ToolboxPage() {
                 </label>
                 {enableLongVideo && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-500 dark:text-gray-400">Segments:</span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      Segments:
+                    </span>
                     <select
                       value={longVideoSegmentsCount}
-                      onChange={(e) => setLongVideoSegmentsCount(Number(e.target.value))}
+                      onChange={(e) =>
+                        setLongVideoSegmentsCount(Number(e.target.value))
+                      }
                       disabled={isRunning}
                       className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
@@ -1860,23 +2452,31 @@ export default function ToolboxPage() {
                 Estimated Usage & Cost
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Model-side prompt tokens (est.): ~{estimatedPromptTokens.toLocaleString()}
+                Model-side prompt tokens (est.): ~
+                {estimatedPromptTokens.toLocaleString()}
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                User charge (single run): {formatUsdFromCents(estimatedSingleChargeCents)}
-                {tab === "video" ? ` · duration factor x${durationFactor.toFixed(1)}` : ""}
+                User charge (single run):{" "}
+                {formatUsdFromCents(estimatedSingleChargeCents)}
+                {tab === "video"
+                  ? ` · duration factor x${durationFactor.toFixed(1)}`
+                  : ""}
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Model provider cost (single run): {formatUsdFromCents(estimatedSingleBaseCostCents)}
+                Model provider cost (single run):{" "}
+                {formatUsdFromCents(estimatedSingleBaseCostCents)}
               </p>
               {runCount > 1 && (
                 <p className="text-xs text-gray-600 dark:text-gray-400">
-                  Total for {runCount} runs: {formatUsdFromCents(estimatedTotalChargeCents)} charged ·{" "}
-                  {formatUsdFromCents(estimatedTotalBaseCostCents)} provider cost
+                  Total for {runCount} runs:{" "}
+                  {formatUsdFromCents(estimatedTotalChargeCents)} charged ·{" "}
+                  {formatUsdFromCents(estimatedTotalBaseCostCents)} provider
+                  cost
                 </p>
               )}
               <p className="text-[11px] text-gray-500 dark:text-gray-500">
-                Note: WaveSpeed is task-priced. Token estimate is prompt-length based and for reference only.
+                Note: WaveSpeed is task-priced. Token estimate is prompt-length
+                based and for reference only.
               </p>
             </div>
 
@@ -1897,19 +2497,23 @@ export default function ToolboxPage() {
                 tab === "image"
                   ? handleGenerateImage
                   : enableLongVideo
-                  ? handleGenerateLongVideo
-                  : handleGenerateVideo
+                    ? handleGenerateLongVideo
+                    : handleGenerateVideo
               }
               disabled={
                 isRunning ||
-                (tab === "video" && (!prompt.trim() || (videoMode === "i2v" && !i2vImageUrl))) ||
+                (tab === "video" &&
+                  (!prompt.trim() || (videoMode === "i2v" && !i2vImageUrl))) ||
                 (tab === "image" &&
-                  ((imageMode === "t2i" || imageMode === "i2i_text") &&
-                    !prompt.trim())) ||
+                  (imageMode === "t2i" || imageMode === "i2i_text") &&
+                  !prompt.trim()) ||
                 (tab === "image" &&
                   (imageMode === "i2i" || imageMode === "i2i_text") &&
                   !imageInputUrl &&
-                  !(imageModelId === "wavespeed-ai/flux-kontext-pro/multi" && imageInputUrls.length > 0))
+                  !(
+                    imageModelId === "wavespeed-ai/flux-kontext-pro/multi" &&
+                    imageInputUrls.length > 0
+                  ))
               }
               className="w-full py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -1917,11 +2521,11 @@ export default function ToolboxPage() {
                 ? tab === "image"
                   ? "生成中..."
                   : status === "generating"
-                  ? "Submitting..."
-                  : "Generating..."
+                    ? "Submitting..."
+                    : "Generating..."
                 : tab === "image"
-                ? "生成图片"
-                : "Generate Video"}
+                  ? "生成图片"
+                  : "Generate Video"}
             </button>
           </div>
         </div>
@@ -1933,12 +2537,14 @@ export default function ToolboxPage() {
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                   {status === "completed"
-                    ? tab === "image" ? "图片生成完成" : "Video Ready"
+                    ? tab === "image"
+                      ? "图片生成完成"
+                      : "Video Ready"
                     : status === "failed"
-                    ? "Generation Failed"
-                    : tab === "image"
-                    ? "生成中…"
-                    : "Generating…"}
+                      ? "Generation Failed"
+                      : tab === "image"
+                        ? "生成中…"
+                        : "Generating…"}
                 </h2>
                 {saveStatus === "saving" && (
                   <span className="text-xs text-gray-400">保存中…</span>
@@ -1958,7 +2564,10 @@ export default function ToolboxPage() {
                 )}
               </div>
               {(status === "completed" || status === "failed") && (
-                <button onClick={handleReset} className="text-sm text-blue-600 hover:underline">
+                <button
+                  onClick={handleReset}
+                  className="text-sm text-blue-600 hover:underline"
+                >
                   {tab === "image" ? "再生成一张" : "New video"}
                 </button>
               )}
@@ -1971,8 +2580,19 @@ export default function ToolboxPage() {
                     fill="none"
                     viewBox="0 0 24 24"
                   >
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
                   </svg>
                   <div className="text-center">
                     <p className="text-gray-700 dark:text-gray-300 font-medium">
@@ -1981,11 +2601,16 @@ export default function ToolboxPage() {
                         : `Generating with ${selectedModel.label}…`}
                     </p>
                     {tab === "video" && taskId && (
-                      <p className="text-xs text-gray-400 mt-1">Task: {taskId}</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Task: {taskId}
+                      </p>
                     )}
                     {elapsed > 0 && (
                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        {elapsed}s{tab === "video" ? " — video generation typically takes 1–3 minutes" : ""}
+                        {elapsed}s
+                        {tab === "video"
+                          ? " — video generation typically takes 1–3 minutes"
+                          : ""}
                       </p>
                     )}
                   </div>
@@ -1994,7 +2619,9 @@ export default function ToolboxPage() {
 
               {status === "failed" && (
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-                  <p className="text-red-700 dark:text-red-400 text-sm">{error}</p>
+                  <p className="text-red-700 dark:text-red-400 text-sm">
+                    {error}
+                  </p>
                 </div>
               )}
 
@@ -2043,53 +2670,68 @@ export default function ToolboxPage() {
                 </div>
               )}
 
-              {status === "completed" && outputUrl && tab === "video" && !enableLongVideo && (
-                <div className="space-y-4">
-                  <video
-                    key={outputUrl}
-                    src={outputUrl}
-                    controls
-                    autoPlay
-                    loop
-                    className="w-full rounded-lg border border-gray-200 dark:border-gray-700 max-h-[60vh] mx-auto"
-                  />
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <a
-                      href={outputUrl}
-                      download
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 text-center py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors text-sm"
-                    >
-                      Download Video
-                    </a>
-                    <button
-                      onClick={handleReset}
-                      className="flex-1 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm"
-                    >
-                      Generate Another
-                    </button>
+              {status === "completed" &&
+                outputUrl &&
+                tab === "video" &&
+                !enableLongVideo && (
+                  <div className="space-y-4">
+                    <video
+                      key={outputUrl}
+                      src={outputUrl}
+                      controls
+                      autoPlay
+                      loop
+                      className="w-full rounded-lg border border-gray-200 dark:border-gray-700 max-h-[60vh] mx-auto"
+                    />
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <a
+                        href={outputUrl}
+                        download
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 text-center py-2.5 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                      >
+                        Download Video
+                      </a>
+                      <button
+                        onClick={handleReset}
+                        className="flex-1 py-2.5 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm"
+                      >
+                        Generate Another
+                      </button>
+                    </div>
+                    {elapsed > 0 && (
+                      <p className="text-xs text-center text-gray-400">
+                        Generated in {elapsed}s using {selectedModel.label}
+                      </p>
+                    )}
                   </div>
-                  {elapsed > 0 && (
-                    <p className="text-xs text-center text-gray-400">
-                      Generated in {elapsed}s using {selectedModel.label}
-                    </p>
-                  )}
-                </div>
-              )}
+                )}
 
               {tab === "video" && longVideoSegments.length > 0 && (
                 <div className="mt-6 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Long Video Segments
-                    </h3>
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                        Long Video Segments
+                      </h3>
+                      <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded text-gray-600 dark:text-gray-400">
+                        {
+                          longVideoSegments.filter(
+                            (s) => s.status === "completed",
+                          ).length
+                        }
+                        /{longVideoSegments.length} completed
+                      </span>
+                    </div>
                     {isStitching && stitchProgress ? (
                       <div className="flex items-center gap-2 min-w-[140px]">
                         <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                            style={{ width: `${Math.round((stitchProgress.current / stitchProgress.total) * 100)}%` }}
+                            style={{
+                              width: `${Math.round((stitchProgress.current / stitchProgress.total) * 100)}%`,
+                            }}
                           />
                         </div>
                         <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
@@ -2101,7 +2743,9 @@ export default function ToolboxPage() {
                         onClick={handleStitch}
                         disabled={
                           isStitching ||
-                          longVideoSegments.filter((s) => s.status === "completed").length < 2
+                          longVideoSegments.filter(
+                            (s) => s.status === "completed",
+                          ).length < 2
                         }
                         className="text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white disabled:opacity-50"
                       >
@@ -2124,17 +2768,19 @@ export default function ToolboxPage() {
                               segment.status === "completed"
                                 ? "text-green-600"
                                 : segment.status === "failed"
-                                ? "text-red-500"
-                                : segment.status === "generating"
-                                ? "text-blue-500"
-                                : "text-gray-400"
+                                  ? "text-red-500"
+                                  : segment.status === "generating"
+                                    ? "text-blue-500"
+                                    : "text-gray-400"
                             }`}
                           >
                             {segment.status}
                           </p>
                         </div>
                         {segment.taskId && (
-                          <p className="text-xs text-gray-400 mt-1">Task: {segment.taskId}</p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            Task: {segment.taskId}
+                          </p>
                         )}
                         {segment.outputUrl && (
                           <a
@@ -2147,7 +2793,9 @@ export default function ToolboxPage() {
                           </a>
                         )}
                         {segment.error && (
-                          <p className="text-xs text-red-500 mt-1">{segment.error}</p>
+                          <p className="text-xs text-red-500 mt-1">
+                            {segment.error}
+                          </p>
                         )}
                       </div>
                     ))}
@@ -2158,28 +2806,42 @@ export default function ToolboxPage() {
               {(stitchedVideoUrl || isStitching) && tab === "video" && (
                 <div className="mt-6 space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">长视频</h3>
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
+                      长视频
+                    </h3>
                     {isStitching && stitchProgress && (
                       <div className="flex items-center gap-2 flex-1 ml-4">
                         <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-blue-500 rounded-full transition-all duration-500"
-                            style={{ width: `${Math.round((stitchProgress.current / stitchProgress.total) * 100)}%` }}
+                            style={{
+                              width: `${Math.round((stitchProgress.current / stitchProgress.total) * 100)}%`,
+                            }}
                           />
                         </div>
                         <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
-                          {Math.round((stitchProgress.current / stitchProgress.total) * 100)}%
-                          （{stitchProgress.current}/{stitchProgress.total} 段）
+                          {Math.round(
+                            (stitchProgress.current / stitchProgress.total) *
+                              100,
+                          )}
+                          % （{stitchProgress.current}/{stitchProgress.total}{" "}
+                          段）
                         </span>
                       </div>
                     )}
                   </div>
                   {isStitching && !stitchProgress && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">合并中，请稍等…</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      合并中，请稍等…
+                    </p>
                   )}
-                  {!isStitching && !stitchedVideoUrl && longVideoSegments.some((s) => s.status === "completed") && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">合并失败，可在下方手动合并各段。</p>
-                  )}
+                  {!isStitching &&
+                    !stitchedVideoUrl &&
+                    longVideoSegments.some((s) => s.status === "completed") && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        合并失败，可在下方手动合并各段。
+                      </p>
+                    )}
                   {!isStitching && stitchedVideoUrl && (
                     <>
                       <video
@@ -2202,215 +2864,274 @@ export default function ToolboxPage() {
               )}
 
               {/* Audio mixing panel — shown when video is ready */}
-              {tab === "video" && (stitchedVideoUrl || (outputUrl && status === "completed")) && (
-                <div className="mt-6 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setAudioMode((prev) => (prev ? null : "voiceover"))}
-                    className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750"
-                  >
-                    <span>🎙 添加旁白 / 背景音乐</span>
-                    <span className="text-gray-400">{audioMode ? "▲" : "▼"}</span>
-                  </button>
+              {tab === "video" &&
+                (stitchedVideoUrl || (outputUrl && status === "completed")) && (
+                  <div className="mt-6 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAudioMode((prev) => (prev ? null : "voiceover"))
+                      }
+                      className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-750"
+                    >
+                      <span>🎙 添加旁白 / 背景音乐</span>
+                      <span className="text-gray-400">
+                        {audioMode ? "▲" : "▼"}
+                      </span>
+                    </button>
 
-                  {audioMode && (
-                    <div className="p-4 space-y-4">
-                      {/* Mode selector */}
-                      <div className="flex gap-2">
-                        {(["voiceover", "bgm", "both"] as const).map((m) => (
-                          <button
-                            key={m}
-                            type="button"
-                            onClick={() => setAudioMode(m)}
-                            className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-                              audioMode === m
-                                ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300"
-                                : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300"
-                            }`}
-                          >
-                            {m === "voiceover" ? "🎙 旁白" : m === "bgm" ? "🎵 背景音乐" : "两者都加"}
-                          </button>
-                        ))}
-                      </div>
+                    {audioMode && (
+                      <div className="p-4 space-y-4">
+                        {/* Mode selector */}
+                        <div className="flex gap-2">
+                          {(["voiceover", "bgm", "both"] as const).map((m) => (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setAudioMode(m)}
+                              className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                                audioMode === m
+                                  ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300"
+                                  : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300"
+                              }`}
+                            >
+                              {m === "voiceover"
+                                ? "🎙 旁白"
+                                : m === "bgm"
+                                  ? "🎵 背景音乐"
+                                  : "两者都加"}
+                            </button>
+                          ))}
+                        </div>
 
-                      {/* Voiceover section */}
-                      {(audioMode === "voiceover" || audioMode === "both") && (
-                        <div className="space-y-3">
-                          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">旁白文字</label>
-                          <textarea
-                            value={voiceoverText}
-                            onChange={(e) => setVoiceoverText(e.target.value)}
-                            rows={3}
-                            placeholder="输入旁白内容，支持中英文（最多 4096 字）…"
-                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white resize-none"
-                          />
-                          <div className="flex flex-wrap gap-3 items-center">
-                            <div>
-                              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">音色</label>
-                              <div className="flex items-center gap-2">
-                                <select
-                                  value={ttsVoice}
-                                  onChange={(e) => { setTtsVoice(e.target.value as typeof ttsVoice); setTtsPreviewUrl(null); }}
-                                  className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700 dark:text-white"
-                                >
-                                  {(["nova", "shimmer", "alloy", "echo", "fable", "onyx"] as const).map((v) => (
-                                    <option key={v} value={v}>{v}</option>
-                                  ))}
-                                </select>
-                                <button
-                                  type="button"
-                                  onClick={handleTtsPreview}
-                                  disabled={isTtsPreviewing}
-                                  className="text-xs px-2 py-1 rounded border border-purple-400 text-purple-600 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 disabled:opacity-50"
-                                >
-                                  {isTtsPreviewing ? "生成中…" : "试听"}
-                                </button>
+                        {/* Voiceover section */}
+                        {(audioMode === "voiceover" ||
+                          audioMode === "both") && (
+                          <div className="space-y-3">
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                              旁白文字
+                            </label>
+                            <textarea
+                              value={voiceoverText}
+                              onChange={(e) => setVoiceoverText(e.target.value)}
+                              rows={3}
+                              placeholder="输入旁白内容，支持中英文（最多 4096 字）…"
+                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white resize-none"
+                            />
+                            <div className="flex flex-wrap gap-3 items-center">
+                              <div>
+                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                  音色
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <select
+                                    value={ttsVoice}
+                                    onChange={(e) => {
+                                      setTtsVoice(
+                                        e.target.value as typeof ttsVoice,
+                                      );
+                                      setTtsPreviewUrl(null);
+                                    }}
+                                    className="text-xs border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700 dark:text-white"
+                                  >
+                                    {(
+                                      [
+                                        "nova",
+                                        "shimmer",
+                                        "alloy",
+                                        "echo",
+                                        "fable",
+                                        "onyx",
+                                      ] as const
+                                    ).map((v) => (
+                                      <option key={v} value={v}>
+                                        {v}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    onClick={handleTtsPreview}
+                                    disabled={isTtsPreviewing}
+                                    className="text-xs px-2 py-1 rounded border border-purple-400 text-purple-600 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 disabled:opacity-50"
+                                  >
+                                    {isTtsPreviewing ? "生成中…" : "试听"}
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex-1 min-w-[120px]">
+                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                  旁白音量 {voiceoverVolume}%
+                                </label>
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={100}
+                                  value={voiceoverVolume}
+                                  onChange={(e) =>
+                                    setVoiceoverVolume(Number(e.target.value))
+                                  }
+                                  className="w-full"
+                                />
                               </div>
                             </div>
-                            <div className="flex-1 min-w-[120px]">
+                            {ttsPreviewUrl && (
+                              <audio
+                                key={ttsPreviewUrl}
+                                src={ttsPreviewUrl}
+                                controls
+                                autoPlay
+                                className="w-full mt-1"
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {/* BGM section */}
+                        {(audioMode === "bgm" || audioMode === "both") && (
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                背景音乐
+                              </label>
+                              <div className="flex gap-1">
+                                {(["ai", "upload"] as const).map((s) => (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    onClick={() => setBgmSource(s)}
+                                    className={`px-2 py-0.5 rounded text-xs border transition-colors ${
+                                      bgmSource === s
+                                        ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300"
+                                        : "border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400"
+                                    }`}
+                                  >
+                                    {s === "ai" ? "🎵 AI 生成" : "📁 上传文件"}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {bgmSource === "ai" ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  value={bgmPrompt}
+                                  onChange={(e) => setBgmPrompt(e.target.value)}
+                                  rows={2}
+                                  placeholder="描述音乐风格，例如：轻柔钢琴背景音乐，舒缓温暖，无人声…"
+                                  className="w-full px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white resize-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleGenerateBgm}
+                                  disabled={isGeneratingBgm}
+                                  className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                  {isGeneratingBgm
+                                    ? "AI 生成中…"
+                                    : bgmAudioUrl
+                                      ? "重新生成"
+                                      : "AI 生成背景音乐"}
+                                </button>
+                                {bgmAudioUrl && (
+                                  <audio
+                                    key={bgmAudioUrl}
+                                    src={bgmAudioUrl}
+                                    controls
+                                    className="w-full"
+                                  />
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => bgmFileRef.current?.click()}
+                                    className="text-xs px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+                                  >
+                                    {bgmFile ? bgmFile.name : "选择音频文件"}
+                                  </button>
+                                  {bgmFile && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setBgmFile(null)}
+                                      className="text-xs text-red-500"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+                                <input
+                                  ref={bgmFileRef}
+                                  type="file"
+                                  accept="audio/*"
+                                  className="hidden"
+                                  onChange={(e) =>
+                                    setBgmFile(e.target.files?.[0] ?? null)
+                                  }
+                                />
+                              </div>
+                            )}
+
+                            <div>
                               <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                                旁白音量 {voiceoverVolume}%
+                                音乐音量 {bgmVolume}%
                               </label>
                               <input
                                 type="range"
                                 min={0}
                                 max={100}
-                                value={voiceoverVolume}
-                                onChange={(e) => setVoiceoverVolume(Number(e.target.value))}
+                                value={bgmVolume}
+                                onChange={(e) =>
+                                  setBgmVolume(Number(e.target.value))
+                                }
                                 className="w-full"
                               />
                             </div>
                           </div>
-                          {ttsPreviewUrl && (
-                            <audio
-                              key={ttsPreviewUrl}
-                              src={ttsPreviewUrl}
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={handleMixAudio}
+                          disabled={isMixing}
+                          className="w-full py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                        >
+                          {isMixing
+                            ? "混音中…（实时渲染，请耐心等待）"
+                            : "生成带音频视频"}
+                        </button>
+
+                        {audioError && (
+                          <p className="text-xs text-red-500 dark:text-red-400">
+                            {audioError}
+                          </p>
+                        )}
+
+                        {mixedVideoUrl && (
+                          <div className="space-y-2">
+                            <p className="text-xs text-green-600 dark:text-green-400 font-medium">
+                              ✓ 混音完成
+                            </p>
+                            <video
+                              src={mixedVideoUrl}
                               controls
-                              autoPlay
-                              className="w-full mt-1"
+                              className="w-full rounded-lg border border-gray-200 dark:border-gray-700 max-h-[60vh]"
                             />
-                          )}
-                        </div>
-                      )}
-
-                      {/* BGM section */}
-                      {(audioMode === "bgm" || audioMode === "both") && (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <label className="text-xs font-medium text-gray-700 dark:text-gray-300">背景音乐</label>
-                            <div className="flex gap-1">
-                              {(["ai", "upload"] as const).map((s) => (
-                                <button
-                                  key={s}
-                                  type="button"
-                                  onClick={() => setBgmSource(s)}
-                                  className={`px-2 py-0.5 rounded text-xs border transition-colors ${
-                                    bgmSource === s
-                                      ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300"
-                                      : "border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400"
-                                  }`}
-                                >
-                                  {s === "ai" ? "🎵 AI 生成" : "📁 上传文件"}
-                                </button>
-                              ))}
-                            </div>
+                            <a
+                              href={mixedVideoUrl}
+                              download="video-with-audio.webm"
+                              className="inline-flex text-sm px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                            >
+                              下载带音频视频
+                            </a>
                           </div>
-
-                          {bgmSource === "ai" ? (
-                            <div className="space-y-2">
-                              <textarea
-                                value={bgmPrompt}
-                                onChange={(e) => setBgmPrompt(e.target.value)}
-                                rows={2}
-                                placeholder="描述音乐风格，例如：轻柔钢琴背景音乐，舒缓温暖，无人声…"
-                                className="w-full px-3 py-2 text-xs border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white resize-none"
-                              />
-                              <button
-                                type="button"
-                                onClick={handleGenerateBgm}
-                                disabled={isGeneratingBgm}
-                                className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-                              >
-                                {isGeneratingBgm ? "AI 生成中…" : bgmAudioUrl ? "重新生成" : "AI 生成背景音乐"}
-                              </button>
-                              {bgmAudioUrl && (
-                                <audio key={bgmAudioUrl} src={bgmAudioUrl} controls className="w-full" />
-                              )}
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => bgmFileRef.current?.click()}
-                                  className="text-xs px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
-                                >
-                                  {bgmFile ? bgmFile.name : "选择音频文件"}
-                                </button>
-                                {bgmFile && (
-                                  <button type="button" onClick={() => setBgmFile(null)} className="text-xs text-red-500">✕</button>
-                                )}
-                              </div>
-                              <input
-                                ref={bgmFileRef}
-                                type="file"
-                                accept="audio/*"
-                                className="hidden"
-                                onChange={(e) => setBgmFile(e.target.files?.[0] ?? null)}
-                              />
-                            </div>
-                          )}
-
-                          <div>
-                            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                              音乐音量 {bgmVolume}%
-                            </label>
-                            <input
-                              type="range"
-                              min={0}
-                              max={100}
-                              value={bgmVolume}
-                              onChange={(e) => setBgmVolume(Number(e.target.value))}
-                              className="w-full"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={handleMixAudio}
-                        disabled={isMixing}
-                        className="w-full py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50"
-                      >
-                        {isMixing ? "混音中…（实时渲染，请耐心等待）" : "生成带音频视频"}
-                      </button>
-
-                      {audioError && (
-                        <p className="text-xs text-red-500 dark:text-red-400">{audioError}</p>
-                      )}
-
-                      {mixedVideoUrl && (
-                        <div className="space-y-2">
-                          <p className="text-xs text-green-600 dark:text-green-400 font-medium">✓ 混音完成</p>
-                          <video
-                            src={mixedVideoUrl}
-                            controls
-                            className="w-full rounded-lg border border-gray-200 dark:border-gray-700 max-h-[60vh]"
-                          />
-                          <a
-                            href={mixedVideoUrl}
-                            download="video-with-audio.webm"
-                            className="inline-flex text-sm px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
-                          >
-                            下载带音频视频
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
             </div>
           </div>
         )}

@@ -2,6 +2,8 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
+const VERCEL_DRAIN_UA_PREFIX = "vercel-drain:";
+
 type AnalyticsDrainEvent = {
   schema?: string;
   eventType?: string;
@@ -49,7 +51,10 @@ function normalizeTimestamp(value: unknown) {
   return new Date();
 }
 
-function parseDrainEvents(rawBody: string, contentType: string | null): AnalyticsDrainEvent[] {
+function parseDrainEvents(
+  rawBody: string,
+  contentType: string | null,
+): AnalyticsDrainEvent[] {
   const text = rawBody.trim();
   if (!text) return [];
 
@@ -74,7 +79,8 @@ function parseDrainEvents(rawBody: string, contentType: string | null): Analytic
 
   const parsed = JSON.parse(text) as unknown;
   if (Array.isArray(parsed)) return parsed as AnalyticsDrainEvent[];
-  if (parsed && typeof parsed === "object") return [parsed as AnalyticsDrainEvent];
+  if (parsed && typeof parsed === "object")
+    return [parsed as AnalyticsDrainEvent];
   return [];
 }
 
@@ -85,9 +91,16 @@ function constantTimeEqual(a: string, b: string) {
   return crypto.timingSafeEqual(aBuf, bBuf);
 }
 
-function verifySignature(rawBody: string, signatureHeader: string | null, secret: string) {
+function verifySignature(
+  rawBody: string,
+  signatureHeader: string | null,
+  secret: string,
+) {
   if (!signatureHeader) return false;
-  const expected = crypto.createHmac("sha1", secret).update(rawBody).digest("hex");
+  const expected = crypto
+    .createHmac("sha1", secret)
+    .update(rawBody)
+    .digest("hex");
   const normalizedSignature = signatureHeader.startsWith("sha1=")
     ? signatureHeader.slice(5)
     : signatureHeader;
@@ -97,7 +110,8 @@ function verifySignature(rawBody: string, signatureHeader: string | null, secret
 function isMissingWebVisitRelationError(error: unknown) {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { message?: unknown; meta?: unknown };
-  const message = typeof candidate.message === "string" ? candidate.message : "";
+  const message =
+    typeof candidate.message === "string" ? candidate.message : "";
   const meta = JSON.stringify(candidate.meta ?? {});
   return (
     message.includes("42P01") ||
@@ -122,7 +136,10 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get("x-vercel-signature");
     signatureVerified = verifySignature(rawBody, signature, signatureSecret);
     if (!signatureVerified) {
-      return NextResponse.json({ ok: false, error: "invalid_signature" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: "invalid_signature" },
+        { status: 401 },
+      );
     }
   }
 
@@ -134,7 +151,10 @@ export async function POST(request: NextRequest) {
       request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
       null;
     if (!tokenHeader || tokenHeader !== customToken) {
-      return NextResponse.json({ ok: false, error: "invalid_token" }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: "invalid_token" },
+        { status: 401 },
+      );
     }
   }
 
@@ -142,13 +162,15 @@ export async function POST(request: NextRequest) {
   try {
     events = parseDrainEvents(rawBody, request.headers.get("content-type"));
   } catch {
-    return NextResponse.json({ ok: false, error: "invalid_payload" }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: "invalid_payload" },
+      { status: 400 },
+    );
   }
 
   const rows = events
     .filter(
-      (event) =>
-        !event?.schema || event.schema.startsWith("vercel.analytics")
+      (event) => !event?.schema || event.schema.startsWith("vercel.analytics"),
     )
     .filter((event) => (event.eventType ?? "pageview") === "pageview")
     .filter((event) => typeof event.path === "string")
@@ -156,7 +178,10 @@ export async function POST(request: NextRequest) {
       path: normalizePath(event.path),
       referrer: null as string | null,
       sessionId: normalizeSessionId(event.sessionId),
-      userAgent: trimOrNull(event.userAgent, 512),
+      userAgent: trimOrNull(
+        `${VERCEL_DRAIN_UA_PREFIX}${event.userAgent?.trim() || "unknown"}`,
+        512,
+      ),
       country: trimOrNull(event.country, 8),
       createdAt: normalizeTimestamp(event.timestamp),
     }));

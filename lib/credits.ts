@@ -7,7 +7,6 @@ const PRICING: Record<string, { inputPer1M: number; outputPer1M: number }> = {
 };
 
 const DEFAULT_MODEL = "gpt-4o";
-const MARKUP_MULTIPLIER = 60;
 
 function parsePositiveMultiplier(raw: string | undefined, fallback: number) {
   if (!raw) return fallback;
@@ -16,21 +15,44 @@ function parsePositiveMultiplier(raw: string | undefined, fallback: number) {
   return parsed;
 }
 
+// OpenAI pricing multiplier (configurable via OPENAI_CHARGE_MULTIPLIER)
+const MARKUP_MULTIPLIER = parsePositiveMultiplier(
+  process.env.OPENAI_CHARGE_MULTIPLIER,
+  60,
+);
+
 /** Flat fee in cents for agent service calls (no per-token data available). */
 export const AGENT_FLAT_FEE_CENTS = 5;
 
+// Wavespeed has different pricing — default is 2x (100% markup), not 60x
 const WAVESPEED_CHARGE_MULTIPLIER = parsePositiveMultiplier(
   process.env.WAVESPEED_CHARGE_MULTIPLIER,
-  MARKUP_MULTIPLIER
+  2,
 );
 const WAVESPEED_IMAGE_CHARGE_MULTIPLIER = parsePositiveMultiplier(
   process.env.WAVESPEED_IMAGE_CHARGE_MULTIPLIER,
-  WAVESPEED_CHARGE_MULTIPLIER
+  WAVESPEED_CHARGE_MULTIPLIER,
 );
 const WAVESPEED_VIDEO_CHARGE_MULTIPLIER = parsePositiveMultiplier(
   process.env.WAVESPEED_VIDEO_CHARGE_MULTIPLIER,
-  WAVESPEED_CHARGE_MULTIPLIER
+  WAVESPEED_CHARGE_MULTIPLIER,
 );
+
+// Debug logging - remove in production
+if (process.env.NODE_ENV !== "production") {
+  console.log("[PRICING DEBUG] Multipliers loaded:", {
+    WAVESPEED_CHARGE_MULTIPLIER,
+    WAVESPEED_IMAGE_CHARGE_MULTIPLIER,
+    WAVESPEED_VIDEO_CHARGE_MULTIPLIER,
+    env: {
+      WAVESPEED_CHARGE_MULTIPLIER: process.env.WAVESPEED_CHARGE_MULTIPLIER,
+      WAVESPEED_IMAGE_CHARGE_MULTIPLIER:
+        process.env.WAVESPEED_IMAGE_CHARGE_MULTIPLIER,
+      WAVESPEED_VIDEO_CHARGE_MULTIPLIER:
+        process.env.WAVESPEED_VIDEO_CHARGE_MULTIPLIER,
+    },
+  });
+}
 
 const WAVESPEED_DEFAULT_IMAGE_BASE_COST_CENTS = 5; // $0.05
 const WAVESPEED_DEFAULT_VIDEO_BASE_COST_CENTS = 30; // $0.30
@@ -59,10 +81,7 @@ const WAVESPEED_MODEL_BASE_COST_CENTS: Record<string, number> = {
  * Calculate cost in cents for given token usage after 60x markup.
  * Minimum charge: 1 cent.
  */
-export function calculateCostCents(
-  usage: TokenUsage,
-  model?: string
-): number {
+export function calculateCostCents(usage: TokenUsage, model?: string): number {
   const rates = PRICING[model ?? ""] ?? PRICING[DEFAULT_MODEL];
   const inputCost = (usage.promptTokens / 1_000_000) * rates.inputPer1M;
   const outputCost = (usage.completionTokens / 1_000_000) * rates.outputPer1M;
@@ -90,7 +109,7 @@ export async function getCreditBalance(userId: string): Promise<number> {
 
 export function getWavespeedFeeCents(
   modelId: string,
-  mediaType: "image" | "video"
+  mediaType: "image" | "video",
 ): number {
   const baseCostCents =
     WAVESPEED_MODEL_BASE_COST_CENTS[modelId] ??
@@ -101,7 +120,21 @@ export function getWavespeedFeeCents(
     mediaType === "video"
       ? WAVESPEED_VIDEO_CHARGE_MULTIPLIER
       : WAVESPEED_IMAGE_CHARGE_MULTIPLIER;
-  return Math.max(1, Math.ceil(baseCostCents * multiplier));
+  const costCents = Math.max(1, Math.ceil(baseCostCents * multiplier));
+
+  // Debug logging
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[PRICING] getWavespeedFeeCents:", {
+      modelId,
+      mediaType,
+      baseCostCents,
+      multiplier,
+      finalCostCents: costCents,
+      finalCostDollars: `$${(costCents / 100).toFixed(2)}`,
+    });
+  }
+
+  return costCents;
 }
 
 /**
@@ -164,7 +197,10 @@ export async function deductFlatFee(params: {
     },
   });
 
-  return { costCents: params.feeCents, newBalance: updatedUser.creditBalanceCents };
+  return {
+    costCents: params.feeCents,
+    newBalance: updatedUser.creditBalanceCents,
+  };
 }
 
 /**

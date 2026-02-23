@@ -1,3 +1,5 @@
+import { toPublicUrl } from "./public-url";
+
 const WAVESPEED_BASE = "https://api.wavespeed.ai/api/v3";
 
 function getApiKey(): string {
@@ -51,33 +53,36 @@ function buildRequestBody(
   duration?: number,
   aspectRatio?: string,
   imageUrl?: string,
-  generateAudio?: boolean
+  generateAudio?: boolean,
 ): Record<string, unknown> {
   const body: Record<string, unknown> = { prompt };
   const ratio = aspectRatio ?? "16:9";
+  // Convert imageUrl to public URL for external providers
+  const publicImageUrl = toPublicUrl(imageUrl);
 
   if (modelId.startsWith("wavespeed-ai/wan-")) {
     // WAN 2.2 models — no audio support
     const sizeMap: Record<string, Record<string, string>> = {
       "16:9": { "480p": "832*480", "720p": "1280*720" },
       "9:16": { "480p": "480*832", "720p": "720*1280" },
-      "1:1":  { "480p": "480*480", "720p": "720*720" },
+      "1:1": { "480p": "480*480", "720p": "720*720" },
     };
     const res = modelId.includes("480p") ? "480p" : "720p";
-    body.size = sizeMap[ratio]?.[res] ?? (res === "480p" ? "832*480" : "1280*720");
+    body.size =
+      sizeMap[ratio]?.[res] ?? (res === "480p" ? "832*480" : "1280*720");
     if (duration) body.duration = duration;
-    if (imageUrl) body.image = imageUrl;
+    if (publicImageUrl) body.image = publicImageUrl;
     body.seed = -1;
   } else if (modelId.startsWith("alibaba/wan-")) {
     // Alibaba WAN models (Wan 2.6) — supports audio
     const sizeMap: Record<string, string> = {
       "16:9": "1280*720",
       "9:16": "720*1280",
-      "1:1":  "720*720",
+      "1:1": "720*720",
     };
     body.size = sizeMap[ratio] ?? "1280*720";
     if (duration) body.duration = duration;
-    if (imageUrl) body.image = imageUrl;
+    if (publicImageUrl) body.image = publicImageUrl;
     if (generateAudio) body.generate_audio = true;
     body.seed = -1;
   } else if (modelId.startsWith("bytedance/seedance-")) {
@@ -85,20 +90,20 @@ function buildRequestBody(
     body.aspect_ratio = ratio;
     body.resolution = modelId.includes("fast") ? "480p" : "720p";
     if (duration) body.duration = duration;
-    if (imageUrl) body.image = imageUrl; // API requires "image", not "image_url"
+    if (publicImageUrl) body.image = publicImageUrl; // API requires "image", not "image_url"
     body.generate_audio = generateAudio ?? false;
     body.seed = -1;
   } else if (modelId.startsWith("kwaivgi/")) {
     // Kling uses aspect_ratio
     body.aspect_ratio = ratio;
     if (duration) body.duration = duration;
-    if (imageUrl) body.image = imageUrl;
+    if (publicImageUrl) body.image = publicImageUrl;
     body.seed = -1;
   } else {
     // Generic fallback
     if (duration) body.duration = duration;
     if (aspectRatio) body.aspect_ratio = aspectRatio;
-    if (imageUrl) body.image_url = imageUrl;
+    if (publicImageUrl) body.image_url = publicImageUrl;
     body.seed = -1;
   }
 
@@ -106,7 +111,7 @@ function buildRequestBody(
 }
 
 export async function submitVideoTask(
-  params: VideoSubmitParams
+  params: VideoSubmitParams,
 ): Promise<VideoTask> {
   const key = getApiKey();
   const body = buildRequestBody(
@@ -115,10 +120,16 @@ export async function submitVideoTask(
     params.duration,
     params.aspectRatio,
     params.imageUrl,
-    params.generateAudio
+    params.generateAudio,
   );
 
-  const res = await fetch(`${WAVESPEED_BASE}/${params.modelId}`, {
+  const encodedModelId = encodeURIComponent(params.modelId);
+  const url = `${WAVESPEED_BASE}/${encodedModelId}`;
+  console.log(`[WaveSpeed] Submitting video task to: ${url}`);
+  console.log(`[WaveSpeed] Model: ${params.modelId}`);
+  console.log(`[WaveSpeed] Request body:`, JSON.stringify(body, null, 2));
+
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,
@@ -127,8 +138,11 @@ export async function submitVideoTask(
     body: JSON.stringify(body),
   });
 
+  console.log(`[WaveSpeed] Response status: ${res.status}`);
+
   const json = await parseJsonSafe(res);
   if (!res.ok || json.code !== 200) {
+    console.error(`[WaveSpeed] Error response:`, json);
     throw new Error(String(json.message ?? `WaveSpeed error ${res.status}`));
   }
   return json.data as VideoTask;
@@ -140,10 +154,12 @@ export interface BgmSubmitParams {
   duration?: number;
 }
 
-export async function submitBgmTask(params: BgmSubmitParams): Promise<VideoTask> {
+export async function submitBgmTask(
+  params: BgmSubmitParams,
+): Promise<VideoTask> {
   const key = getApiKey();
   const body: Record<string, unknown> = {
-    video: params.videoUrl,
+    video: toPublicUrl(params.videoUrl),
     prompt: params.prompt,
     duration: params.duration ?? 8,
   };
@@ -172,12 +188,23 @@ export async function getVideoTask(taskIdOrUrl: string): Promise<VideoTask> {
   const url = taskIdOrUrl.startsWith("http")
     ? taskIdOrUrl
     : `${WAVESPEED_BASE}/predictions/${taskIdOrUrl}`;
+
+  console.log(`[WaveSpeed] Polling task status from: ${url}`);
+
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${key}` },
   });
+
+  console.log(`[WaveSpeed] Poll response status: ${res.status}`);
+
   const json = await parseJsonSafe(res);
   if (!res.ok || json.code !== 200) {
     const msg = String(json.message ?? "");
+    console.error(`[WaveSpeed] Error polling task:`, {
+      status: res.status,
+      message: msg,
+      response: json,
+    });
     // WaveSpeed returns "not finished" when the task is still processing
     if (msg.toLowerCase().includes("not finished")) {
       return { status: "processing", outputs: [] } as unknown as VideoTask;
@@ -206,29 +233,29 @@ export interface ImageSubmitParams {
 
 /** Seedream size map: canonical ratio → "width*height" */
 const SEEDREAM_SIZE: Record<string, string> = {
-  "1:1":  "1024*1024",
+  "1:1": "1024*1024",
   "16:9": "1344*768",
   "9:16": "768*1344",
-  "4:3":  "1152*896",
-  "3:4":  "896*1152",
+  "4:3": "1152*896",
+  "3:4": "896*1152",
 };
 
 /** Wan 2.6 image models require >= 3,686,400 pixels (e.g. 1920x1920). */
 const WAN_IMAGE_SIZE: Record<string, string> = {
-  "1:1":  "1920*1920",
+  "1:1": "1920*1920",
   "16:9": "2560*1440",
   "9:16": "1440*2560",
-  "4:3":  "2240*1664",
-  "3:4":  "1664*2240",
+  "4:3": "2240*1664",
+  "3:4": "1664*2240",
 };
 
 /** Seedream 4.5 currently enforces the same minimum pixel requirement. */
 const SEEDREAM_45_SIZE: Record<string, string> = {
-  "1:1":  "1920*1920",
+  "1:1": "1920*1920",
   "16:9": "2560*1440",
   "9:16": "1440*2560",
-  "4:3":  "2240*1664",
-  "3:4":  "1664*2240",
+  "4:3": "2240*1664",
+  "3:4": "1664*2240",
 };
 
 function needsLargeImageSize(modelId: string): boolean {
@@ -258,7 +285,8 @@ function buildImageRequestBodies(params: {
 }): Record<string, unknown>[] {
   const size = getImageSize(params.modelId, params.ratio);
   const prompt = params.prompt?.trim();
-  const imageUrl = params.imageUrl?.trim();
+  const imageUrl = toPublicUrl(params.imageUrl?.trim());
+  const imageUrls = params.imageUrls?.map((url) => toPublicUrl(url));
   const hasPrompt = Boolean(prompt);
   const hasImage = Boolean(imageUrl);
 
@@ -274,7 +302,7 @@ function buildImageRequestBodies(params: {
 
   // FLUX Kontext Pro Multi: uses { prompt, images: [...], aspect_ratio }
   if (params.modelId === "wavespeed-ai/flux-kontext-pro/multi") {
-    const images = params.imageUrls?.length ? params.imageUrls : imageUrl ? [imageUrl] : [];
+    const images = imageUrls?.length ? imageUrls : imageUrl ? [imageUrl] : [];
     const body: Record<string, unknown> = {
       prompt: prompt || "Edit these images",
       images,
@@ -322,7 +350,7 @@ function buildImageRequestBodies(params: {
  * Submit an image generation task (always async — caller must poll urls.get).
  */
 export async function submitImageTask(
-  params: ImageSubmitParams
+  params: ImageSubmitParams,
 ): Promise<VideoTask> {
   const key = getApiKey();
   const ratio = params.aspectRatio ?? "1:1";
@@ -338,7 +366,8 @@ export async function submitImageTask(
 
   let lastError = "Failed to generate image";
   for (const body of bodies) {
-    let res = await fetch(`${WAVESPEED_BASE}/${params.modelId}`, {
+    const encodedModelId = encodeURIComponent(params.modelId);
+    let res = await fetch(`${WAVESPEED_BASE}/${encodedModelId}`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,
@@ -355,8 +384,9 @@ export async function submitImageTask(
     const msg = String(json.message ?? `WaveSpeed error ${res.status}`);
     lastError = msg;
     const lowerMsg = msg.toLowerCase();
-    const requiresLargeSize =
-      lowerMsg.includes("image size must be at least 3686400 pixels");
+    const requiresLargeSize = lowerMsg.includes(
+      "image size must be at least 3686400 pixels",
+    );
 
     // Safety retry for providers that recently increased minimum image size.
     if (requiresLargeSize && !needsLargeImageSize(params.modelId)) {
@@ -364,7 +394,7 @@ export async function submitImageTask(
         ...body,
         size: WAN_IMAGE_SIZE[ratio] ?? WAN_IMAGE_SIZE["1:1"],
       };
-      res = await fetch(`${WAVESPEED_BASE}/${params.modelId}`, {
+      res = await fetch(`${WAVESPEED_BASE}/${encodedModelId}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${key}`,
