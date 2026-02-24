@@ -11,6 +11,7 @@ import {
   TIER_ORDER,
   type TierKey,
 } from "@/lib/subscription";
+import { TEXT_MODELS, DEFAULT_TEXT_MODEL } from "@/lib/ai-models";
 
 interface Trend {
   name: string;
@@ -24,6 +25,7 @@ interface RecurringSchedule {
   useAi: boolean;
   aiPrompt: string | null;
   imageModelId?: string | null;
+  textModelId?: string | null;
   aiLanguage: string | null;
   trendRegion: string | null;
   xAccountId: string | null;
@@ -119,6 +121,7 @@ export default function RecurringPage() {
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLanguage, setAiLanguage] = useState("");
   const [imageModelId, setImageModelId] = useState("");
+  const [textModelId, setTextModelId] = useState(DEFAULT_TEXT_MODEL.id);
   const [trendRegion, setTrendRegion] = useState<
     "" | "global" | "usa" | "china" | "africa"
   >("");
@@ -143,6 +146,7 @@ export default function RecurringPage() {
   );
   const [editAiPrompt, setEditAiPrompt] = useState("");
   const [editImageModelId, setEditImageModelId] = useState("");
+  const [editTextModelId, setEditTextModelId] = useState(DEFAULT_TEXT_MODEL.id);
   const [editTrendRegion, setEditTrendRegion] = useState<
     "" | "global" | "usa" | "china" | "africa"
   >("");
@@ -268,6 +272,7 @@ export default function RecurringPage() {
           aiPrompt: aiPrompt || undefined,
           aiLanguage: aiLanguage || undefined,
           imageModelId: imageModelId || undefined,
+          textModelId: textModelId || undefined,
           trendRegion: trendRegion || undefined,
           xAccountId: selectedAccountId,
           frequency,
@@ -284,6 +289,7 @@ export default function RecurringPage() {
       setAiPrompt("");
       setAiLanguage("");
       setImageModelId("");
+      setTextModelId(DEFAULT_TEXT_MODEL.id);
       setTrendRegion("");
       setFrequency("daily");
       setTime("09:00");
@@ -308,6 +314,7 @@ export default function RecurringPage() {
         body: JSON.stringify({
           prompt: aiPrompt || undefined,
           language: aiLanguage || undefined,
+          model: textModelId || undefined,
         }),
       });
 
@@ -347,6 +354,7 @@ export default function RecurringPage() {
     setEditingScheduleId(schedule.id);
     setEditAiPrompt(schedule.aiPrompt || "");
     setEditImageModelId(schedule.imageModelId || "");
+    setEditTextModelId(schedule.textModelId || DEFAULT_TEXT_MODEL.id);
     setEditTrendRegion(
       (schedule.trendRegion as "" | "global" | "usa" | "china" | "africa") ||
         "",
@@ -365,6 +373,7 @@ export default function RecurringPage() {
     setEditingScheduleId(null);
     setEditAiPrompt("");
     setEditImageModelId("");
+    setEditTextModelId(DEFAULT_TEXT_MODEL.id);
     setEditTrendRegion("");
     setEditTrendPreview([]);
     setEditTrendPreviewError("");
@@ -386,6 +395,7 @@ export default function RecurringPage() {
       if (schedule?.useAi) {
         patchBody.aiPrompt = editAiPrompt;
         patchBody.imageModelId = editImageModelId;
+        patchBody.textModelId = editTextModelId || null;
         patchBody.trendRegion = editTrendRegion || null;
       }
       const res = await fetch(`/api/recurring/${scheduleId}`, {
@@ -503,6 +513,7 @@ export default function RecurringPage() {
         body: JSON.stringify({
           prompt: combinedPrompt,
           language: aiLanguage || undefined,
+          model: textModelId || undefined,
         }),
       });
       const data = await res.json();
@@ -581,7 +592,7 @@ export default function RecurringPage() {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: combinedPrompt }),
+        body: JSON.stringify({ prompt: combinedPrompt, model: editTextModelId || undefined }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to generate");
@@ -935,6 +946,26 @@ export default function RecurringPage() {
               </div>
               <div>
                 <label
+                  htmlFor="textModelId"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                >
+                  AI Model
+                </label>
+                <select
+                  id="textModelId"
+                  value={textModelId}
+                  onChange={(e) => setTextModelId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                >
+                  {TEXT_MODELS.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.label} · {model.provider}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
                   htmlFor="imageModelId"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
                 >
@@ -1250,6 +1281,24 @@ export default function RecurringPage() {
                                 className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
                                 placeholder={t("editAiPromptPlaceholder")}
                               />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                                AI Model
+                              </label>
+                              <select
+                                value={editTextModelId}
+                                onChange={(e) =>
+                                  setEditTextModelId(e.target.value)
+                                }
+                                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                              >
+                                {TEXT_MODELS.map((model) => (
+                                  <option key={model.id} value={model.id}>
+                                    {model.label} · {model.provider}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">

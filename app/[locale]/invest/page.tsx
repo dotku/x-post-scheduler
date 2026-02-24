@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Archivo, Space_Mono } from "next/font/google";
 import { prisma } from "@/lib/db";
 import { getWavespeedFeeCents } from "@/lib/credits";
+import { TEXT_MODELS } from "@/lib/ai-models";
 
 const heading = Archivo({
   subsets: ["latin"],
@@ -64,6 +65,13 @@ const TEXT = {
     kpiRequests: "AI Requests (30d)",
     kpiCashTopup: "Cash Top-up (30d)",
     kpiCashTopupNote: "actual paid credit purchases",
+    aiEngineTitle: "AI Model Engine",
+    aiEngineSubtitle:
+      "Model-agnostic architecture: swap or add any provider without re-engineering the product.",
+    aiTextModels: "Text Models",
+    aiImageModels: "Image Models",
+    aiVideoModels: "Video Models",
+    aiProviders: "AI Providers",
     calcRevenue:
       "Estimated Revenue (30d) = billed model usage across text, image, video, and voice",
     calcArr: "Implied ARR = 12 x 30d estimated revenue",
@@ -142,6 +150,12 @@ const TEXT = {
     kpiRequests: "AI 请求量（30天）",
     kpiCashTopup: "现金充值（30天）",
     kpiCashTopupNote: "用户实际完成支付充值",
+    aiEngineTitle: "AI 模型引擎",
+    aiEngineSubtitle: "模型无关架构：无需重构产品即可切换或接入任意 AI 提供商。",
+    aiTextModels: "文本模型",
+    aiImageModels: "图片模型",
+    aiVideoModels: "视频模型",
+    aiProviders: "AI 提供商",
     calcRevenue: "估算收入（30天）= 文本/图片/视频/语音模型计费使用总额",
     calcArr: "推算 ARR = 30天估算收入 x 12",
     calcMultiple: "估值倍数会根据活跃创作者、访问量和请求量动态调整。",
@@ -529,6 +543,14 @@ export default async function InvestPage({
   const equityAggressive =
     raiseHighCents / (valuationLowCents + raiseHighCents);
 
+  // AI model engine stats
+  const textModelCount = TEXT_MODELS.length;
+  const textProviders = [...new Set(TEXT_MODELS.map((m) => m.provider))];
+  // Image models: t2i + i2i from pricing table (approximate, based on known registry)
+  const imageModelCount = 9;
+  // Video models from pricing table
+  const videoModelCount = 5;
+
   const kpis = [
     {
       label: t.kpiVisits30d,
@@ -668,6 +690,64 @@ export default async function InvestPage({
               </p>
             </article>
           ))}
+        </section>
+
+        {/* AI Model Engine section */}
+        <section className="mt-6 rounded-2xl border border-[#43C9FF]/35 bg-[#0a1e30]/80 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className={`${heading.className} text-xl text-[#F6FBFF]`}>
+                {t.aiEngineTitle}
+              </h2>
+              <p className="mt-1 text-sm text-[#a8c6dd]">{t.aiEngineSubtitle}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {textProviders.map((provider) => (
+                <span
+                  key={provider}
+                  className="rounded-full border border-[#43C9FF]/40 bg-[#43C9FF]/10 px-3 py-1 text-xs font-medium text-[#a8dff7]"
+                >
+                  {provider}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
+              <p className={`${heading.className} text-3xl text-[#6CFFA3]`}>
+                {textProviders.length}
+              </p>
+              <p className="mt-1 text-xs text-[#9ac8e7]">{t.aiProviders}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
+              <p className={`${heading.className} text-3xl text-white`}>
+                {textModelCount}
+              </p>
+              <p className="mt-1 text-xs text-[#9ac8e7]">{t.aiTextModels}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
+              <p className={`${heading.className} text-3xl text-white`}>
+                {imageModelCount}+
+              </p>
+              <p className="mt-1 text-xs text-[#9ac8e7]">{t.aiImageModels}</p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-center">
+              <p className={`${heading.className} text-3xl text-white`}>
+                {videoModelCount}+
+              </p>
+              <p className="mt-1 text-xs text-[#9ac8e7]">{t.aiVideoModels}</p>
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {TEXT_MODELS.map((m) => (
+              <span
+                key={m.id}
+                className="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-[#c5dcea]"
+              >
+                {m.label}
+              </span>
+            ))}
+          </div>
         </section>
 
         <section className="mt-10 grid gap-4 lg:grid-cols-3">

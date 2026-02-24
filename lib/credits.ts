@@ -1,9 +1,34 @@
 import { prisma } from "./db";
 import type { TokenUsage } from "./usage-tracking";
 
-// OpenAI pricing in cents per 1M tokens
+// LLM pricing in cents per 1M tokens (base cost before markup).
+// Covers both legacy direct-API keys and AI Gateway model IDs (provider/model format).
 const PRICING: Record<string, { inputPer1M: number; outputPer1M: number }> = {
+  // Legacy direct OpenAI (kept for backwards compatibility)
   "gpt-4o": { inputPer1M: 250, outputPer1M: 1000 }, // $2.50 / $10.00
+
+  // OpenAI (via AI Gateway)
+  "openai/gpt-4o":      { inputPer1M: 250, outputPer1M: 1000 },  // $2.50 / $10
+  "openai/gpt-4o-mini": { inputPer1M: 15,  outputPer1M: 60 },    // $0.15 / $0.60
+  "openai/gpt-5":       { inputPer1M: 125, outputPer1M: 1000 },  // $1.25 / $10
+
+  // Anthropic (via AI Gateway)
+  "anthropic/claude-sonnet-4":   { inputPer1M: 300, outputPer1M: 1500 }, // $3 / $15
+  "anthropic/claude-3.5-sonnet": { inputPer1M: 300, outputPer1M: 1500 }, // $3 / $15
+  "anthropic/claude-3.5-haiku":  { inputPer1M: 80,  outputPer1M: 400 },  // $0.80 / $4
+
+  // Google (via AI Gateway)
+  "google/gemini-2.5-flash": { inputPer1M: 30,  outputPer1M: 250 }, // $0.30 / $2.50
+  "google/gemini-2.5-pro":   { inputPer1M: 125, outputPer1M: 1000 }, // $1.25 / $10
+
+  // xAI (via AI Gateway)
+  "xai/grok-3":      { inputPer1M: 300, outputPer1M: 1500 }, // $3 / $15
+  "xai/grok-3-mini": { inputPer1M: 30,  outputPer1M: 50 },   // $0.30 / $0.50
+  "xai/grok-3-fast": { inputPer1M: 500, outputPer1M: 2500 }, // $5 / $25
+
+  // Mistral (via AI Gateway)
+  "mistral/mistral-small":  { inputPer1M: 10, outputPer1M: 30 },  // $0.10 / $0.30
+  "mistral/mistral-medium": { inputPer1M: 40, outputPer1M: 200 }, // $0.40 / $2
 };
 
 const DEFAULT_MODEL = "gpt-4o";
@@ -324,4 +349,103 @@ export async function addCredits(params: {
   });
 
   return updatedUser.creditBalanceCents;
+}
+/**
+ * Get trial user ID based on IP + device fingerprint + date.
+ * Format: "trial-{hash(ip+ua+date)}"
+ * This prevents bypassing daily quota via localStorage manipulation.
+ */
+export async function getTrialUserIdFromRequest(
+  ipAddress: string,
+  userAgent: string,
+): Promise<{
+  userId: string;
+  ipAddress: string;
+  userAgent: string;
+}> {
+  // Create a stable hash of IP + user agent + date
+  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  const crypto = await import("crypto");
+  const input = `${ipAddress}|${userAgent}|${today}`;
+  const hash = crypto
+    .createHash("sha256")
+    .update(input)
+    .digest("hex")
+    .slice(0, 12);
+  const trialUserId = `trial-${hash}`;
+
+  return {
+    userId: trialUserId,
+    ipAddress,
+    userAgent,
+  };
+}
+
+/**
+ * Get or create a trial user based on IP + device fingerprint.
+ * Ensures each device/IP combo gets $1 per day.
+ */
+export async function getOrCreateTrialUser(
+  ipAddress: string,
+  userAgent: string,
+): Promise<string> {
+  const { userId } = await getTrialUserIdFromRequest(ipAddress, userAgent);
+  const DAILY_TRIAL_CREDITS_CENTS = 100; // $1
+
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  // Try to find existing daily reset transaction
+  const todayReset = await prisma.creditTransaction.findFirst({
+    where: {
+      userId,
+      description: "Daily trial credit reset",
+      createdAt: {
+        gte: today,
+        lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+      },
+    },
+    select: { id: true },
+  });
+
+  // If reset already done today, return the user as is
+  if (todayReset) {
+    return userId;
+  }
+
+  // Create or update user
+  const user = await prisma.user.upsert({
+    where: { id: userId },
+    update: {},
+    create: {
+      id: userId,
+      creditBalanceCents: DAILY_TRIAL_CREDITS_CENTS,
+      auth0Sub: `trial-no-auth-${Date.now()}`,
+    },
+    select: { creditBalanceCents: true },
+  });
+
+  // Check if reset is needed (current balance might be less than 100)
+  if (user.creditBalanceCents < DAILY_TRIAL_CREDITS_CENTS) {
+    const needed = DAILY_TRIAL_CREDITS_CENTS - user.creditBalanceCents;
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { creditBalanceCents: DAILY_TRIAL_CREDITS_CENTS },
+      select: { creditBalanceCents: true },
+    });
+
+    // Log the reset transaction
+    await prisma.creditTransaction.create({
+      data: {
+        userId,
+        type: "topup",
+        amountCents: needed,
+        balanceAfter: updatedUser.creditBalanceCents,
+        description: "Daily trial credit reset",
+        metadata: JSON.stringify({ ipAddress, userAgent }),
+      },
+    });
+  }
+
+  return userId;
 }

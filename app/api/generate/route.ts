@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { generateTweet, generateTweetSuggestions } from "@/lib/openai";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { trackTokenUsage } from "@/lib/usage-tracking";
 import { hasCredits, deductCredits, deductFlatFee, AGENT_FLAT_FEE_CENTS } from "@/lib/credits";
@@ -8,6 +7,10 @@ import {
   generateWithAgents,
   isAgentServiceConfigured,
 } from "@/lib/agent-client";
+import {
+  generateTweetViaGateway,
+  generateSuggestionsViaGateway,
+} from "@/lib/ai-gateway";
 
 export async function POST(request: NextRequest) {
   let user;
@@ -25,9 +28,9 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { prompt, multiple, language } = body;
+  const { prompt, multiple, language, model: modelId } = body;
 
-  // Use agent service if configured
+  // Use agent service if configured (no model selection — agent handles routing)
   if (isAgentServiceConfigured()) {
     try {
       const result = await generateWithAgents({
@@ -41,7 +44,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: result.error }, { status: 500 });
       }
 
-      // Deduct flat fee for agent calls
       try {
         await deductFlatFee({ userId: user.id, feeCents: AGENT_FLAT_FEE_CENTS, source: "agent_generate" });
       } catch (error) {
@@ -62,12 +64,12 @@ export async function POST(request: NextRequest) {
         pipeline_log: result.pipeline_log,
       });
     } catch (error) {
-      console.error("Agent service error, falling back to direct OpenAI:", error);
-      // Fall through to direct OpenAI below
+      console.error("Agent service error, falling back to AI Gateway:", error);
+      // Fall through to AI Gateway below
     }
   }
 
-  // Fallback: direct OpenAI generation
+  // AI Gateway generation (supports multiple providers)
   const [sources, recentPostsRows] = await Promise.all([
     prisma.knowledgeSource.findMany({
       where: { isActive: true, userId: user.id },
@@ -103,13 +105,14 @@ export async function POST(request: NextRequest) {
     .join("\n\n---\n\n");
 
   if (multiple) {
-    const result = await generateTweetSuggestions(
+    const result = await generateSuggestionsViaGateway({
       knowledgeContext,
       prompt,
-      3,
+      count: 3,
       language,
-      recentPosts
-    );
+      recentPosts,
+      modelId,
+    });
 
     if (result.usage) {
       try {
@@ -117,10 +120,10 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           source: "generate_api_suggestions",
           usage: result.usage,
-          model: result.model,
+          model: result.modelId,
           metadata: { multiple: true },
         });
-        await deductCredits({ userId: user.id, usage: result.usage, model: result.model, source: "generate_api_suggestions" });
+        await deductCredits({ userId: user.id, usage: result.usage, model: result.modelId, source: "generate_api_suggestions" });
       } catch (error) {
         console.error("Failed to track usage/deduct credits (suggestions):", error);
       }
@@ -132,7 +135,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ suggestions: result.suggestions });
   } else {
-    const result = await generateTweet(knowledgeContext, prompt, language, recentPosts);
+    const result = await generateTweetViaGateway({
+      knowledgeContext,
+      prompt,
+      language,
+      recentPosts,
+      modelId,
+    });
 
     if (result.usage) {
       try {
@@ -140,10 +149,10 @@ export async function POST(request: NextRequest) {
           userId: user.id,
           source: "generate_api_single",
           usage: result.usage,
-          model: result.model,
+          model: result.modelId,
           metadata: { multiple: false },
         });
-        await deductCredits({ userId: user.id, usage: result.usage, model: result.model, source: "generate_api_single" });
+        await deductCredits({ userId: user.id, usage: result.usage, model: result.modelId, source: "generate_api_single" });
       } catch (error) {
         console.error("Failed to track usage/deduct credits (single):", error);
       }

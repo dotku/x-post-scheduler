@@ -10,6 +10,7 @@ import {
   TIER_ORDER,
   isVerifiedMember,
   getTierInfo,
+  normalizeTier,
 } from "@/lib/subscription";
 import type { TierKey } from "@/lib/subscription";
 
@@ -120,6 +121,7 @@ export default function SettingsPage() {
   const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">(
     "monthly",
   );
+  const normalizedSubTier = normalizeTier(subTier);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -315,7 +317,7 @@ export default function SettingsPage() {
       }
       if (subRes.ok) {
         const subData = await subRes.json();
-        setSubTier(subData.tier);
+        setSubTier(normalizeTier(subData.tier) ?? subData.tier ?? null);
         setSubStatus(subData.status);
         setSubPeriodEnd(subData.periodEnd);
         setAccountLimit(subData.accountLimit ?? 1);
@@ -462,7 +464,7 @@ export default function SettingsPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        setSubTier(data.tier);
+        setSubTier(normalizeTier(data.tier) ?? data.tier ?? null);
         setSubStatus(data.status);
         setSubPeriodEnd(data.periodEnd);
         setMessage({
@@ -1223,19 +1225,19 @@ export default function SettingsPage() {
             {appLanguage === "zh" ? "会员订阅" : "Membership"}
           </h2>
 
-          {isVerifiedMember(subTier, subStatus) && subTier ? (
+          {isVerifiedMember(subTier, subStatus) && normalizedSubTier ? (
             /* Active subscription */
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-3">
                 <span
                   className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${
-                    subTier === "gold"
+                    normalizedSubTier === "gold"
                       ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
-                      : subTier === "silver"
+                      : normalizedSubTier === "silver"
                         ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-                        : subTier === "iron"
+                        : normalizedSubTier === "iron"
                           ? "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
-                          : subTier === "bronze"
+                          : normalizedSubTier === "bronze"
                             ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
                             : "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300"
                   }`}
@@ -1260,23 +1262,25 @@ export default function SettingsPage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {/* Upgrade/downgrade to other tiers */}
-                {TIER_ORDER.filter((t) => t !== subTier).map((tier) => {
-                  const info = TIERS[tier as TierKey];
-                  return (
-                    <button
-                      key={tier}
-                      onClick={() => handleSubscribe(tier)}
-                      disabled={subLoading !== null}
-                      className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
-                    >
-                      {subLoading === tier
-                        ? "…"
-                        : appLanguage === "zh"
-                          ? `切换至${info.labelZh} $${(info.priceMonthly / 100).toFixed(0)}/月`
-                          : `Switch to ${info.label} $${(info.priceMonthly / 100).toFixed(0)}/mo`}
-                    </button>
-                  );
-                })}
+                {TIER_ORDER.filter((t) => t !== normalizedSubTier).map(
+                  (tier) => {
+                    const info = TIERS[tier as TierKey];
+                    return (
+                      <button
+                        key={tier}
+                        onClick={() => handleSubscribe(tier)}
+                        disabled={subLoading !== null}
+                        className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                      >
+                        {subLoading === tier
+                          ? "…"
+                          : appLanguage === "zh"
+                            ? `切换至${info.labelZh} $${(info.priceMonthly / 100).toFixed(0)}/月`
+                            : `Switch to ${info.label} $${(info.priceMonthly / 100).toFixed(0)}/mo`}
+                      </button>
+                    );
+                  },
+                )}
                 <button
                   onClick={handleCancelSubscription}
                   disabled={subLoading !== null}
@@ -1326,7 +1330,7 @@ export default function SettingsPage() {
                   </button>
                   {TIER_ORDER.map((tier) => {
                     const info = TIERS[tier as TierKey];
-                    const isCurrentTier = tier === subTier;
+                    const isCurrentTier = tier === normalizedSubTier;
                     return (
                       <button
                         key={tier}

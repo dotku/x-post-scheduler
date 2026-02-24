@@ -6,7 +6,7 @@ import {
   SUBSCRIPTION_PRICE_IDS,
   SUBSCRIPTION_YEARLY_PRICE_IDS,
 } from "@/lib/stripe";
-import { TIER_ORDER } from "@/lib/subscription";
+import { TIER_ORDER, normalizeTier } from "@/lib/subscription";
 import type { TierKey } from "@/lib/subscription";
 
 export async function POST(request: NextRequest) {
@@ -23,15 +23,17 @@ export async function POST(request: NextRequest) {
       interval?: "monthly" | "yearly";
     };
 
-    if (!TIER_ORDER.includes(tier as TierKey)) {
+    const normalizedTier = normalizeTier(tier);
+
+    if (!normalizedTier || !TIER_ORDER.includes(normalizedTier as TierKey)) {
       return NextResponse.json({ error: "Invalid tier" }, { status: 400 });
     }
 
     const billingInterval = interval === "yearly" ? "yearly" : "monthly";
     const priceId =
       billingInterval === "yearly"
-        ? SUBSCRIPTION_YEARLY_PRICE_IDS[tier]
-        : SUBSCRIPTION_PRICE_IDS[tier];
+        ? SUBSCRIPTION_YEARLY_PRICE_IDS[normalizedTier]
+        : SUBSCRIPTION_PRICE_IDS[normalizedTier];
     if (!priceId) {
       return NextResponse.json(
         { error: "Subscription not configured for this tier" },
@@ -93,12 +95,19 @@ export async function POST(request: NextRequest) {
         await stripe.subscriptions.update(activeSub.id, {
           cancel_at_period_end: false,
           items: [{ id: activeSub.items.data[0].id, price: priceId }],
-          metadata: { userId: user.id, tier, interval: billingInterval },
+          metadata: {
+            userId: user.id,
+            tier: normalizedTier,
+            interval: billingInterval,
+          },
           proration_behavior: "always_invoice",
         });
         await prisma.user.updateMany({
           where: { stripeCustomerId: customerId },
-          data: { subscriptionTier: tier, subscriptionStatus: "active" },
+          data: {
+            subscriptionTier: normalizedTier,
+            subscriptionStatus: "active",
+          },
         });
         return NextResponse.json({ reactivated: true });
       }
@@ -128,9 +137,17 @@ export async function POST(request: NextRequest) {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${origin}/settings?sub=success`,
       cancel_url: `${origin}/settings`,
-      metadata: { userId: user.id, tier, interval: billingInterval },
+      metadata: {
+        userId: user.id,
+        tier: normalizedTier,
+        interval: billingInterval,
+      },
       subscription_data: {
-        metadata: { userId: user.id, tier, interval: billingInterval },
+        metadata: {
+          userId: user.id,
+          tier: normalizedTier,
+          interval: billingInterval,
+        },
       },
     });
 

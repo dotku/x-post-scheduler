@@ -28,6 +28,11 @@ model User {
   stripeCustomerId      String?   @unique
   stripeSubscriptionId  String?   @unique
   subscriptionPeriodEnd DateTime?
+  // Login streak & daily rewards
+  loginStreak           Int       @default(0)
+  longestStreak         Int       @default(0)
+  lastLoginDate         DateTime?
+  lastLoginRewardAt     DateTime?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -168,8 +173,8 @@ model XAccount {
   followingCount     Int?
   lastSyncedAt       DateTime?
   isDefault          Boolean  @default(false)
-  xApiKey            String
-  xApiSecret         String
+  xApiKey            String?
+  xApiSecret         String?
   xAccessToken       String
   xAccessTokenSecret String
   createdAt          DateTime @default(now())

@@ -1,16 +1,21 @@
 import { TwitterApi } from "twitter-api-v2";
 
 export interface XCredentials {
-  apiKey: string;
-  apiSecret: string;
+  apiKey?: string;
+  apiSecret?: string;
   accessToken: string;
   accessTokenSecret: string;
 }
 
 function createXClient(credentials: XCredentials) {
+  const appKey = credentials.apiKey || process.env.TWITTER_API_KEY;
+  const appSecret = credentials.apiSecret || process.env.TWITTER_API_SECRET;
+  if (!appKey || !appSecret) {
+    throw new Error("Twitter app credentials are not configured");
+  }
   return new TwitterApi({
-    appKey: credentials.apiKey,
-    appSecret: credentials.apiSecret,
+    appKey,
+    appSecret,
     accessToken: credentials.accessToken,
     accessSecret: credentials.accessTokenSecret,
   });

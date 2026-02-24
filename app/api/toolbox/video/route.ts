@@ -1,26 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
+import { getAuthenticatedUser } from "@/lib/auth0";
 import { submitVideoTask, VIDEO_MODELS, I2V_MODELS } from "@/lib/wavespeed";
 import { trackWavespeedUsage } from "@/lib/usage-tracking";
-import { deductWavespeedCredits, getCreditBalance, getWavespeedFeeCents } from "@/lib/credits";
+import {
+  deductWavespeedCredits,
+  getCreditBalance,
+  getWavespeedFeeCents,
+  getOrCreateTrialUser,
+} from "@/lib/credits";
+
+function getClientIp(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  const cfConnectingIp = request.headers.get("cf-connecting-ip");
+  const ip = forwarded
+    ? forwarded.split(",")[0].trim()
+    : cfConnectingIp || "unknown";
+  return ip;
+}
 
 export async function POST(request: NextRequest) {
-  let user: Awaited<ReturnType<typeof requireAuth>>;
+  // Try to authenticate; if fails, use trial user
+  let user: Awaited<ReturnType<typeof getAuthenticatedUser>> | null = null;
+  const clientIp = getClientIp(request);
+  const userAgent = request.headers.get("user-agent") || "unknown";
+
   try {
-    user = await requireAuth();
+    const authenticatedUser = await getAuthenticatedUser();
+    if (authenticatedUser) {
+      user = authenticatedUser;
+    }
   } catch {
-    return unauthorizedResponse();
+    // Not authenticated
+  }
+
+  // If not authenticated, use trial user
+  if (!user) {
+    const trialUserId = await getOrCreateTrialUser(clientIp, userAgent);
+    user = {
+      id: trialUserId,
+      auth0Sub: "trial",
+      email: null,
+      name: "Trial User",
+      picture: null,
+      language: "en",
+    };
   }
 
   const body = await request.json();
-  const { modelId, prompt, duration, aspectRatio, imageUrl, generateAudio } = body as {
-    modelId: string;
-    prompt: string;
-    duration?: number;
-    aspectRatio?: string;
-    imageUrl?: string;
-    generateAudio?: boolean;
-  };
+  const { modelId, prompt, duration, aspectRatio, imageUrl, generateAudio } =
+    body as {
+      modelId: string;
+      prompt: string;
+      duration?: number;
+      aspectRatio?: string;
+      imageUrl?: string;
+      generateAudio?: boolean;
+    };
 
   if (!prompt?.trim()) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
@@ -35,16 +70,28 @@ export async function POST(request: NextRequest) {
   const feeCents = getWavespeedFeeCents(modelId, "video");
   const balanceCents = await getCreditBalance(user.id);
   if (balanceCents < feeCents) {
+    const isTrialUser = user.id.startsWith("trial-");
     return NextResponse.json(
       {
         error: `Insufficient credits. Need $${(feeCents / 100).toFixed(2)} to generate this video.`,
+        ...(isTrialUser && {
+          trialMessage:
+            "You've used your daily $1 trial credit. Sign up for a free account to unlock more credits!",
+        }),
       },
-      { status: 402 }
+      { status: 402 },
     );
   }
 
   try {
-    const task = await submitVideoTask({ modelId, prompt, duration, aspectRatio, imageUrl, generateAudio });
+    const task = await submitVideoTask({
+      modelId,
+      prompt,
+      duration,
+      aspectRatio,
+      imageUrl,
+      generateAudio,
+    });
     try {
       await deductWavespeedCredits({
         userId: user.id,
@@ -54,12 +101,20 @@ export async function POST(request: NextRequest) {
         taskId: task.id,
       });
     } catch (creditError) {
-      if (creditError instanceof Error && creditError.message === "INSUFFICIENT_CREDITS") {
+      if (
+        creditError instanceof Error &&
+        creditError.message === "INSUFFICIENT_CREDITS"
+      ) {
+        const isTrialUser = user.id.startsWith("trial-");
         return NextResponse.json(
           {
             error: `Insufficient credits. Need $${(feeCents / 100).toFixed(2)} to generate this video.`,
+            ...(isTrialUser && {
+              trialMessage:
+                "You've used your daily $1 trial credit. Sign up for a free account to unlock more credits!",
+            }),
           },
-          { status: 402 }
+          { status: 402 },
         );
       }
       console.error("Failed to deduct WaveSpeed video credits:", creditError);
@@ -82,8 +137,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("WaveSpeed submit error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to submit task" },
-      { status: 500 }
+      {
+        error: error instanceof Error ? error.message : "Failed to submit task",
+      },
+      { status: 500 },
     );
   }
 }

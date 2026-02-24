@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { IMAGE_MODELS, VIDEO_MODELS } from "@/lib/wavespeed";
+import { TEXT_MODELS, DEFAULT_TEXT_MODEL } from "@/lib/ai-models";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 function detectInAppBrowser(userAgent: string) {
@@ -90,6 +91,49 @@ export default function LandingContent({
   const [copiedWechat, setCopiedWechat] = useState("");
   const [stats, setStats] = useState<PublicStatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [trialTopic, setTrialTopic] = useState("");
+  const [trialLanguage, setTrialLanguage] = useState("English");
+  const [trialTone, setTrialTone] = useState("");
+  const [trialGoal, setTrialGoal] = useState("");
+  const [trialOutput, setTrialOutput] = useState("");
+  const [trialTextModelId, setTrialTextModelId] = useState(DEFAULT_TEXT_MODEL.id);
+  const [trialGenerating, setTrialGenerating] = useState(false);
+  const [trialError, setTrialError] = useState<string | null>(null);
+  const [trialRemainingCents, setTrialRemainingCents] = useState<number | null>(null);
+  const [xKeysOpen, setXKeysOpen] = useState(false);
+  const [xApiKey, setXApiKey] = useState("");
+  const [xApiSecret, setXApiSecret] = useState("");
+  const [xAccessToken, setXAccessToken] = useState("");
+  const [xAccessTokenSecret, setXAccessTokenSecret] = useState("");
+  const [xPublishing, setXPublishing] = useState(false);
+  const [xPublishResult, setXPublishResult] = useState<{
+    success?: boolean;
+    tweetUrl?: string;
+    error?: string;
+  } | null>(null);
+  // Editor mode tabs
+  const [editorMode, setEditorMode] = useState<"text" | "image" | "video">("text");
+  // Image generation state
+  const t2iModels = useMemo(
+    () => IMAGE_MODELS.filter((m) => !m.mode || m.mode === "t2i"),
+    [],
+  );
+  const [imgModelId, setImgModelId] = useState("bytedance/seedream-v4.5");
+  const [imgPrompt, setImgPrompt] = useState("");
+  const [imgAspect, setImgAspect] = useState("1:1");
+  const [imgGenerating, setImgGenerating] = useState(false);
+  const [imgOutput, setImgOutput] = useState<string | null>(null);
+  const [imgError, setImgError] = useState<string | null>(null);
+  // Video generation state
+  const t2vModels = useMemo(() => VIDEO_MODELS, []);
+  const [vidModelId, setVidModelId] = useState("wavespeed-ai/wan-2.2/t2v-480p-ultra-fast");
+  const [vidPrompt, setVidPrompt] = useState("");
+  const [vidAspect, setVidAspect] = useState("16:9");
+  const [vidDuration, setVidDuration] = useState(5);
+  const [vidGenerating, setVidGenerating] = useState(false);
+  const [vidOutput, setVidOutput] = useState<string | null>(null);
+  const [vidError, setVidError] = useState<string | null>(null);
+  const vidPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const browserEnv = useMemo(() => detectInAppBrowser(userAgent), [userAgent]);
 
   const features = useMemo(
@@ -217,6 +261,49 @@ export default function LandingContent({
       .map(([vendor, requests]) => ({ vendor, requests }));
   }, [stats]);
 
+  // Cleanup video poll timer on unmount
+  useEffect(() => {
+    return () => {
+      if (vidPollRef.current) clearTimeout(vidPollRef.current);
+    };
+  }, []);
+
+  // Auto-save generated images to community gallery
+  useEffect(() => {
+    if (!imgOutput) return;
+    const model = t2iModels.find((m) => m.id === imgModelId);
+    fetch("/api/landing/save-gallery", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "image",
+        modelId: imgModelId,
+        modelLabel: model?.label ?? imgModelId,
+        prompt: imgPrompt,
+        sourceUrl: imgOutput,
+        aspectRatio: imgAspect,
+      }),
+    }).catch(() => {}); // fire-and-forget
+  }, [imgOutput]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-save generated videos to community gallery
+  useEffect(() => {
+    if (!vidOutput) return;
+    const model = t2vModels.find((m) => m.id === vidModelId);
+    fetch("/api/landing/save-gallery", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "video",
+        modelId: vidModelId,
+        modelLabel: model?.label ?? vidModelId,
+        prompt: vidPrompt,
+        sourceUrl: vidOutput,
+        aspectRatio: vidAspect,
+      }),
+    }).catch(() => {}); // fire-and-forget
+  }, [vidOutput]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     fetch("/api/public/stats")
       .then(async (res) => {
@@ -227,6 +314,49 @@ export default function LandingContent({
       .finally(() => setStatsLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = window.sessionStorage.getItem("landing-editor-draft");
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as {
+        topic?: string;
+        xHandle?: string;
+        xCredentials?: {
+          apiKey: string;
+          apiSecret: string;
+          accessToken: string;
+          accessTokenSecret: string;
+        };
+        language?: string;
+        tone?: string;
+        goal?: string;
+        output?: string;
+      };
+      setTrialTopic(parsed.topic ?? "");
+      setTrialLanguage(parsed.language ?? "English");
+      setTrialTone(parsed.tone ?? "");
+      setTrialGoal(parsed.goal ?? "");
+      setTrialOutput(parsed.output ?? "");
+    } catch {
+      // ignore invalid session payload
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.sessionStorage.setItem(
+      "landing-editor-draft",
+      JSON.stringify({
+        topic: trialTopic,
+        language: trialLanguage,
+        tone: trialTone,
+        goal: trialGoal,
+        output: trialOutput,
+      }),
+    );
+  }, [trialTopic, trialLanguage, trialTone, trialGoal, trialOutput]);
+
   async function handleCopyLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -234,6 +364,190 @@ export default function LandingContent({
       setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
+    }
+  }
+
+  async function handleGenerateTrialPost() {
+    const topic = trialTopic.trim();
+    const tone = trialTone.trim();
+    const goal = trialGoal.trim();
+
+    if (!topic || !tone || !goal) return;
+
+    setTrialGenerating(true);
+    setTrialError(null);
+    setXPublishResult(null);
+
+    try {
+      const res = await fetch("/api/landing/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, tone, goal, language: trialLanguage, model: trialTextModelId }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.error === "trial_exhausted") {
+          setTrialError(
+            locale === "zh"
+              ? "今日 $1 免费额度已用完。注册后赠送 $5 正式额度。"
+              : "Your free trial ($1/day) is used up. Sign up to get $5 free credits.",
+          );
+        } else {
+          setTrialError(data.message || data.error || "Generation failed");
+        }
+        return;
+      }
+
+      setTrialOutput(data.content ?? "");
+      if (typeof data.remainingCents === "number") {
+        setTrialRemainingCents(data.remainingCents);
+      }
+    } catch {
+      setTrialError(locale === "zh" ? "生成失败，请重试" : "Generation failed, please try again");
+    } finally {
+      setTrialGenerating(false);
+    }
+  }
+
+  async function handlePublishToX() {
+    if (!trialOutput.trim()) return;
+    setXPublishing(true);
+    setXPublishResult(null);
+    try {
+      const res = await fetch("/api/landing/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: trialOutput,
+          xApiKey,
+          xApiSecret,
+          xAccessToken,
+          xAccessTokenSecret,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setXPublishResult({ success: false, error: data.error || "Publish failed" });
+      } else {
+        setXPublishResult({ success: true, tweetUrl: data.tweetUrl });
+      }
+    } catch {
+      setXPublishResult({
+        success: false,
+        error: locale === "zh" ? "发布失败，请重试" : "Publish failed, please try again",
+      });
+    } finally {
+      setXPublishing(false);
+    }
+  }
+
+  function handleInsufficientCredits(data: { error?: string }) {
+    const exhaustedMsg =
+      locale === "zh"
+        ? "今日 $1 免费额度已用完。注册后赠送 $5 正式额度。"
+        : "Your free trial ($1/day) is used up. Sign up to get $5 free credits.";
+    return data.error?.includes("INSUFFICIENT") || data.error?.includes("trial_exhausted")
+      ? exhaustedMsg
+      : data.error || (locale === "zh" ? "生成失败，请重试" : "Generation failed");
+  }
+
+  async function handleGenerateImage() {
+    if (!imgPrompt.trim()) return;
+    setImgGenerating(true);
+    setImgOutput(null);
+    setImgError(null);
+    try {
+      const res = await fetch("/api/toolbox/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: imgModelId,
+          prompt: imgPrompt,
+          aspectRatio: imgAspect,
+          mode: "t2i",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setImgError(handleInsufficientCredits(data));
+        return;
+      }
+      const url = data.task?.outputs?.[0] ?? null;
+      if (url) {
+        setImgOutput(url);
+        if (typeof data.task?.remainingCents === "number") {
+          setTrialRemainingCents(data.task.remainingCents);
+        }
+      } else {
+        setImgError(locale === "zh" ? "生成失败，请重试" : "Generation failed");
+      }
+    } catch {
+      setImgError(locale === "zh" ? "网络错误" : "Network error");
+    } finally {
+      setImgGenerating(false);
+    }
+  }
+
+  function pollVideoStatus(taskId: string, pollUrl?: string) {
+    vidPollRef.current = setTimeout(async () => {
+      try {
+        const url = pollUrl
+          ? `/api/toolbox/video/${taskId}?pollUrl=${encodeURIComponent(pollUrl)}`
+          : `/api/toolbox/video/${taskId}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const task = data.task;
+        if (task?.status === "completed") {
+          setVidOutput(task.outputs?.[0] ?? null);
+          setVidGenerating(false);
+        } else if (task?.status === "failed") {
+          setVidError(task.error || (locale === "zh" ? "生成失败" : "Generation failed"));
+          setVidGenerating(false);
+        } else {
+          pollVideoStatus(taskId, pollUrl);
+        }
+      } catch {
+        setVidError(locale === "zh" ? "网络错误" : "Network error");
+        setVidGenerating(false);
+      }
+    }, 3000);
+  }
+
+  async function handleGenerateVideo() {
+    if (!vidPrompt.trim()) return;
+    if (vidPollRef.current) clearTimeout(vidPollRef.current);
+    setVidGenerating(true);
+    setVidOutput(null);
+    setVidError(null);
+    try {
+      const res = await fetch("/api/toolbox/video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelId: vidModelId,
+          prompt: vidPrompt,
+          duration: vidDuration,
+          aspectRatio: vidAspect,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setVidError(handleInsufficientCredits(data));
+        setVidGenerating(false);
+        return;
+      }
+      const taskId = data.task?.id;
+      const taskPollUrl = data.task?.urls?.get;
+      if (taskId) {
+        pollVideoStatus(taskId, taskPollUrl);
+      } else {
+        setVidError(locale === "zh" ? "生成失败" : "Generation failed");
+        setVidGenerating(false);
+      }
+    } catch {
+      setVidError(locale === "zh" ? "网络错误" : "Network error");
+      setVidGenerating(false);
     }
   }
 
@@ -382,6 +696,523 @@ export default function LandingContent({
               </p>
             </>
           )}
+        </div>
+      </section>
+
+      {/* Try editor */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 sm:p-8">
+          <div className="flex flex-col gap-2 mb-6">
+            <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+              {t("editorTitle")}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {t("editorSubtitle")}
+            </p>
+          </div>
+
+          {/* Mode tabs */}
+          <div className="flex gap-1 mb-6 p-1 bg-gray-100 dark:bg-gray-900 rounded-lg w-fit">
+            {(["text", "image", "video"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setEditorMode(mode)}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  editorMode === mode
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                }`}
+              >
+                {mode === "text"
+                  ? locale === "zh" ? "📝 文字" : "📝 Text"
+                  : mode === "image"
+                  ? locale === "zh" ? "🖼️ 图片" : "🖼️ Image"
+                  : locale === "zh" ? "🎬 视频" : "🎬 Video"}
+              </button>
+            ))}
+          </div>
+
+          {editorMode === "text" && (<>
+          {/* Sample presets */}
+          <div className="mb-4">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              {locale === "zh" ? "快速填入示例 →" : "Try a sample →"}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {([
+                { topic: locale === "zh" ? "AI 生产力工具" : "AI productivity tools", tone: locale === "zh" ? "专业、权威" : "professional", goal: locale === "zh" ? "吸引注册" : "drive signups" },
+                { topic: locale === "zh" ? "视频内容创作技巧" : "video content creation tips", tone: locale === "zh" ? "轻松、充满活力" : "casual, energetic", goal: locale === "zh" ? "涨粉" : "grow following" },
+                { topic: locale === "zh" ? "创业融资经验" : "bootstrapping a startup", tone: locale === "zh" ? "真实、坦诚" : "authentic, raw", goal: locale === "zh" ? "建立社群" : "build community" },
+                { topic: locale === "zh" ? "早晨健身计划" : "morning workout routine", tone: locale === "zh" ? "激励人心" : "motivational", goal: locale === "zh" ? "激发行动" : "inspire action" },
+                { topic: locale === "zh" ? "加密货币市场趋势" : "crypto market trends", tone: locale === "zh" ? "理性、自信" : "analytical, confident", goal: locale === "zh" ? "建立思想领导力" : "establish thought leadership" },
+              ] as const).map((sample) => (
+                <button
+                  key={sample.topic}
+                  type="button"
+                  onClick={() => {
+                    setTrialTopic(sample.topic);
+                    setTrialTone(sample.tone);
+                    setTrialGoal(sample.goal);
+                  }}
+                  className="rounded-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 py-1 text-xs text-gray-700 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-colors"
+                >
+                  {sample.topic}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {t("editorTopicLabel")}
+              </span>
+              <input
+                value={trialTopic}
+                onChange={(e) => setTrialTopic(e.target.value)}
+                placeholder={t("editorTopicPlaceholder")}
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+              />
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {t("editorLanguageLabel")}
+              </span>
+              <select
+                value={trialLanguage}
+                onChange={(e) => setTrialLanguage(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+              >
+                <option value="English">English</option>
+                <option value="中文">中文</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                {t("editorToneLabel")}
+              </span>
+              <input
+                value={trialTone}
+                onChange={(e) => setTrialTone(e.target.value)}
+                placeholder={t("editorTonePlaceholder")}
+                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+              />
+            </label>
+          </div>
+
+          <label className="flex flex-col gap-1 mt-4">
+            <span className="text-sm font-medium text-gray-900 dark:text-white">
+              {t("editorGoalLabel")}
+            </span>
+            <input
+              value={trialGoal}
+              onChange={(e) => setTrialGoal(e.target.value)}
+              placeholder={t("editorGoalPlaceholder")}
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+            />
+          </label>
+
+          <div className="mt-4">
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                {locale === "zh" ? "AI 模型" : "AI Model"}
+              </span>
+              <select
+                value={trialTextModelId}
+                onChange={(e) => setTrialTextModelId(e.target.value)}
+                className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+              >
+                {TEXT_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label} · {m.provider}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleGenerateTrialPost}
+              disabled={
+                trialGenerating ||
+                !trialTopic.trim() ||
+                !trialTone.trim() ||
+                !trialGoal.trim()
+              }
+              className="inline-flex items-center px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
+            >
+              {trialGenerating
+                ? locale === "zh"
+                  ? "生成中..."
+                  : "Generating..."
+                : t("editorGenerateButton")}
+            </button>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              {t("editorSessionHint")}
+            </span>
+            {trialRemainingCents !== null && (
+              <span className="text-xs text-green-600 dark:text-green-400">
+                {locale === "zh"
+                  ? `剩余试用额度: $${(trialRemainingCents / 100).toFixed(2)}`
+                  : `Trial balance: $${(trialRemainingCents / 100).toFixed(2)}`}
+              </span>
+            )}
+          </div>
+
+          {trialError && (
+            <div className="mt-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3">
+              <p className="text-sm text-red-700 dark:text-red-300">{trialError}</p>
+              {!isLoggedIn && (
+                <Link
+                  href={`${prefix}/login`}
+                  className="mt-2 inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  {locale === "zh" ? "立即注册，领取 $5 →" : "Sign up for $5 free credits →"}
+                </Link>
+              )}
+            </div>
+          )}
+
+          <div className="mt-5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4">
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
+              {t("editorPreviewLabel")}
+            </p>
+            <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap min-h-12">
+              {trialOutput || t("editorPreviewPlaceholder")}
+            </p>
+          </div>
+
+          {/* X Publishing Section — shown after content is generated */}
+          {trialOutput && (
+            <div className="mt-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <button
+                type="button"
+                onClick={() => setXKeysOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg"
+              >
+                <span>
+                  {locale === "zh"
+                    ? "发布到 X（需要你的 API Key）"
+                    : "Publish to X (requires your API keys)"}
+                </span>
+                <svg
+                  className={`w-4 h-4 transition-transform ${xKeysOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {xKeysOpen && (
+                <div className="px-4 pb-4 space-y-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {locale === "zh"
+                      ? "API Key 仅用于本次发布，不会被存储。"
+                      : "Your API keys are used only for this request and are never stored."}{" "}
+                    <Link href={`${prefix}/docs`} className="text-blue-500 hover:underline">
+                      {locale === "zh" ? "查看文档" : "View docs"}
+                    </Link>
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input
+                      type="password"
+                      placeholder="API Key"
+                      value={xApiKey}
+                      onChange={(e) => setXApiKey(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                    />
+                    <input
+                      type="password"
+                      placeholder="API Secret"
+                      value={xApiSecret}
+                      onChange={(e) => setXApiSecret(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                    />
+                    <input
+                      type="password"
+                      placeholder="Access Token"
+                      value={xAccessToken}
+                      onChange={(e) => setXAccessToken(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                    />
+                    <input
+                      type="password"
+                      placeholder="Access Token Secret"
+                      value={xAccessTokenSecret}
+                      onChange={(e) => setXAccessTokenSecret(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handlePublishToX}
+                    disabled={
+                      xPublishing ||
+                      !xApiKey ||
+                      !xApiSecret ||
+                      !xAccessToken ||
+                      !xAccessTokenSecret
+                    }
+                    className="inline-flex items-center px-5 py-2.5 rounded-lg bg-black text-white text-sm font-semibold hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {xPublishing
+                      ? locale === "zh"
+                        ? "发布中..."
+                        : "Publishing..."
+                      : locale === "zh"
+                        ? "发布到 X"
+                        : "Publish to X"}
+                  </button>
+                  {xPublishResult && (
+                    <div
+                      className={`rounded-lg px-4 py-3 text-sm ${
+                        xPublishResult.success
+                          ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
+                          : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+                      }`}
+                    >
+                      {xPublishResult.success ? (
+                        <>
+                          {locale === "zh" ? "发布成功！" : "Published successfully!"}{" "}
+                          {xPublishResult.tweetUrl && (
+                            <a
+                              href={xPublishResult.tweetUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline font-semibold"
+                            >
+                              {locale === "zh" ? "查看推文 →" : "View tweet →"}
+                            </a>
+                          )}
+                        </>
+                      ) : (
+                        xPublishResult.error
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          </>)}
+
+          {/* Image generation mode */}
+          {editorMode === "image" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {locale === "zh" ? "模型" : "Model"}
+                  </span>
+                  <select
+                    value={imgModelId}
+                    onChange={(e) => setImgModelId(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  >
+                    {t2iModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {locale === "zh" ? "比例" : "Aspect ratio"}
+                  </span>
+                  <select
+                    value={imgAspect}
+                    onChange={(e) => setImgAspect(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  >
+                    {["1:1", "16:9", "9:16", "4:3", "3:4"].map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {locale === "zh" ? "提示词" : "Prompt"}
+                </span>
+                <textarea
+                  rows={3}
+                  value={imgPrompt}
+                  onChange={(e) => setImgPrompt(e.target.value)}
+                  placeholder={locale === "zh" ? "描述你想生成的图片..." : "Describe the image you want to generate..."}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white resize-none"
+                />
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleGenerateImage}
+                  disabled={imgGenerating || !imgPrompt.trim()}
+                  className="inline-flex items-center px-5 py-2.5 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {imgGenerating
+                    ? locale === "zh" ? "生成中..." : "Generating..."
+                    : locale === "zh" ? "🖼️ 生成图片" : "🖼️ Generate Image"}
+                </button>
+                {trialRemainingCents !== null && (
+                  <span className="text-xs text-green-600 dark:text-green-400">
+                    {locale === "zh"
+                      ? `剩余额度: $${(trialRemainingCents / 100).toFixed(2)}`
+                      : `Balance: $${(trialRemainingCents / 100).toFixed(2)}`}
+                  </span>
+                )}
+              </div>
+              {imgError && (
+                <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3">
+                  <p className="text-sm text-red-700 dark:text-red-300">{imgError}</p>
+                  {!isLoggedIn && (
+                    <Link href={`${prefix}/login`} className="mt-2 inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                      {locale === "zh" ? "立即注册，领取 $5 →" : "Sign up for $5 free credits →"}
+                    </Link>
+                  )}
+                </div>
+              )}
+              {imgOutput && (
+                <div className="mt-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imgOutput}
+                    alt="Generated image"
+                    className="rounded-lg max-w-full max-h-96 object-contain border border-gray-200 dark:border-gray-700"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Video generation mode */}
+          {editorMode === "video" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {locale === "zh" ? "模型" : "Model"}
+                  </span>
+                  <select
+                    value={vidModelId}
+                    onChange={(e) => setVidModelId(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  >
+                    {t2vModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {locale === "zh" ? "比例" : "Aspect ratio"}
+                  </span>
+                  <select
+                    value={vidAspect}
+                    onChange={(e) => setVidAspect(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  >
+                    {["16:9", "9:16", "1:1"].map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {locale === "zh" ? "时长" : "Duration"}
+                  </span>
+                  <select
+                    value={vidDuration}
+                    onChange={(e) => setVidDuration(Number(e.target.value))}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  >
+                    <option value={5}>5s</option>
+                    <option value={10}>10s</option>
+                  </select>
+                </label>
+              </div>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {locale === "zh" ? "提示词" : "Prompt"}
+                </span>
+                <textarea
+                  rows={3}
+                  value={vidPrompt}
+                  onChange={(e) => setVidPrompt(e.target.value)}
+                  placeholder={locale === "zh" ? "描述你想生成的视频内容..." : "Describe the video you want to generate..."}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white resize-none"
+                />
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleGenerateVideo}
+                  disabled={vidGenerating || !vidPrompt.trim()}
+                  className="inline-flex items-center px-5 py-2.5 rounded-lg bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-50"
+                >
+                  {vidGenerating
+                    ? locale === "zh" ? "生成中（请稍候）..." : "Generating (please wait)..."
+                    : locale === "zh" ? "🎬 生成视频" : "🎬 Generate Video"}
+                </button>
+                {trialRemainingCents !== null && (
+                  <span className="text-xs text-green-600 dark:text-green-400">
+                    {locale === "zh"
+                      ? `剩余额度: $${(trialRemainingCents / 100).toFixed(2)}`
+                      : `Balance: $${(trialRemainingCents / 100).toFixed(2)}`}
+                  </span>
+                )}
+              </div>
+              {vidError && (
+                <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3">
+                  <p className="text-sm text-red-700 dark:text-red-300">{vidError}</p>
+                  {!isLoggedIn && (
+                    <Link href={`${prefix}/login`} className="mt-2 inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                      {locale === "zh" ? "立即注册，领取 $5 →" : "Sign up for $5 free credits →"}
+                    </Link>
+                  )}
+                </div>
+              )}
+              {vidOutput && (
+                <div className="mt-2">
+                  <video
+                    src={vidOutput}
+                    controls
+                    autoPlay
+                    loop
+                    muted
+                    className="rounded-lg max-w-full max-h-96 border border-gray-200 dark:border-gray-700"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            {!isLoggedIn ? (
+              <Link
+                href={`${prefix}/login`}
+                className="inline-flex items-center px-5 py-2.5 rounded-lg border border-blue-300 text-blue-700 dark:text-blue-300 dark:border-blue-600 text-sm font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20"
+              >
+                {t("editorUnlockButton")}
+              </Link>
+            ) : (
+              <Link
+                href={`${prefix}/toolbox`}
+                className="inline-flex items-center px-5 py-2.5 rounded-lg border border-blue-300 text-blue-700 dark:text-blue-300 dark:border-blue-600 text-sm font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20"
+              >
+                {t("editorGoMediaStudio")}
+              </Link>
+            )}
+          </div>
         </div>
       </section>
 
@@ -905,6 +1736,29 @@ export default function LandingContent({
                 {lang === "zh" ? "已复制微信号" : "WeChat ID copied"}
               </p>
             )}
+          </div>
+
+          {/* Africa region support */}
+          <div className="text-center space-y-2 sm:space-y-1">
+            <p className="text-sm sm:text-base font-medium text-gray-700 dark:text-gray-300">
+              {lang === "zh" ? "非洲地区客服" : "Africa Region Support"} — Mohamadou Laminou:
+            </p>
+            <div className="flex flex-col sm:flex-row sm:gap-4 gap-2 text-sm sm:text-base">
+              <a
+                href="mailto:mohamadou439@gmail.com"
+                className="px-3 py-2 sm:py-1.5 rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all"
+              >
+                mohamadou439@gmail.com
+              </a>
+              <a
+                href="https://wa.me/8613162726136"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-2 sm:py-1.5 rounded-md bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-300 transition-all"
+              >
+                WhatsApp: +86 131 6272 6136
+              </a>
+            </div>
           </div>
           <Link
             href={`${prefix}/invest`}

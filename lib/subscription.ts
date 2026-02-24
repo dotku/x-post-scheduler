@@ -51,29 +51,40 @@ export const TIER_ORDER: TierKey[] = [
   "gold",
 ];
 
+export function normalizeTier(tier?: string | null): TierKey | null {
+  if (!tier) return null;
+  const normalized = tier.toLowerCase().trim();
+  if (normalized === "air" || normalized === "woods") return "wood";
+  if (normalized in TIERS) return normalized as TierKey;
+  return null;
+}
+
 export function getAccountLimit(tier?: string | null): number {
-  if (!tier) return 0; // Free/pay-as-you-go: 0 accounts
-  if (tier === "air") return 1; // Backward compat for legacy "air" tier users
-  if (!(tier in TIERS)) return 0;
-  return TIERS[tier as TierKey].accountLimit;
+  const normalizedTier = normalizeTier(tier);
+  if (!normalizedTier) return 0; // Free/pay-as-you-go: 0 accounts
+  return TIERS[normalizedTier].accountLimit;
 }
 
 export function isVerifiedMember(
   tier?: string | null,
   status?: string | null,
 ): boolean {
-  return !!tier && status === "active";
+  return !!normalizeTier(tier) && status === "active";
 }
 
-export function getTierInfo(tier: string) {
-  return TIERS[tier as TierKey] ?? null;
+export function getTierInfo(tier?: string | null) {
+  const normalizedTier = normalizeTier(tier);
+  return normalizedTier ? TIERS[normalizedTier] : null;
 }
 
 /** Hourly frequency options and their tier requirements */
-export const HOURLY_FREQUENCIES: Record<string, { hours: number; minTier: TierKey }> = {
-  every_2h:  { hours: 2,  minTier: "gold" },
-  every_4h:  { hours: 4,  minTier: "silver" },
-  every_6h:  { hours: 6,  minTier: "iron" },
+export const HOURLY_FREQUENCIES: Record<
+  string,
+  { hours: number; minTier: TierKey }
+> = {
+  every_2h: { hours: 2, minTier: "gold" },
+  every_4h: { hours: 4, minTier: "silver" },
+  every_6h: { hours: 6, minTier: "iron" },
   every_12h: { hours: 12, minTier: "bronze" },
 };
 
@@ -82,9 +93,7 @@ export function isTierAtLeast(
   userTier: string | null | undefined,
   minTier: TierKey,
 ): boolean {
-  if (!userTier) return false;
-  // Backward compat: treat legacy "air" tier as "wood"
-  const normalizedTier = userTier === "air" ? "wood" : userTier;
-  if (!(normalizedTier in TIERS)) return false;
-  return TIER_ORDER.indexOf(normalizedTier as TierKey) >= TIER_ORDER.indexOf(minTier);
+  const normalizedTier = normalizeTier(userTier);
+  if (!normalizedTier) return false;
+  return TIER_ORDER.indexOf(normalizedTier) >= TIER_ORDER.indexOf(minTier);
 }

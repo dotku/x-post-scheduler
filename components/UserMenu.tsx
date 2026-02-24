@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { isVerifiedMember, getTierInfo } from "@/lib/subscription";
+import DailyCheckin from "@/components/DailyCheckin";
 
 interface SubInfo {
   tier: string | null;
@@ -129,6 +130,7 @@ export default function UserMenu() {
               </p>
             )}
           </div>
+          <DailyCheckin compact />
           <Link
             href={`${prefix}/settings`}
             className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
