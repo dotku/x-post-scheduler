@@ -215,3 +215,67 @@ export async function verifyCredentials(credentials: XCredentials): Promise<{
     };
   }
 }
+
+export interface UserInfo {
+  id: string;
+  username: string;
+  followersCount: number;
+}
+
+export async function getUserInfo(credentials: XCredentials): Promise<UserInfo> {
+  const client = createXClient(credentials);
+  const me = await client.v2.me({ "user.fields": ["public_metrics"] });
+
+  return {
+    id: me.data.id,
+    username: me.data.username,
+    followersCount: me.data.public_metrics?.followers_count ?? 0,
+  };
+}
+
+export interface DetailedTweetMetrics {
+  id: string;
+  text: string;
+  createdAt: Date | null;
+  impressions: number;
+  likes: number;
+  retweets: number;
+  replies: number;
+  quotes: number;
+}
+
+/**
+ * Fetch recent tweets from user timeline with detailed metrics
+ */
+export async function getRecentTweetsWithMetrics(
+  maxResults: number,
+  credentials: XCredentials
+): Promise<DetailedTweetMetrics[]> {
+  const client = createXClient(credentials);
+  const me = await client.v2.me();
+
+  const paginator = await client.v2.userTimeline(me.data.id, {
+    max_results: Math.min(100, Math.max(5, maxResults)),
+    exclude: ["replies", "retweets"],
+    "tweet.fields": ["created_at", "public_metrics"],
+  });
+
+  const tweets = paginator.tweets ?? [];
+  const results: DetailedTweetMetrics[] = [];
+
+  for (const tweet of tweets) {
+    const metrics = tweet.public_metrics;
+    results.push({
+      id: tweet.id,
+      text: tweet.text ?? "",
+      createdAt: tweet.created_at ? new Date(tweet.created_at) : null,
+      impressions: metrics?.impression_count ?? 0,
+      likes: metrics?.like_count ?? 0,
+      retweets: metrics?.retweet_count ?? 0,
+      replies: metrics?.reply_count ?? 0,
+      quotes: metrics?.quote_count ?? 0,
+    });
+  }
+
+  return results;
+}

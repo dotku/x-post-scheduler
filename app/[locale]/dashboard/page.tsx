@@ -191,6 +191,14 @@ export default async function Dashboard({
               >
                 {tNav("knowledge")}
               </Link>
+
+              <Link
+                href={`${prefix}/analytics`}
+                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
+              >
+                {tNav("analytics")}
+              </Link>
+
               <div className="border-l border-gray-300 dark:border-gray-600 h-5 mx-1 hidden sm:block" />
               <LanguageSwitcher />
               <UserMenu />

@@ -6,6 +6,7 @@
     "compose": "创作帖子",
     "autoPost": "自动发布管理",
     "knowledge": "知识库",
+    "analytics": "数据分析",
     "appTitle": "X 推创"
   },
   "userMenu": {
@@ -361,5 +362,30 @@
     "embeddedHint": "内嵌浏览器不支持登录，请在 Safari 或 Chrome 中打开。",
     "copyLink": "复制链接",
     "linkCopied": "已复制！"
+  },
+  "analytics": {
+    "title": "数据分析",
+    "backToDashboard": "← 返回",
+    "selectAccount": "选择 X 账号",
+    "allAccounts": "全部账号",
+    "timeRange": "时间范围",
+    "last7Days": "最近 7 天",
+    "last30Days": "最近 30 天",
+    "last90Days": "最近 90 天",
+    "accountMetrics": "账号指标",
+    "totalFollowers": "总粉丝数",
+    "newFollowers": "新增粉丝",
+    "totalPosts": "帖子数",
+    "totalImpressions": "曝光量",
+    "totalEngagements": "互动数",
+    "totalComments": "评论数",
+    "postPerformance": "帖子表现",
+    "post": "帖子",
+    "likes": "点赞数",
+    "engagementRate": "互动率",
+    "impressions": "曝光量",
+    "noData": "所选时间段暂无数据",
+    "loading": "加载分析数据中...",
+    "viewOnX": "在 X 上查看 ↗"
   }
 }
