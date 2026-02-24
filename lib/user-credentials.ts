@@ -8,6 +8,9 @@ export interface UserXAccountSummary {
   username: string | null;
   isDefault: boolean;
   createdAt: Date;
+  followersCount: number | null;
+  followingCount: number | null;
+  lastSyncedAt: Date | null;
 }
 
 export interface ResolvedXCredentials {
@@ -27,6 +30,9 @@ export async function listUserXAccounts(
       username: true,
       isDefault: true,
       createdAt: true,
+      followersCount: true,
+      followingCount: true,
+      lastSyncedAt: true,
     },
   });
 

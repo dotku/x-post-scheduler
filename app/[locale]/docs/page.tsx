@@ -29,11 +29,12 @@ export default function DocsPage() {
             如何获取 X (Twitter) API 密钥
           </p>
           <p className="mt-4 text-gray-600 dark:text-gray-400">
-            To post to X through this app, you need 4 API credentials from the
-            X Developer Portal. Follow the steps below to obtain them.
+            To post to X through this app, you need 4 API credentials from the X
+            Developer Portal. Follow the steps below to obtain them.
           </p>
           <p className="mt-1 text-gray-600 dark:text-gray-400">
-            要通过本应用发布推文，你需要从 X 开发者平台获取 4 个 API 密钥。请按以下步骤操作。
+            要通过本应用发布推文，你需要从 X 开发者平台获取 4 个 API
+            密钥。请按以下步骤操作。
           </p>
         </div>
 
@@ -68,8 +69,8 @@ export default function DocsPage() {
                   </span>
                 </li>
                 <li>
-                  If you haven&apos;t already, apply for a Developer account. The free
-                  tier is sufficient.
+                  If you haven&apos;t already, apply for a Developer account.
+                  The free tier is sufficient.
                   <br />
                   <span className="text-gray-500 dark:text-gray-500">
                     如果还没有开发者账号，申请一个即可。免费套餐就够用了。
@@ -150,7 +151,8 @@ export default function DocsPage() {
                 generating tokens. If you change permissions later, you need to
                 regenerate all tokens.
                 <br />
-                重要：必须在生成 Token 之前设置权限。如果之后更改权限，需要重新生成所有 Token。
+                重要：必须在生成 Token
+                之前设置权限。如果之后更改权限，需要重新生成所有 Token。
               </div>
               <ol className="list-decimal list-inside space-y-2 text-gray-600 dark:text-gray-400 text-sm">
                 <li>
@@ -281,7 +283,10 @@ export default function DocsPage() {
                 </li>
                 <li>
                   Make sure it says{" "}
-                  <strong>&ldquo;Created with Read and Write permissions&rdquo;</strong>.
+                  <strong>
+                    &ldquo;Created with Read and Write permissions&rdquo;
+                  </strong>
+                  .
                   <br />
                   <span className="text-gray-500 dark:text-gray-500">
                     确认显示"Created with Read and Write permissions"。
@@ -308,14 +313,14 @@ export default function DocsPage() {
             </span>
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Add Credentials to X Post Scheduler
+                Add Credentials to xPilot
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                将密钥添加到 X Post Scheduler
+                将密钥添加到 X 推创
               </p>
               <ol className="list-decimal list-inside space-y-2 text-gray-600 dark:text-gray-400 text-sm">
                 <li>
-                  Sign in to X Post Scheduler and go to the{" "}
+                  Sign in to xPilot and go to the{" "}
                   <Link
                     href="/settings"
                     className="text-blue-600 dark:text-blue-400 underline"
@@ -325,7 +330,7 @@ export default function DocsPage() {
                   page.
                   <br />
                   <span className="text-gray-500 dark:text-gray-500">
-                    登录 X Post Scheduler 并进入设置页面。
+                    登录 X 推创 并进入设置页面。
                   </span>
                 </li>
                 <li>
@@ -378,8 +383,8 @@ export default function DocsPage() {
                 <strong>regenerate</strong> both your Access Token and Secret.
               </p>
               <p className="text-gray-500 dark:text-gray-500">
-                你的应用权限可能是"只读"。请改为"读写"，然后重新生成 Access Token 和
-                Secret。
+                你的应用权限可能是"只读"。请改为"读写"，然后重新生成 Access
+                Token 和 Secret。
               </p>
             </div>
             <div>
@@ -403,7 +408,8 @@ export default function DocsPage() {
                 tweets per 24 hours. Wait and try again later.
               </p>
               <p className="text-gray-500 dark:text-gray-500">
-                触发了 X API 速率限制。免费套餐每 24 小时约可发 17 条推文，稍后再试。
+                触发了 X API 速率限制。免费套餐每 24 小时约可发 17
+                条推文，稍后再试。
               </p>
             </div>
           </div>

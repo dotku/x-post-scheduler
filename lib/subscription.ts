@@ -43,7 +43,13 @@ export const TIERS = {
 
 export type TierKey = keyof typeof TIERS;
 
-export const TIER_ORDER: TierKey[] = ["air", "bronze", "iron", "silver", "gold"];
+export const TIER_ORDER: TierKey[] = [
+  "air",
+  "bronze",
+  "iron",
+  "silver",
+  "gold",
+];
 
 export function getAccountLimit(tier?: string | null): number {
   if (!tier || !(tier in TIERS)) return 1;

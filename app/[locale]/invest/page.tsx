@@ -31,7 +31,7 @@ const TEXT = {
     title2: "media operating system",
     title3: "for creators.",
     intro:
-      "X Post Scheduler started as automation. It is now an AI media operating system with text, image, video, and voice creation workflows, scheduling, and publishing. We are raising to expand model coverage, platform-native distribution, and multi-agent creation for viral content.",
+      "xPilot started as automation. It is now an AI media operating system with text, image, video, and voice creation workflows, scheduling, and publishing. We are raising to expand model coverage, platform-native distribution, and multi-agent creation for viral content.",
     requestDeck: "Request Deck",
     bookCall: "Book 20-min Call",
     valuationLabel: "Valuation",
@@ -111,7 +111,7 @@ const TEXT = {
     title2: "创作者媒体操作系统",
     title3: "让内容生产可规模化。",
     intro:
-      "X Post Scheduler 最初是自动化发帖工具，现在已发展为覆盖文本、图片、视频、语音创作工作流，并支持调度与发布的 AI 媒体操作系统。我们正在融资，用于扩展模型覆盖、平台化分发能力，以及多智能体爆款内容生产能力。",
+      "X 推创 最初是自动化发帖工具，现在已发展为覆盖文本、图片、视频、语音创作工作流，并支持调度与发布的 AI 媒体操作系统。我们正在融资，用于扩展模型覆盖、平台化分发能力，以及多智能体爆款内容生产能力。",
     requestDeck: "索取融资材料",
     bookCall: "预约 20 分钟沟通",
     valuationLabel: "估值",

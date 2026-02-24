@@ -260,6 +260,12 @@ export default function LandingContent({
               {t("docs")}
             </Link>
             <Link
+              href={`${prefix}/changelog`}
+              className="text-gray-600 dark:text-gray-400 hover:underline underline-offset-4"
+            >
+              {t("changelog")}
+            </Link>
+            <Link
               href={`${prefix}/invest`}
               className="text-gray-600 dark:text-gray-400 hover:underline underline-offset-4"
             >
@@ -290,6 +296,27 @@ export default function LandingContent({
       <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-2 text-center text-sm text-amber-800 dark:text-amber-200">
           {t("betaNotice")}
+        </div>
+      </div>
+
+      {/* Rebranding Announcement */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border-b border-blue-200 dark:border-blue-800">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 text-center">
+          <p className="text-sm sm:text-base text-gray-900 dark:text-white">
+            <span className="font-semibold">
+              🎉 {lang === "zh" ? "品牌升级" : "New Brand"}
+            </span>
+            {" · "}
+            {lang === "zh"
+              ? "X Post Scheduler 正式更名为 xPilot (X 推创)！"
+              : "X Post Scheduler is now xPilot!"}{" "}
+            <Link
+              href={`${prefix}/changelog`}
+              className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+            >
+              {lang === "zh" ? "了解详情 →" : "Learn more →"}
+            </Link>
+          </p>
         </div>
       </div>
 
@@ -635,145 +662,149 @@ export default function LandingContent({
                 {lang === "zh" ? "开始使用" : "Get Started"}
               </Link>
             </div>
-            {(["air", "bronze", "iron", "silver", "gold"] as const).map((tier) => {
-              const tiers = {
-                air: {
-                  labelEn: "Air",
-                  labelZh: "轻量",
-                  price: 1,
-                  accounts: "1",
-                  accountsZh: "1 个账号",
-                  popular: false,
-                  color: "sky",
-                },
-                bronze: {
-                  labelEn: "Bronze",
-                  labelZh: "青铜",
-                  price: 3,
-                  accounts: "5",
-                  accountsZh: "5 个账号",
-                  popular: false,
-                  color: "amber",
-                },
-                iron: {
-                  labelEn: "Iron",
-                  labelZh: "钢铁",
-                  price: 5,
-                  accounts: "30",
-                  accountsZh: "30 个账号",
-                  popular: false,
-                  color: "slate",
-                },
-                silver: {
-                  labelEn: "Silver",
-                  labelZh: "白银",
-                  price: 10,
-                  accounts: "100",
-                  accountsZh: "100 个账号",
-                  popular: true,
-                  color: "blue",
-                },
-                gold: {
-                  labelEn: "Gold",
-                  labelZh: "黄金",
-                  price: 100,
-                  accounts: lang === "zh" ? "无限" : "Unlimited",
-                  accountsZh: "无限账号",
-                  popular: false,
-                  color: "yellow",
-                },
-              }[tier];
-              const isPopular = tiers.popular;
-              return (
-                <div
-                  key={tier}
-                  className={`relative rounded-2xl border-2 p-6 flex flex-col text-left ${
-                    isPopular
-                      ? "border-blue-500 shadow-lg"
-                      : "border-gray-200 dark:border-gray-700"
-                  }`}
-                >
-                  {isPopular && (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">
-                      {lang === "zh" ? "最受欢迎" : "Most Popular"}
-                    </span>
-                  )}
-                  <p className="text-base font-bold text-gray-900 dark:text-white mb-1">
-                    {lang === "zh" ? tiers.labelZh : tiers.labelEn}
-                  </p>
-                  <p className="text-3xl font-extrabold text-gray-900 dark:text-white">
-                    ${tiers.price}
-                    <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
-                      /mo
-                    </span>
-                  </p>
-                  <ul className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-400 flex-1">
-                    <li className="flex items-center gap-2">
-                      <svg
-                        className="w-4 h-4 text-green-500 shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      {lang === "zh"
-                        ? tiers.accountsZh
-                        : `${tiers.accounts} account${tiers.accounts === "1" ? "" : "s"}`}
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <svg
-                        className="w-4 h-4 text-green-500 shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      {lang === "zh"
-                        ? `每月充值 $${tiers.price}`
-                        : `$${tiers.price} monthly credit`}
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <svg
-                        className="w-4 h-4 text-green-500 shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      {lang === "zh" ? "✓ 认证会员标识" : "✓ Verified badge"}
-                    </li>
-                  </ul>
-                  <Link
-                    href={isLoggedIn ? `${prefix}/settings` : `${prefix}/login`}
-                    className={`mt-5 block text-center py-2 rounded-lg text-sm font-semibold transition-colors ${
+            {(["air", "bronze", "iron", "silver", "gold"] as const).map(
+              (tier) => {
+                const tiers = {
+                  air: {
+                    labelEn: "Air",
+                    labelZh: "轻量",
+                    price: 1,
+                    accounts: "1",
+                    accountsZh: "1 个账号",
+                    popular: false,
+                    color: "sky",
+                  },
+                  bronze: {
+                    labelEn: "Bronze",
+                    labelZh: "青铜",
+                    price: 3,
+                    accounts: "5",
+                    accountsZh: "5 个账号",
+                    popular: false,
+                    color: "amber",
+                  },
+                  iron: {
+                    labelEn: "Iron",
+                    labelZh: "钢铁",
+                    price: 5,
+                    accounts: "30",
+                    accountsZh: "30 个账号",
+                    popular: false,
+                    color: "slate",
+                  },
+                  silver: {
+                    labelEn: "Silver",
+                    labelZh: "白银",
+                    price: 10,
+                    accounts: "100",
+                    accountsZh: "100 个账号",
+                    popular: true,
+                    color: "blue",
+                  },
+                  gold: {
+                    labelEn: "Gold",
+                    labelZh: "黄金",
+                    price: 100,
+                    accounts: lang === "zh" ? "无限" : "Unlimited",
+                    accountsZh: "无限账号",
+                    popular: false,
+                    color: "yellow",
+                  },
+                }[tier];
+                const isPopular = tiers.popular;
+                return (
+                  <div
+                    key={tier}
+                    className={`relative rounded-2xl border-2 p-6 flex flex-col text-left ${
                       isPopular
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        ? "border-blue-500 shadow-lg"
+                        : "border-gray-200 dark:border-gray-700"
                     }`}
                   >
-                    {lang === "zh" ? "立即订阅" : "Get Started"}
-                  </Link>
-                </div>
-              );
-            })}
+                    {isPopular && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                        {lang === "zh" ? "最受欢迎" : "Most Popular"}
+                      </span>
+                    )}
+                    <p className="text-base font-bold text-gray-900 dark:text-white mb-1">
+                      {lang === "zh" ? tiers.labelZh : tiers.labelEn}
+                    </p>
+                    <p className="text-3xl font-extrabold text-gray-900 dark:text-white">
+                      ${tiers.price}
+                      <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                        /mo
+                      </span>
+                    </p>
+                    <ul className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-400 flex-1">
+                      <li className="flex items-center gap-2">
+                        <svg
+                          className="w-4 h-4 text-green-500 shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                        {lang === "zh"
+                          ? tiers.accountsZh
+                          : `${tiers.accounts} account${tiers.accounts === "1" ? "" : "s"}`}
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <svg
+                          className="w-4 h-4 text-green-500 shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                        {lang === "zh"
+                          ? `每月充值 $${tiers.price}`
+                          : `$${tiers.price} monthly credit`}
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <svg
+                          className="w-4 h-4 text-green-500 shrink-0"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M5 13l4 4L19 7"
+                          />
+                        </svg>
+                        {lang === "zh" ? "✓ 认证会员标识" : "✓ Verified badge"}
+                      </li>
+                    </ul>
+                    <Link
+                      href={
+                        isLoggedIn ? `${prefix}/settings` : `${prefix}/login`
+                      }
+                      className={`mt-5 block text-center py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        isPopular
+                          ? "bg-blue-600 text-white hover:bg-blue-700"
+                          : "border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      {lang === "zh" ? "立即订阅" : "Get Started"}
+                    </Link>
+                  </div>
+                );
+              },
+            )}
           </div>
 
           {/* Enterprise plan */}

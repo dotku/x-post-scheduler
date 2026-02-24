@@ -6,7 +6,7 @@
     "compose": "Compose Post",
     "autoPost": "Auto Post Manager",
     "knowledge": "Knowledge Base",
-    "appTitle": "X Post Scheduler"
+    "appTitle": "xPilot"
   },
   "userMenu": {
     "settings": "Settings",
@@ -18,7 +18,7 @@
     "current": "EN"
   },
   "dashboard": {
-    "title": "X Post Scheduler",
+    "title": "xPilot",
     "scheduled": "Scheduled",
     "posted": "Posted",
     "failed": "Failed",
@@ -34,10 +34,14 @@
     "statsTotalPosts": "Total Posts",
     "statsViews": "Site Views",
     "statsImpressions": "X Impressions",
+    "statsFollowers": "followers",
     "syncViews": "Sync Views",
+    "syncFollowers": "Sync Followers",
     "syncing": "Syncing...",
     "syncTooltip": "Fetch latest impression counts from X API",
+    "syncFollowersTooltip": "Fetch latest follower counts from X API",
     "syncDone": "Synced {synced} tweets · {impressions} total impressions",
+    "followersSynced": "Synced {synced} accounts · {total} total followers",
     "syncFailed": "Sync failed",
     "impressionsChart": "Daily Impressions",
     "statsByAccount": "By Account",
@@ -277,16 +281,17 @@
     "errorAdd": "Failed to add source"
   },
   "landing": {
-    "appName": "X Post Scheduler",
+    "appName": "xPilot",
     "galleryFeed": "Community",
     "docs": "Docs",
+    "changelog": "Changelog",
     "investor": "Investor",
     "signIn": "Sign In",
     "dashboard": "Dashboard",
     "goToDashboard": "Go to Dashboard",
     "betaNotice": "This project is currently in beta testing. Please do not use it in production environments.",
-    "heroTitle": "Automate Your X Posts",
-    "heroHighlight": "with AI",
+    "heroTitle": "Your Social Marketing Copilot AI",
+    "heroHighlight": "",
     "heroSubtitle": "Schedule posts, generate AI-powered content from your knowledge base, and grow your audience on autopilot. Free $5 credit to get started.",
     "getStarted": "Get Started Free",
     "noCard": "No credit card required",
@@ -342,12 +347,12 @@
     "pricing4": "No monthly subscription",
     "ctaTitle": "Ready to automate your X presence?",
     "ctaButton": "Get Started Free",
-    "footerName": "X Post Scheduler",
+    "footerName": "xPilot",
     "investorMemo": "Investor Memo"
   },
   "login": {
-    "title": "X Post Scheduler",
-    "subtitle": "Schedule and automate your X (Twitter) posts with AI-powered content generation",
+    "title": "xPilot",
+    "subtitle": "Your social marketing copilot AI - Schedule and automate your X posts with AI-powered content generation",
     "signIn": "Sign In / Sign Up",
     "features": "Features:",
     "feature1": "Schedule posts for optimal engagement times",

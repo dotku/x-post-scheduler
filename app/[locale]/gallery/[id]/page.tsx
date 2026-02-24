@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import GalleryDetailClient from "./detail-client";
 
 export const metadata: Metadata = {
-  title: "Gallery Detail | X Post Scheduler",
+  title: "Gallery Detail | xPilot",
 };
 
 export default async function GalleryDetailPage({

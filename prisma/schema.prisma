@@ -163,6 +163,9 @@ model XAccount {
   id                 String   @id @default(cuid())
   label              String?
   username           String?
+  followersCount     Int?
+  followingCount     Int?
+  lastSyncedAt       DateTime?
   isDefault          Boolean  @default(false)
   xApiKey            String
   xApiSecret         String

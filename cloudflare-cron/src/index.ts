@@ -19,7 +19,7 @@ function toAbsoluteUrl(baseUrl: string, path: string): string {
 async function triggerEndpoint(env: Env, path: string): Promise<Response> {
   const headers: HeadersInit = {
     "content-type": "application/json",
-    "user-agent": "cloudflare-cron/x-post-scheduler",
+    "user-agent": "cloudflare-cron/xpilot",
   };
 
   if (env.CRON_SECRET) {
@@ -38,31 +38,39 @@ const worker = {
   async scheduled(
     event: ScheduledController,
     env: Env,
-    ctx: WorkerExecutionContext
+    ctx: WorkerExecutionContext,
   ): Promise<void> {
     if (!env.APP_BASE_URL) {
       throw new Error("Missing APP_BASE_URL worker secret/var.");
     }
 
     if (event.cron === "* * * * *") {
-      ctx.waitUntil((async () => {
-        const res = await triggerEndpoint(env, "/api/scheduler");
-        if (!res.ok) {
-          const body = await res.text();
-          throw new Error(`Scheduler trigger failed (${res.status}): ${body}`);
-        }
-      })());
+      ctx.waitUntil(
+        (async () => {
+          const res = await triggerEndpoint(env, "/api/scheduler");
+          if (!res.ok) {
+            const body = await res.text();
+            throw new Error(
+              `Scheduler trigger failed (${res.status}): ${body}`,
+            );
+          }
+        })(),
+      );
       return;
     }
 
     if (event.cron === "0 0 * * *") {
-      ctx.waitUntil((async () => {
-        const res = await triggerEndpoint(env, "/api/daily-generate");
-        if (!res.ok) {
-          const body = await res.text();
-          throw new Error(`Daily-generate trigger failed (${res.status}): ${body}`);
-        }
-      })());
+      ctx.waitUntil(
+        (async () => {
+          const res = await triggerEndpoint(env, "/api/daily-generate");
+          if (!res.ok) {
+            const body = await res.text();
+            throw new Error(
+              `Daily-generate trigger failed (${res.status}): ${body}`,
+            );
+          }
+        })(),
+      );
       return;
     }
   },

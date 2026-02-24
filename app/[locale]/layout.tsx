@@ -21,7 +21,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "X Post Scheduler",
+  title: "xPilot - Your Social Marketing Copilot AI",
   description: "Schedule and automate your X (Twitter) posts",
 };
 
@@ -45,7 +45,9 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale}>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
         <NextIntlClientProvider messages={messages}>
           <Auth0Provider>{children}</Auth0Provider>
         </NextIntlClientProvider>
