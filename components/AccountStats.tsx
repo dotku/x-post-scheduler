@@ -308,8 +308,8 @@ export default function AccountStats() {
                         color: "rgb(156,163,175)",
                         marginBottom: "4px",
                       }}
-                      formatter={(value: number) => [
-                        value.toLocaleString(),
+                      formatter={(value: number | undefined) => [
+                        (value ?? 0).toLocaleString(),
                         t("statsImpressions"),
                       ]}
                     />

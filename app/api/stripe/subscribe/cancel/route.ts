@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { stripe } from "@/lib/stripe";
+import type Stripe from "stripe";
 
 export async function POST() {
   let user;
@@ -31,6 +32,6 @@ export async function POST() {
 
   return NextResponse.json({
     success: true,
-    periodEnd: new Date(sub.current_period_end * 1000).toISOString(),
+    periodEnd: new Date((sub as unknown as { current_period_end: number }).current_period_end * 1000).toISOString(),
   });
 }

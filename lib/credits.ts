@@ -291,6 +291,7 @@ export async function addCredits(params: {
   userId: string;
   amountCents: number;
   stripeSessionId: string;
+  description?: string;
 }): Promise<number> {
   // Prevent double-crediting on webhook retries
   const existing = await prisma.creditTransaction.findFirst({
