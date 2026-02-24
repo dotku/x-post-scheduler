@@ -87,6 +87,7 @@ export default function LandingContent({
     typeof window === "undefined" ? "" : window.navigator.userAgent || "",
   );
   const [copied, setCopied] = useState(false);
+  const [copiedWechat, setCopiedWechat] = useState("");
   const [stats, setStats] = useState<PublicStatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const browserEnv = useMemo(() => detectInAppBrowser(userAgent), [userAgent]);
@@ -847,20 +848,84 @@ export default function LandingContent({
       )}
 
       {/* Footer */}
-      <footer className="border-t border-gray-200 dark:border-gray-700 py-8">
-        <div className="flex flex-col items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-          <p>{t("footerName")}</p>
-          <div className="text-center">
-            <p className="font-medium">{t("supportContact")}:</p>
-            <p>techfront-robot ({t("shanghai")})</p>
-            <p>xinmai002leo ({t("shenzhen")})</p>
+      <footer className="border-t border-gray-200 dark:border-gray-700 py-8 px-4">
+        <div className="flex flex-col items-center gap-3 sm:gap-4">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {t("footerName")}
+          </p>
+          <div className="text-center space-y-2 sm:space-y-1">
+            <p className="text-sm sm:text-base font-medium text-gray-700 dark:text-gray-300">
+              {lang === "zh" ? "微信客服" : "WeChat Support"}:
+            </p>
+            <div className="flex flex-col sm:flex-row sm:gap-4 gap-2 text-sm sm:text-base">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText("techfront-robot");
+                  setCopiedWechat("techfront-robot");
+                  setTimeout(() => setCopiedWechat(""), 2000);
+                }}
+                className={`px-3 py-2 sm:py-1.5 rounded-md transition-all ${
+                  copiedWechat === "techfront-robot"
+                    ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                    : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                }`}
+              >
+                {copiedWechat === "techfront-robot" ? "✓ " : ""}
+                techfront-robot ({t("shanghai")})
+              </button>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText("xinmai002leo");
+                  setCopiedWechat("xinmai002leo");
+                  setTimeout(() => setCopiedWechat(""), 2000);
+                }}
+                className={`px-3 py-2 sm:py-1.5 rounded-md transition-all ${
+                  copiedWechat === "xinmai002leo"
+                    ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                    : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                }`}
+              >
+                {copiedWechat === "xinmai002leo" ? "✓ " : ""}
+                xinmai002leo ({t("shenzhen")})
+              </button>
+            </div>
+            {copiedWechat && (
+              <p className="text-xs text-green-600 dark:text-green-400 animate-fade-in">
+                {lang === "zh" ? "已复制微信号" : "WeChat ID copied"}
+              </p>
+            )}
           </div>
           <Link
             href={`${prefix}/invest`}
-            className="hover:underline underline-offset-4"
+            className="text-sm hover:underline underline-offset-4 text-gray-500 dark:text-gray-400"
           >
             {t("investorMemo")}
           </Link>
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 text-xs text-gray-500 dark:text-gray-500 pt-3">
+            <Link
+              href={`${prefix}/privacy`}
+              className="hover:text-gray-700 dark:hover:text-gray-400 hover:underline underline-offset-2"
+            >
+              {lang === "zh" ? "隐私政策" : "Privacy"}
+            </Link>
+            <Link
+              href={`${prefix}/terms`}
+              className="hover:text-gray-700 dark:hover:text-gray-400 hover:underline underline-offset-2"
+            >
+              {lang === "zh" ? "服务条款" : "Terms"}
+            </Link>
+            <Link
+              href={`${prefix}/disclaimer`}
+              className="hover:text-gray-700 dark:hover:text-gray-400 hover:underline underline-offset-2"
+            >
+              {lang === "zh" ? "免责声明" : "Disclaimer"}
+            </Link>
+          </div>
+          <p className="text-xs text-gray-400 dark:text-gray-600 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            {lang === "zh"
+              ? `© ${new Date().getFullYear()} X 推创. 保留所有权利。`
+              : `© ${new Date().getFullYear()} xPilot. All rights reserved.`}
+          </p>
         </div>
       </footer>
     </div>
