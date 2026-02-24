@@ -850,6 +850,11 @@ export default function LandingContent({
       <footer className="border-t border-gray-200 dark:border-gray-700 py-8">
         <div className="flex flex-col items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
           <p>{t("footerName")}</p>
+          <div className="text-center">
+            <p className="font-medium">{t("supportContact")}:</p>
+            <p>techfront-robot ({t("shanghai")})</p>
+            <p>xinmai002leo ({t("shenzhen")})</p>
+          </div>
           <Link
             href={`${prefix}/invest`}
             className="hover:underline underline-offset-4"

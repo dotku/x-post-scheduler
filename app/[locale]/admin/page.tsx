@@ -5,11 +5,15 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
 import { getWavespeedFeeCents } from "@/lib/credits";
 import AdminCreditTopup from "@/components/AdminCreditTopup";
+import AdminMembershipManager from "@/components/AdminMembershipManager";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
-const OPENAI_PRICING_USD_PER_1M: Record<string, { input: number; output: number }> = {
+const OPENAI_PRICING_USD_PER_1M: Record<
+  string,
+  { input: number; output: number }
+> = {
   "gpt-4o": { input: 2.5, output: 10 },
 };
 
@@ -18,7 +22,9 @@ function estimateOpenAICostUsd(params: {
   promptTokens: number;
   completionTokens: number;
 }) {
-  const pricing = OPENAI_PRICING_USD_PER_1M[params.model ?? ""] ?? OPENAI_PRICING_USD_PER_1M["gpt-4o"];
+  const pricing =
+    OPENAI_PRICING_USD_PER_1M[params.model ?? ""] ??
+    OPENAI_PRICING_USD_PER_1M["gpt-4o"];
   const inputCost = (params.promptTokens / 1_000_000) * pricing.input;
   const outputCost = (params.completionTokens / 1_000_000) * pricing.output;
   return inputCost + outputCost;
@@ -40,7 +46,7 @@ function toNumber(value: unknown): number | null {
 
 function readNumberByKeys(
   object: Record<string, unknown> | null | undefined,
-  keys: string[]
+  keys: string[],
 ): number | null {
   if (!object) return null;
   for (const key of keys) {
@@ -53,7 +59,8 @@ function readNumberByKeys(
 function isMissingWebVisitRelationError(error: unknown) {
   if (!error || typeof error !== "object") return false;
   const candidate = error as { message?: unknown; meta?: unknown };
-  const message = typeof candidate.message === "string" ? candidate.message : "";
+  const message =
+    typeof candidate.message === "string" ? candidate.message : "";
   const meta = JSON.stringify(candidate.meta ?? {});
   return (
     message.includes("42P01") ||
@@ -88,22 +95,27 @@ async function fetchWavespeedUsage(rangeDays = 30) {
   const end = new Date();
   const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
 
-  const response = await fetch("https://api.wavespeed.ai/api/v3/user/usage_stats", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+  const response = await fetch(
+    "https://api.wavespeed.ai/api/v3/user/usage_stats",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        start_time: start.toISOString(),
+        end_time: end.toISOString(),
+      }),
+      signal: AbortSignal.timeout(15000),
     },
-    body: JSON.stringify({
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
-    }),
-    signal: AbortSignal.timeout(15000),
-  });
+  );
 
-  const payload = (await response.json().catch(() => null)) as
-    | { code?: number; message?: string; data?: Record<string, unknown> }
-    | null;
+  const payload = (await response.json().catch(() => null)) as {
+    code?: number;
+    message?: string;
+    data?: Record<string, unknown>;
+  } | null;
 
   if (!response.ok || payload?.code !== 200 || !payload?.data) {
     return {
@@ -124,11 +136,24 @@ async function fetchWavespeedUsage(rangeDays = 30) {
     available: true as const,
     rangeDays: days,
     summary: {
-      totalRequests: readNumberByKeys(summary, ["total_requests", "request_count", "requests"]) ?? 0,
+      totalRequests:
+        readNumberByKeys(summary, [
+          "total_requests",
+          "request_count",
+          "requests",
+        ]) ?? 0,
       totalTasks:
-        readNumberByKeys(summary, ["total_tasks", "task_count", "success_requests"]) ?? 0,
+        readNumberByKeys(summary, [
+          "total_tasks",
+          "task_count",
+          "success_requests",
+        ]) ?? 0,
       totalCostUsd:
-        readNumberByKeys(summary, ["total_cost", "cost_usd", "total_cost_usd"]) ?? 0,
+        readNumberByKeys(summary, [
+          "total_cost",
+          "cost_usd",
+          "total_cost_usd",
+        ]) ?? 0,
     },
     topModels: perModel.slice(0, 6).map((item) => ({
       model:
@@ -136,12 +161,13 @@ async function fetchWavespeedUsage(rangeDays = 30) {
         (item.model_name as string | undefined) ??
         (item.model as string | undefined) ??
         "unknown",
-      requests: readNumberByKeys(item, [
-        "requests",
-        "request_count",
-        "count",
-        "total_count",
-      ]) ?? 0,
+      requests:
+        readNumberByKeys(item, [
+          "requests",
+          "request_count",
+          "count",
+          "total_count",
+        ]) ?? 0,
       costUsd: readNumberByKeys(item, ["cost_usd", "total_cost", "cost"]) ?? 0,
     })),
   };
@@ -307,22 +333,25 @@ export default async function AdminPage() {
   let webVisits30d = 0;
   let topPages30d: Array<{ path: string; visits: bigint }> = [];
   try {
-    const hasWebVisitTable = await prisma.$queryRaw<Array<{ exists: string | null }>>`
+    const hasWebVisitTable = await prisma.$queryRaw<
+      Array<{ exists: string | null }>
+    >`
       SELECT to_regclass('public."WebVisit"')::text AS exists
     `;
     if (hasWebVisitTable[0]?.exists) {
-      const [webVisits24hResult, webVisits30dResult, topPages] = await Promise.all([
-        prisma.$queryRaw<Array<{ count: bigint }>>`
+      const [webVisits24hResult, webVisits30dResult, topPages] =
+        await Promise.all([
+          prisma.$queryRaw<Array<{ count: bigint }>>`
           SELECT COUNT(*)::bigint AS count
           FROM "WebVisit"
           WHERE "createdAt" >= ${since24h}
         `,
-        prisma.$queryRaw<Array<{ count: bigint }>>`
+          prisma.$queryRaw<Array<{ count: bigint }>>`
           SELECT COUNT(*)::bigint AS count
           FROM "WebVisit"
           WHERE "createdAt" >= ${since30d}
         `,
-        prisma.$queryRaw<Array<{ path: string; visits: bigint }>>`
+          prisma.$queryRaw<Array<{ path: string; visits: bigint }>>`
           SELECT "path", COUNT(*)::bigint AS visits
           FROM "WebVisit"
           WHERE "createdAt" >= ${since30d}
@@ -330,7 +359,7 @@ export default async function AdminPage() {
           ORDER BY visits DESC
           LIMIT 10
         `,
-      ]);
+        ]);
       webVisits24h = toCountNumber(webVisits24hResult[0]?.count);
       webVisits30d = toCountNumber(webVisits30dResult[0]?.count);
       topPages30d = topPages;
@@ -345,17 +374,26 @@ export default async function AdminPage() {
   const revenueAllTimeCents = revenueAllTimeAgg._sum.amountCents ?? 0;
   const payingUsers30dCount = payingUsers30d.length;
   const payingUsersAllTimeCount = payingUsersAllTime.length;
-  const arppu30dCents = payingUsers30dCount > 0 ? Math.round(revenue30dCents / payingUsers30dCount) : 0;
+  const arppu30dCents =
+    payingUsers30dCount > 0
+      ? Math.round(revenue30dCents / payingUsers30dCount)
+      : 0;
   const openAiPromptTokens30d = openAiUsage30d._sum.promptTokens ?? 0;
   const openAiCompletionTokens30d = openAiUsage30d._sum.completionTokens ?? 0;
   const openAiCharge30dCents = Math.max(
     1,
     Math.ceil(
-      ((openAiPromptTokens30d / 1_000_000) * 250 + (openAiCompletionTokens30d / 1_000_000) * 1000) *
-        60
-    )
+      ((openAiPromptTokens30d / 1_000_000) * 250 +
+        (openAiCompletionTokens30d / 1_000_000) * 1000) *
+        60,
+    ),
   );
-  const wavespeedCharge30dCents = (wavespeedByModel30d as Array<{ model: string | null; _count: { _all: number } }>).reduce((sum, row) => {
+  const wavespeedCharge30dCents = (
+    wavespeedByModel30d as Array<{
+      model: string | null;
+      _count: { _all: number };
+    }>
+  ).reduce((sum, row) => {
     const modelId = row.model ?? "";
     if (!modelId) return sum;
     const fee = getWavespeedFeeCents(modelId, inferWavespeedMediaType(modelId));
@@ -379,25 +417,41 @@ export default async function AdminPage() {
     completionTokens: openAiCompletionTokens30d,
   });
   const wavespeedCostUsd30d =
-    wavespeedUsage.enabled && wavespeedUsage.available ? wavespeedUsage.summary.totalCostUsd : 0;
-  const estimatedCost30dCents = Math.round((openAiCostUsd30d + wavespeedCostUsd30d) * 100);
+    wavespeedUsage.enabled && wavespeedUsage.available
+      ? wavespeedUsage.summary.totalCostUsd
+      : 0;
+  const estimatedCost30dCents = Math.round(
+    (openAiCostUsd30d + wavespeedCostUsd30d) * 100,
+  );
   const costRunRatePerDayCents = estimatedCost30dCents / 30;
   const estCost7dCents = Math.round(costRunRatePerDayCents * 7);
   const estCost30dCents = Math.round(costRunRatePerDayCents * 30);
   const estCost90dCents = Math.round(costRunRatePerDayCents * 90);
   const estCost12mCents = Math.round(costRunRatePerDayCents * 365);
-  const operatingProfit7dCents = estRevenue7dCents - Math.round(costRunRatePerDayCents * 7);
-  const operatingProfit30dCents = estRevenue30dCents - Math.round(costRunRatePerDayCents * 30);
-  const operatingProfit90dCents = estRevenue90dCents - Math.round(costRunRatePerDayCents * 90);
-  const operatingProfit12mCents = estRevenue12mCents - Math.round(costRunRatePerDayCents * 365);
+  const operatingProfit7dCents =
+    estRevenue7dCents - Math.round(costRunRatePerDayCents * 7);
+  const operatingProfit30dCents =
+    estRevenue30dCents - Math.round(costRunRatePerDayCents * 30);
+  const operatingProfit90dCents =
+    estRevenue90dCents - Math.round(costRunRatePerDayCents * 90);
+  const operatingProfit12mCents =
+    estRevenue12mCents - Math.round(costRunRatePerDayCents * 365);
   const estProfit7dCents =
-    estRevenue7dCents - Math.round(costRunRatePerDayCents * 7) - promoCostTotalCents;
+    estRevenue7dCents -
+    Math.round(costRunRatePerDayCents * 7) -
+    promoCostTotalCents;
   const estProfit30dCents =
-    estRevenue30dCents - Math.round(costRunRatePerDayCents * 30) - promoCostTotalCents;
+    estRevenue30dCents -
+    Math.round(costRunRatePerDayCents * 30) -
+    promoCostTotalCents;
   const estProfit90dCents =
-    estRevenue90dCents - Math.round(costRunRatePerDayCents * 90) - promoCostTotalCents;
+    estRevenue90dCents -
+    Math.round(costRunRatePerDayCents * 90) -
+    promoCostTotalCents;
   const estProfit12mCents =
-    estRevenue12mCents - Math.round(costRunRatePerDayCents * 365) - promoCostTotalCents;
+    estRevenue12mCents -
+    Math.round(costRunRatePerDayCents * 365) -
+    promoCostTotalCents;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -419,14 +473,23 @@ export default async function AdminPage() {
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card title={t("runs24h")} value={runs24h.toLocaleString()} />
           <Card title={t("runs7d")} value={runs7d.toLocaleString()} />
-          <Card title={t("successRate7d")} value={`${successRate7d.toFixed(1)}%`} />
+          <Card
+            title={t("successRate7d")}
+            value={`${successRate7d.toFixed(1)}%`}
+          />
           <Card title={t("failures7d")} value={failure7d.toLocaleString()} />
         </section>
 
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card title={t("totalUsers")} value={totalUsers.toLocaleString()} />
-          <Card title={t("recurringUsers")} value={recurringUsers.length.toLocaleString()} />
-          <Card title={t("activeSchedules")} value={activeSchedules.toLocaleString()} />
+          <Card
+            title={t("recurringUsers")}
+            value={recurringUsers.length.toLocaleString()}
+          />
+          <Card
+            title={t("activeSchedules")}
+            value={activeSchedules.toLocaleString()}
+          />
         </section>
 
         <section className="bg-white dark:bg-gray-800 rounded-lg shadow">
@@ -437,8 +500,14 @@ export default async function AdminPage() {
           </div>
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Card title={t("pageviews24h")} value={webVisits24h.toLocaleString()} />
-              <Card title={t("pageviews30d")} value={webVisits30d.toLocaleString()} />
+              <Card
+                title={t("pageviews24h")}
+                value={webVisits24h.toLocaleString()}
+              />
+              <Card
+                title={t("pageviews30d")}
+                value={webVisits30d.toLocaleString()}
+              />
             </div>
             {topPages30d.length > 0 && (
               <div className="space-y-2">
@@ -471,14 +540,32 @@ export default async function AdminPage() {
           </div>
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card title={t("revenue24h")} value={`$${(revenue24hCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
-              <Card title={t("revenue30d")} value={`$${(revenue30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
-              <Card title={t("revenueAllTime")} value={`$${(revenueAllTimeCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
-              <Card title={t("arppu30d")} value={`$${(arppu30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+              <Card
+                title={t("revenue24h")}
+                value={`$${(revenue24hCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              />
+              <Card
+                title={t("revenue30d")}
+                value={`$${(revenue30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              />
+              <Card
+                title={t("revenueAllTime")}
+                value={`$${(revenueAllTimeCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              />
+              <Card
+                title={t("arppu30d")}
+                value={`$${(arppu30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Card title={t("payingUsers30d")} value={payingUsers30dCount.toLocaleString()} />
-              <Card title={t("payingUsersAllTime")} value={payingUsersAllTimeCount.toLocaleString()} />
+              <Card
+                title={t("payingUsers30d")}
+                value={payingUsers30dCount.toLocaleString()}
+              />
+              <Card
+                title={t("payingUsersAllTime")}
+                value={payingUsersAllTimeCount.toLocaleString()}
+              />
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {t("revenueNote")}
@@ -507,7 +594,10 @@ export default async function AdminPage() {
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                 {t("revenueEstimateNote", {
-                  total: (usageBilled30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                  total: (usageBilled30dCents / 100).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }),
                   openai: (openAiCharge30dCents / 100).toFixed(2),
                   wavespeed: (wavespeedCharge30dCents / 100).toFixed(2),
                 })}
@@ -586,10 +676,15 @@ export default async function AdminPage() {
                   openai: openAiCostUsd30d.toFixed(2),
                   wavespeed: wavespeedCostUsd30d.toFixed(2),
                   total: (estimatedCost30dCents / 100).toFixed(2),
-                  promo: (promoCostTotalCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                  promo: (promoCostTotalCents / 100).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }),
                   users: totalUsers.toLocaleString(),
                 })}
-                {wavespeedUsage.enabled && wavespeedUsage.available === false ? t("wavespeedCostUnavailable") : ""}
+                {wavespeedUsage.enabled && wavespeedUsage.available === false
+                  ? t("wavespeedCostUnavailable")
+                  : ""}
               </p>
             </div>
           </div>
@@ -622,19 +717,30 @@ export default async function AdminPage() {
               </p>
             ) : wavespeedUsage.available === false ? (
               <p className="text-sm text-red-600 dark:text-red-400">
-                {t("wavespeedLoadError", { error: wavespeedUsage.error ?? "Unknown error" })}
+                {t("wavespeedLoadError", {
+                  error: wavespeedUsage.error ?? "Unknown error",
+                })}
               </p>
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Card title={t("wavespeedRequests")} value={wavespeedUsage.summary.totalRequests.toLocaleString()} />
-                  <Card title={t("wavespeedTasks")} value={wavespeedUsage.summary.totalTasks.toLocaleString()} />
+                  <Card
+                    title={t("wavespeedRequests")}
+                    value={wavespeedUsage.summary.totalRequests.toLocaleString()}
+                  />
+                  <Card
+                    title={t("wavespeedTasks")}
+                    value={wavespeedUsage.summary.totalTasks.toLocaleString()}
+                  />
                   <Card
                     title={t("wavespeedCost")}
-                    value={`$${wavespeedUsage.summary.totalCostUsd.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 4,
-                    })}`}
+                    value={`$${wavespeedUsage.summary.totalCostUsd.toLocaleString(
+                      undefined,
+                      {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 4,
+                      },
+                    )}`}
                   />
                 </div>
                 {wavespeedUsage.topModels.length > 0 && (
@@ -642,19 +748,31 @@ export default async function AdminPage() {
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       {t("topModels")}
                     </p>
-                    {wavespeedUsage.topModels.map((item: { model: string; requests: number; costUsd: number }, index: number) => (
-                      <div
-                        key={`${item.model}-${index}`}
-                        className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm"
-                      >
-                        <span className="text-gray-700 dark:text-gray-300 truncate pr-3">
-                          {item.model}
-                        </span>
-                        <span className="text-gray-900 dark:text-white shrink-0">
-                          {t("reqCost", { req: item.requests.toLocaleString(), cost: item.costUsd.toFixed(4) })}
-                        </span>
-                      </div>
-                    ))}
+                    {wavespeedUsage.topModels.map(
+                      (
+                        item: {
+                          model: string;
+                          requests: number;
+                          costUsd: number;
+                        },
+                        index: number,
+                      ) => (
+                        <div
+                          key={`${item.model}-${index}`}
+                          className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm"
+                        >
+                          <span className="text-gray-700 dark:text-gray-300 truncate pr-3">
+                            {item.model}
+                          </span>
+                          <span className="text-gray-900 dark:text-white shrink-0">
+                            {t("reqCost", {
+                              req: item.requests.toLocaleString(),
+                              cost: item.costUsd.toFixed(4),
+                            })}
+                          </span>
+                        </div>
+                      ),
+                    )}
                   </div>
                 )}
               </>
@@ -670,10 +788,22 @@ export default async function AdminPage() {
           </div>
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <Card title={t("openaiRequests")} value={openAiRequests30d.toLocaleString()} />
-              <Card title={t("promptTokens")} value={openAiPromptTokens30d.toLocaleString()} />
-              <Card title={t("completionTokens")} value={openAiCompletionTokens30d.toLocaleString()} />
-              <Card title={t("estCostUsd")} value={`$${openAiCostUsd30d.toFixed(4)}`} />
+              <Card
+                title={t("openaiRequests")}
+                value={openAiRequests30d.toLocaleString()}
+              />
+              <Card
+                title={t("promptTokens")}
+                value={openAiPromptTokens30d.toLocaleString()}
+              />
+              <Card
+                title={t("completionTokens")}
+                value={openAiCompletionTokens30d.toLocaleString()}
+              />
+              <Card
+                title={t("estCostUsd")}
+                value={`$${openAiCostUsd30d.toFixed(4)}`}
+              />
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {t("openaiNote")}
@@ -684,28 +814,42 @@ export default async function AdminPage() {
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                   {t("byModel")}
                 </p>
-                {openAiByModel30d.map((item: { model: string | null; _sum: { promptTokens: number | null; completionTokens: number | null; totalTokens: number | null } }) => {
-                  const promptTokens = item._sum.promptTokens ?? 0;
-                  const completionTokens = item._sum.completionTokens ?? 0;
-                  const estCost = estimateOpenAICostUsd({
-                    model: item.model,
-                    promptTokens,
-                    completionTokens,
-                  });
-                  return (
-                    <div
-                      key={item.model ?? "unknown"}
-                      className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm"
-                    >
-                      <span className="text-gray-700 dark:text-gray-300 truncate pr-3">
-                        {item.model ?? "unknown"}
-                      </span>
-                      <span className="text-gray-900 dark:text-white shrink-0">
-                        {t("tokensCost", { tokens: (item._sum.totalTokens ?? 0).toLocaleString(), cost: estCost.toFixed(4) })}
-                      </span>
-                    </div>
-                  );
-                })}
+                {openAiByModel30d.map(
+                  (item: {
+                    model: string | null;
+                    _sum: {
+                      promptTokens: number | null;
+                      completionTokens: number | null;
+                      totalTokens: number | null;
+                    };
+                  }) => {
+                    const promptTokens = item._sum.promptTokens ?? 0;
+                    const completionTokens = item._sum.completionTokens ?? 0;
+                    const estCost = estimateOpenAICostUsd({
+                      model: item.model,
+                      promptTokens,
+                      completionTokens,
+                    });
+                    return (
+                      <div
+                        key={item.model ?? "unknown"}
+                        className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-2 text-sm"
+                      >
+                        <span className="text-gray-700 dark:text-gray-300 truncate pr-3">
+                          {item.model ?? "unknown"}
+                        </span>
+                        <span className="text-gray-900 dark:text-white shrink-0">
+                          {t("tokensCost", {
+                            tokens: (
+                              item._sum.totalTokens ?? 0
+                            ).toLocaleString(),
+                            cost: estCost.toFixed(4),
+                          })}
+                        </span>
+                      </div>
+                    );
+                  },
+                )}
               </div>
             )}
             {openAiTotalTokens30d === 0 && (
@@ -727,17 +871,28 @@ export default async function AdminPage() {
               <p className="text-gray-500 dark:text-gray-400">{t("noRuns")}</p>
             ) : (
               <div className="space-y-3">
-                {byJob30d.map((item: { jobName: string; _count: { _all: number }; _avg: { durationMs: number | null } }) => (
-                  <div
-                    key={item.jobName}
-                    className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3"
-                  >
-                    <p className="font-medium text-gray-900 dark:text-white">{item.jobName}</p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {t("runsSuffix", { runs: item._count._all.toLocaleString(), avg: Math.round(item._avg.durationMs ?? 0) })}
-                    </p>
-                  </div>
-                ))}
+                {byJob30d.map(
+                  (item: {
+                    jobName: string;
+                    _count: { _all: number };
+                    _avg: { durationMs: number | null };
+                  }) => (
+                    <div
+                      key={item.jobName}
+                      className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3"
+                    >
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {item.jobName}
+                      </p>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        {t("runsSuffix", {
+                          runs: item._count._all.toLocaleString(),
+                          avg: Math.round(item._avg.durationMs ?? 0),
+                        })}
+                      </p>
+                    </div>
+                  ),
+                )}
               </div>
             )}
           </div>
@@ -751,29 +906,46 @@ export default async function AdminPage() {
           </div>
           <div className="p-6">
             {recentFailures.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-400">{t("noFailures")}</p>
+              <p className="text-gray-500 dark:text-gray-400">
+                {t("noFailures")}
+              </p>
             ) : (
               <div className="space-y-3">
-                {recentFailures.map((item: { id: string; jobName: string; statusCode: number | null; error: string | null; triggeredBy: string | null; createdAt: Date }) => (
-                  <div
-                    key={item.id}
-                    className="border border-red-200 dark:border-red-900/50 rounded-lg px-4 py-3 bg-red-50/40 dark:bg-red-900/10"
-                  >
-                    <p className="text-sm font-medium text-red-700 dark:text-red-300">
-                      {item.jobName} · {item.statusCode ?? "N/A"} · {item.triggeredBy ?? "unknown"}
-                    </p>
-                    <p className="text-sm text-red-700/90 dark:text-red-300/90 mt-1">
-                      {item.error || "Unknown error"}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
-                    </p>
-                  </div>
-                ))}
+                {recentFailures.map(
+                  (item: {
+                    id: string;
+                    jobName: string;
+                    statusCode: number | null;
+                    error: string | null;
+                    triggeredBy: string | null;
+                    createdAt: Date;
+                  }) => (
+                    <div
+                      key={item.id}
+                      className="border border-red-200 dark:border-red-900/50 rounded-lg px-4 py-3 bg-red-50/40 dark:bg-red-900/10"
+                    >
+                      <p className="text-sm font-medium text-red-700 dark:text-red-300">
+                        {item.jobName} · {item.statusCode ?? "N/A"} ·{" "}
+                        {item.triggeredBy ?? "unknown"}
+                      </p>
+                      <p className="text-sm text-red-700/90 dark:text-red-300/90 mt-1">
+                        {item.error || "Unknown error"}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {formatDistanceToNow(new Date(item.createdAt), {
+                          addSuffix: true,
+                        })}
+                      </p>
+                    </div>
+                  ),
+                )}
               </div>
             )}
           </div>
         </section>
+
+        <AdminMembershipManager />
+        <AdminCreditTopup />
       </main>
     </div>
   );
@@ -783,7 +955,9 @@ function Card({ title, value }: { title: string; value: string }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-5">
       <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
-      <p className="mt-2 text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">{value}</p>
+      <p className="mt-2 text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">
+        {value}
+      </p>
     </div>
   );
 }

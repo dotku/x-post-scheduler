@@ -348,7 +348,8 @@
     "ctaTitle": "准备好自动化你的 X 账号了吗？",
     "ctaButton": "免费开始",
     "footerName": "X 推创",
-    "investorMemo": "投资人备忘录"
+    "supportContact": "客服支持",    "shanghai": "上海",
+    "shenzhen": "深圳",    "investorMemo": "投资人备忘录"
   },
   "admin": {
     "title": "管理后台",
@@ -433,7 +434,20 @@
     "topupNewBalance": "新余额",
     "topupErrorEmail": "请输入邮箱",
     "topupErrorAmount": "请输入有效金额",
-    "topupErrorNetwork": "网络错误"
+    "topupErrorNetwork": "网络错误",
+    "membershipManager": "会员管理",
+    "userEmail": "用户邮箱",
+    "subscriptionTier": "订阅等级",
+    "subscriptionStatus": "订阅状态",
+    "periodEnd": "到期日期",
+    "adminNote": "备注（可选）",
+    "adminNotePlaceholder": "例如：手动升级、促销等",
+    "updating": "更新中...",
+    "updateMembership": "更新会员资格",
+    "previous": "之前",
+    "updated": "已更新",
+    "tier": "等级",
+    "status": "状态"
   },
   "login": {
     "title": "X 推创",

@@ -348,6 +348,9 @@
     "ctaTitle": "Ready to automate your X presence?",
     "ctaButton": "Get Started Free",
     "footerName": "xPilot",
+    "supportContact": "Support",
+    "shanghai": "Shanghai",
+    "shenzhen": "Shenzhen",
     "investorMemo": "Investor Memo"
   },
   "admin": {
@@ -433,7 +436,20 @@
     "topupNewBalance": "New balance",
     "topupErrorEmail": "Email is required",
     "topupErrorAmount": "Enter a valid amount",
-    "topupErrorNetwork": "Network error"
+    "topupErrorNetwork": "Network error",
+    "membershipManager": "Membership Manager",
+    "userEmail": "User Email",
+    "subscriptionTier": "Subscription Tier",
+    "subscriptionStatus": "Subscription Status",
+    "periodEnd": "Period End",
+    "adminNote": "Note (optional)",
+    "adminNotePlaceholder": "e.g. Manual upgrade, promo, etc.",
+    "updating": "Updating...",
+    "updateMembership": "Update Membership",
+    "previous": "Previous",
+    "updated": "Updated",
+    "tier": "Tier",
+    "status": "Status"
   },
   "login": {
     "title": "xPilot",
