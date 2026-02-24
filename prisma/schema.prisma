@@ -92,6 +92,7 @@ model RecurringSchedule {
   useAi       Boolean  @default(false)
   aiPrompt    String?
   aiLanguage  String?
+  trendRegion String?  // "global" | "usa" | "china" | "africa" — if set, auto-fetch trending news
   frequency   String   // daily, weekly, monthly
   cronExpr    String   // cron expression
   nextRunAt   DateTime

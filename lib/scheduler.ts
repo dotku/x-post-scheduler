@@ -10,9 +10,11 @@ import {
   getCreditBalance,
   getWavespeedFeeCents,
 } from "./credits";
-import { addDays, addWeeks, addMonths } from "date-fns";
+import { addDays, addWeeks, addMonths, addHours } from "date-fns";
+import { HOURLY_FREQUENCIES } from "./subscription";
 import { decodeRecurringAiPrompt } from "./recurring-ai";
 import { submitImageTask, getVideoTask } from "./wavespeed";
+import { buildTrendPrompt } from "./trending";
 
 async function fetchBinary(url: string): Promise<{ buffer: Buffer; mimeType: string }> {
   const response = await fetch(url);
@@ -172,9 +174,23 @@ export async function processRecurringSchedules() {
             })
             .join("\n\n---\n\n");
 
+          // 如果设置了 trendRegion，获取热点并注入 prompt
+          let effectivePrompt = decodedAiPrompt.prompt || undefined;
+          if (schedule.trendRegion) {
+            try {
+              effectivePrompt = await buildTrendPrompt(
+                schedule.userId!,
+                schedule.trendRegion,
+                decodedAiPrompt.prompt,
+              );
+            } catch (trendErr) {
+              console.warn("Failed to fetch trends for scheduler, using base prompt:", trendErr);
+            }
+          }
+
           const generated = await generateTweet(
             knowledgeContext,
-            decodedAiPrompt.prompt || undefined,
+            effectivePrompt,
             schedule.aiLanguage || undefined,
             recentPosts
           );
@@ -292,16 +308,20 @@ export async function processRecurringSchedules() {
     let nextRun = new Date();
     nextRun.setHours(hours, minutes, 0, 0);
 
-    switch (schedule.frequency) {
-      case "daily":
-        nextRun = addDays(nextRun, 1);
-        break;
-      case "weekly":
-        nextRun = addWeeks(nextRun, 1);
-        break;
-      case "monthly":
-        nextRun = addMonths(nextRun, 1);
-        break;
+    if (schedule.frequency in HOURLY_FREQUENCIES) {
+      nextRun = addHours(new Date(), HOURLY_FREQUENCIES[schedule.frequency].hours);
+    } else {
+      switch (schedule.frequency) {
+        case "daily":
+          nextRun = addDays(nextRun, 1);
+          break;
+        case "weekly":
+          nextRun = addWeeks(nextRun, 1);
+          break;
+        case "monthly":
+          nextRun = addMonths(nextRun, 1);
+          break;
+      }
     }
 
     await prisma.recurringSchedule.update({

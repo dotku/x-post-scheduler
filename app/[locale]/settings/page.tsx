@@ -1399,12 +1399,12 @@ export default function SettingsPage() {
                     $0/mo
                   </p>
                   <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 flex-1">
-                    <li>✓ {appLanguage === "zh" ? "1 个账号" : "1 account"}</li>
-                    <li>
-                      ✓{" "}
+                    <li>✓ {appLanguage === "zh" ? "按需购买积分" : "Buy credits as needed"}</li>
+                    <li className="text-gray-400 dark:text-gray-500">
+                      ✗{" "}
                       {appLanguage === "zh"
-                        ? "按需购买积分"
-                        : "Buy credits as needed"}
+                        ? "不支持社交账号自动发布"
+                        : "No social auto-posting"}
                     </li>
                     <li className="text-gray-400 dark:text-gray-500">
                       ✗{" "}
@@ -1500,8 +1500,8 @@ export default function SettingsPage() {
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
                     {appLanguage === "zh"
-                      ? "专属定制方案，适合团队与企业用户"
-                      : "Custom solutions for teams and enterprises"}
+                      ? "专属定制方案，适合月预算 $15k+ 的团队与企业用户"
+                      : "Custom solutions for teams & enterprises with $15k+ monthly budget"}
                   </p>
                 </div>
                 <a

@@ -5,6 +5,18 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useTranslations, useLocale } from "next-intl";
+import {
+  HOURLY_FREQUENCIES,
+  isTierAtLeast,
+  TIER_ORDER,
+  type TierKey,
+} from "@/lib/subscription";
+
+interface Trend {
+  name: string;
+  url?: string;
+  description?: string;
+}
 
 interface RecurringSchedule {
   id: string;
@@ -13,6 +25,7 @@ interface RecurringSchedule {
   aiPrompt: string | null;
   imageModelId?: string | null;
   aiLanguage: string | null;
+  trendRegion: string | null;
   xAccountId: string | null;
   frequency: string;
   cronExpr: string;
@@ -37,6 +50,46 @@ const IMAGE_MODELS_IDS = [
   { id: "alibaba/wan-2.6/text-to-image", label: "Wan 2.6 Image" },
 ];
 
+type ScheduleFrequency =
+  | "daily"
+  | "weekly"
+  | "monthly"
+  | keyof typeof HOURLY_FREQUENCIES;
+
+const HOURLY_FREQUENCY_KEYS = Object.keys(HOURLY_FREQUENCIES) as Array<
+  keyof typeof HOURLY_FREQUENCIES
+>;
+
+const FREQUENCY_OPTIONS: Array<{
+  value: ScheduleFrequency;
+  labelKey: string;
+  minTier?: TierKey;
+}> = [
+  { value: "daily", labelKey: "daily" },
+  { value: "weekly", labelKey: "weekly" },
+  { value: "monthly", labelKey: "monthly" },
+  {
+    value: "every_12h",
+    labelKey: "every12h",
+    minTier: HOURLY_FREQUENCIES.every_12h.minTier,
+  },
+  {
+    value: "every_6h",
+    labelKey: "every6h",
+    minTier: HOURLY_FREQUENCIES.every_6h.minTier,
+  },
+  {
+    value: "every_4h",
+    labelKey: "every4h",
+    minTier: HOURLY_FREQUENCIES.every_4h.minTier,
+  },
+  {
+    value: "every_2h",
+    labelKey: "every2h",
+    minTier: HOURLY_FREQUENCIES.every_2h.minTier,
+  },
+];
+
 export default function RecurringPage() {
   const t = useTranslations("recurring");
   const locale = useLocale();
@@ -51,47 +104,93 @@ export default function RecurringPage() {
     totalTokens: 0,
   });
   const [accounts, setAccounts] = useState<
-    { id: string; label: string | null; username: string | null; isDefault: boolean }[]
+    {
+      id: string;
+      label: string | null;
+      username: string | null;
+      isDefault: boolean;
+    }[]
   >([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Form state
   const [content, setContent] = useState("");
-  const [useAi, setUseAi] = useState(false);
+  const [useAi] = useState(true);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLanguage, setAiLanguage] = useState("");
   const [imageModelId, setImageModelId] = useState("");
+  const [trendRegion, setTrendRegion] = useState<
+    "" | "global" | "usa" | "china" | "africa"
+  >("");
+  const [canUseTrending, setCanUseTrending] = useState(false);
+  const [userTier, setUserTier] = useState<TierKey | null>(null);
+  const [trendPreview, setTrendPreview] = useState<Trend[]>([]);
+  const [trendPreviewLoading, setTrendPreviewLoading] = useState(false);
+  const [trendPreviewError, setTrendPreviewError] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState("");
-  const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">(
-    "daily"
-  );
+  const [frequency, setFrequency] = useState<ScheduleFrequency>("daily");
   const [time, setTime] = useState("09:00");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGeneratingSample, setIsGeneratingSample] = useState(false);
   const [sampleContent, setSampleContent] = useState("");
-  const [testingScheduleId, setTestingScheduleId] = useState<string | null>(null);
-  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [testingScheduleId, setTestingScheduleId] = useState<string | null>(
+    null,
+  );
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(
+    null,
+  );
   const [editAiPrompt, setEditAiPrompt] = useState("");
   const [editImageModelId, setEditImageModelId] = useState("");
-  const [editFrequency, setEditFrequency] = useState<"daily" | "weekly" | "monthly">("daily");
+  const [editTrendRegion, setEditTrendRegion] = useState<
+    "" | "global" | "usa" | "china" | "africa"
+  >("");
+  const [editTrendPreview, setEditTrendPreview] = useState<Trend[]>([]);
+  const [editTrendPreviewLoading, setEditTrendPreviewLoading] = useState(false);
+  const [editTrendPreviewError, setEditTrendPreviewError] = useState("");
+  const [editSampleContent, setEditSampleContent] = useState("");
+  const [isGeneratingEditSample, setIsGeneratingEditSample] = useState(false);
+  const [editFrequency, setEditFrequency] =
+    useState<ScheduleFrequency>("daily");
   const [editTime, setEditTime] = useState("09:00");
-  const [updatingScheduleId, setUpdatingScheduleId] = useState<string | null>(null);
+  const [updatingScheduleId, setUpdatingScheduleId] = useState<string | null>(
+    null,
+  );
   const [editError, setEditError] = useState("");
   const [scheduleTestResults, setScheduleTestResults] = useState<
-    Record<string, { content?: string; error?: string; imageUrl?: string; imageError?: string }>
+    Record<
+      string,
+      {
+        content?: string;
+        error?: string;
+        imageUrl?: string;
+        imageError?: string;
+      }
+    >
   >({});
-  const [publishingScheduleId, setPublishingScheduleId] = useState<string | null>(null);
+  const [publishingScheduleId, setPublishingScheduleId] = useState<
+    string | null
+  >(null);
   const [publishResults, setPublishResults] = useState<
     Record<string, { success?: boolean; error?: string; tweetUrl?: string }>
   >({});
   const [error, setError] = useState("");
 
-  const charCount = content.length;
-  const charRemaining = 280 - charCount;
-
   useEffect(() => {
     void fetchSchedules();
     void fetchAccounts();
+    void (async () => {
+      const res = await fetch("/api/me/subscription");
+      if (!res.ok) return;
+      const sub = await res.json();
+      const activeTier =
+        sub.status === "active" && TIER_ORDER.includes(sub.tier)
+          ? (sub.tier as TierKey)
+          : null;
+      setUserTier(activeTier);
+      setCanUseTrending(
+        activeTier ? isTierAtLeast(activeTier, "silver") : false,
+      );
+    })();
   }, []);
 
   const fetchAccounts = async () => {
@@ -140,17 +239,7 @@ export default function RecurringPage() {
     e.preventDefault();
     setError("");
 
-    if (!useAi) {
-      if (!content.trim()) {
-        setError(t("errorContent"));
-        return;
-      }
-
-      if (charCount > 280) {
-        setError(t("errorLength"));
-        return;
-      }
-    } else if (aiPrompt.length > 500) {
+    if (aiPrompt.length > 500) {
       setError(t("errorAiPrompt"));
       return;
     }
@@ -172,6 +261,7 @@ export default function RecurringPage() {
           aiPrompt: aiPrompt || undefined,
           aiLanguage: aiLanguage || undefined,
           imageModelId: imageModelId || undefined,
+          trendRegion: trendRegion || undefined,
           xAccountId: selectedAccountId,
           frequency,
           cronExpr: time,
@@ -184,10 +274,10 @@ export default function RecurringPage() {
       }
 
       setContent("");
-      setUseAi(false);
       setAiPrompt("");
       setAiLanguage("");
       setImageModelId("");
+      setTrendRegion("");
       setFrequency("daily");
       setTime("09:00");
       void fetchAccounts();
@@ -203,16 +293,6 @@ export default function RecurringPage() {
   const handleGenerateSample = async () => {
     setError("");
     setSampleContent("");
-
-    if (!useAi) {
-      if (!content.trim()) {
-        setError(t("errorContent"));
-        return;
-      }
-      setSampleContent(content.trim());
-      return;
-    }
-
     setIsGeneratingSample(true);
     try {
       const res = await fetch("/api/generate", {
@@ -231,7 +311,9 @@ export default function RecurringPage() {
 
       setSampleContent(data.content || "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to generate sample");
+      setError(
+        err instanceof Error ? err.message : "Failed to generate sample",
+      );
     } finally {
       setIsGeneratingSample(false);
     }
@@ -258,7 +340,17 @@ export default function RecurringPage() {
     setEditingScheduleId(schedule.id);
     setEditAiPrompt(schedule.aiPrompt || "");
     setEditImageModelId(schedule.imageModelId || "");
-    setEditFrequency(schedule.frequency as "daily" | "weekly" | "monthly");
+    setEditTrendRegion(
+      (schedule.trendRegion as "" | "global" | "usa" | "china" | "africa") ||
+        "",
+    );
+    setEditTrendPreview([]);
+    setEditTrendPreviewError("");
+    setEditSampleContent("");
+    const nextFrequency = isScheduleFrequency(schedule.frequency)
+      ? schedule.frequency
+      : "daily";
+    setEditFrequency(nextFrequency);
     setEditTime(schedule.cronExpr);
   };
 
@@ -266,6 +358,10 @@ export default function RecurringPage() {
     setEditingScheduleId(null);
     setEditAiPrompt("");
     setEditImageModelId("");
+    setEditTrendRegion("");
+    setEditTrendPreview([]);
+    setEditTrendPreviewError("");
+    setEditSampleContent("");
     setEditFrequency("daily");
     setEditTime("09:00");
     setEditError("");
@@ -283,6 +379,7 @@ export default function RecurringPage() {
       if (schedule?.useAi) {
         patchBody.aiPrompt = editAiPrompt;
         patchBody.imageModelId = editImageModelId;
+        patchBody.trendRegion = editTrendRegion || null;
       }
       const res = await fetch(`/api/recurring/${scheduleId}`, {
         method: "PATCH",
@@ -296,18 +393,24 @@ export default function RecurringPage() {
       await fetchSchedules();
       handleCancelEdit();
     } catch (err) {
-      setEditError(err instanceof Error ? err.message : "Failed to update schedule");
+      setEditError(
+        err instanceof Error ? err.message : "Failed to update schedule",
+      );
     } finally {
       setUpdatingScheduleId(null);
     }
   };
 
-  const handleTestSchedule = async (id: string) => {
+  const handleTestSchedule = async (id: string, trendName?: string) => {
     setTestingScheduleId(id);
     setScheduleTestResults((prev) => ({ ...prev, [id]: {} }));
 
     try {
-      const res = await fetch(`/api/recurring/${id}/test`, { method: "POST" });
+      const res = await fetch(`/api/recurring/${id}/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(trendName ? { trendName } : {}),
+      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -357,14 +460,131 @@ export default function RecurringPage() {
       const tweetUrl = data.tweetId
         ? `https://x.com/i/web/status/${data.tweetId}`
         : undefined;
-      setPublishResults((prev) => ({ ...prev, [scheduleId]: { success: true, tweetUrl } }));
+      setPublishResults((prev) => ({
+        ...prev,
+        [scheduleId]: { success: true, tweetUrl },
+      }));
     } catch (err) {
       setPublishResults((prev) => ({
         ...prev,
-        [scheduleId]: { error: err instanceof Error ? err.message : "Failed to publish" },
+        [scheduleId]: {
+          error: err instanceof Error ? err.message : "Failed to publish",
+        },
       }));
     } finally {
       setPublishingScheduleId(null);
+    }
+  };
+
+  const handleGenerateFromTrends = async () => {
+    if (trendPreview.length === 0) return;
+    setError("");
+    setSampleContent("");
+    setIsGeneratingSample(true);
+    try {
+      // 随机选 1 条
+      const randomIndex = Math.floor(Math.random() * trendPreview.length);
+      const picked = trendPreview[randomIndex];
+      const trendContext = `Today's trending news: "${picked.name}". Connect this topic naturally to my business context and create an engaging post.`;
+      const combinedPrompt = aiPrompt
+        ? `${trendContext} Additional direction: ${aiPrompt}`
+        : trendContext;
+
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: combinedPrompt,
+          language: aiLanguage || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate");
+      setSampleContent(data.content || "");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate");
+    } finally {
+      setIsGeneratingSample(false);
+    }
+  };
+
+  const fetchTrendPreview = async (region: string) => {
+    if (!region) {
+      setTrendPreview([]);
+      setTrendPreviewError("");
+      return;
+    }
+    setTrendPreviewLoading(true);
+    setTrendPreviewError("");
+    setTrendPreview([]);
+    try {
+      const res = await fetch(`/api/trending?region=${region}`);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setTrendPreviewError(data.error || `HTTP ${res.status}`);
+      } else {
+        setTrendPreview(data.trends ?? []);
+      }
+    } catch (e) {
+      setTrendPreviewError(
+        e instanceof Error ? e.message : "Failed to fetch trends",
+      );
+    } finally {
+      setTrendPreviewLoading(false);
+    }
+  };
+
+  const fetchEditTrendPreview = async (region: string) => {
+    if (!region) {
+      setEditTrendPreview([]);
+      setEditTrendPreviewError("");
+      return;
+    }
+    setEditTrendPreviewLoading(true);
+    setEditTrendPreviewError("");
+    setEditTrendPreview([]);
+    try {
+      const res = await fetch(`/api/trending?region=${region}`);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setEditTrendPreviewError(data.error || `HTTP ${res.status}`);
+      } else {
+        setEditTrendPreview(data.trends ?? []);
+      }
+    } catch (e) {
+      setEditTrendPreviewError(
+        e instanceof Error ? e.message : "Failed to fetch trends",
+      );
+    } finally {
+      setEditTrendPreviewLoading(false);
+    }
+  };
+
+  const handleGenerateFromEditTrends = async () => {
+    if (editTrendPreview.length === 0) return;
+    setEditSampleContent("");
+    setIsGeneratingEditSample(true);
+    try {
+      const randomIndex = Math.floor(Math.random() * editTrendPreview.length);
+      const picked = editTrendPreview[randomIndex];
+      const trendContext = `Today's trending news: "${picked.name}". Connect this topic naturally to my business context and create an engaging post.`;
+      const combinedPrompt = editAiPrompt
+        ? `${trendContext} Additional direction: ${editAiPrompt}`
+        : trendContext;
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: combinedPrompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate");
+      setEditSampleContent(data.content || "");
+    } catch (err) {
+      setEditTrendPreviewError(
+        err instanceof Error ? err.message : "Failed to generate",
+      );
+    } finally {
+      setIsGeneratingEditSample(false);
     }
   };
 
@@ -373,6 +593,44 @@ export default function RecurringPage() {
     if (!model) return modelId;
     if (model.labelKey) return t(model.labelKey as Parameters<typeof t>[0]);
     return model.label ?? modelId;
+  };
+
+  const isHourlyFrequency = (
+    value: string,
+  ): value is keyof typeof HOURLY_FREQUENCIES =>
+    HOURLY_FREQUENCY_KEYS.includes(value as keyof typeof HOURLY_FREQUENCIES);
+
+  const isScheduleFrequency = (value: string): value is ScheduleFrequency =>
+    value === "daily" ||
+    value === "weekly" ||
+    value === "monthly" ||
+    isHourlyFrequency(value);
+
+  const canUseFrequencyOption = (value: ScheduleFrequency) => {
+    if (!isHourlyFrequency(value)) return true;
+    const requiredTier = HOURLY_FREQUENCIES[value].minTier;
+    return userTier ? isTierAtLeast(userTier, requiredTier) : false;
+  };
+
+  const getFrequencyLabel = (value: string) => {
+    switch (value) {
+      case "daily":
+        return t("daily");
+      case "weekly":
+        return t("weekly");
+      case "monthly":
+        return t("monthly");
+      case "every_12h":
+        return t("every12h");
+      case "every_6h":
+        return t("every6h");
+      case "every_4h":
+        return t("every4h");
+      case "every_2h":
+        return t("every2h");
+      default:
+        return value;
+    }
   };
 
   return (
@@ -415,7 +673,8 @@ export default function RecurringPage() {
               {" · "}
               {t("promptIn")} {recurringUsage.promptTokens.toLocaleString()}
               {" · "}
-              {t("completionOut")} {recurringUsage.completionTokens.toLocaleString()}
+              {t("completionOut")}{" "}
+              {recurringUsage.completionTokens.toLocaleString()}
             </p>
           </div>
         </div>
@@ -441,7 +700,9 @@ export default function RecurringPage() {
                 onChange={(e) => setSelectedAccountId(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
               >
-                {accounts.length === 0 && <option value="">{t("noAccount")}</option>}
+                {accounts.length === 0 && (
+                  <option value="">{t("noAccount")}</option>
+                )}
                 {accounts.map((account) => (
                   <option key={account.id} value={account.id}>
                     {(account.label || account.username || "Unnamed account") +
@@ -451,124 +712,246 @@ export default function RecurringPage() {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {t("contentMode")}
-              </label>
-              <div className="flex flex-wrap gap-4">
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                  <input
-                    type="radio"
-                    name="contentMode"
-                    checked={!useAi}
-                    onChange={() => setUseAi(false)}
-                    className="h-4 w-4 text-blue-600 border-gray-300"
-                  />
-                  {t("fixedContent")}
-                </label>
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                  <input
-                    type="radio"
-                    name="contentMode"
-                    checked={useAi}
-                    onChange={() => setUseAi(true)}
-                    className="h-4 w-4 text-blue-600 border-gray-300"
-                  />
-                  {t("aiContent")}
-                </label>
-              </div>
-            </div>
-
-            {!useAi ? (
+            <div className="space-y-4">
               <div>
                 <label
-                  htmlFor="content"
+                  htmlFor="aiPrompt"
                   className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
                 >
-                  {t("postContent")}
+                  {t("aiPrompt")}
                 </label>
                 <textarea
-                  id="content"
+                  id="aiPrompt"
                   rows={3}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-none"
-                  placeholder={t("contentPlaceholder")}
+                  placeholder={t("aiPromptPlaceholder")}
                 />
-                <p
-                  className={`mt-1 text-sm ${
-                    charRemaining < 0
-                      ? "text-red-500"
-                      : charRemaining < 20
-                      ? "text-yellow-500"
-                      : "text-gray-500 dark:text-gray-400"
-                  }`}
-                >
-                  {t("charsRemaining", { count: charRemaining })}
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {t("aiPromptHint")}
                 </p>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="aiPrompt"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                  >
-                    {t("aiPrompt")}
-                  </label>
-                  <textarea
-                    id="aiPrompt"
-                    rows={3}
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-none"
-                    placeholder={t("aiPromptPlaceholder")}
-                  />
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {t("aiPromptHint")}
+              {/* Trending Region */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  🔥 Auto Trending News
+                  {!canUseTrending && (
+                    <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                      Silver+
+                    </span>
+                  )}
+                </label>
+                {!canUseTrending ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    🔒 Upgrade to{" "}
+                    <a
+                      href="/settings"
+                      className="text-blue-600 dark:text-blue-400 underline"
+                    >
+                      Silver or above
+                    </a>{" "}
+                    to auto-generate posts from trending news.
                   </p>
-                </div>
-                <div>
-                  <label
-                    htmlFor="aiLanguage"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                  >
-                    {t("aiLanguage")}
-                  </label>
-                  <input
-                    type="text"
-                    id="aiLanguage"
-                    value={aiLanguage}
-                    onChange={(e) => setAiLanguage(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                    placeholder={t("aiLanguagePlaceholder")}
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="imageModelId"
-                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-                  >
-                    {t("imageModel")}
-                  </label>
-                  <select
-                    id="imageModelId"
-                    value={imageModelId}
-                    onChange={(e) => setImageModelId(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  >
-                    {IMAGE_MODELS_IDS.map((model) => (
-                      <option key={model.id || "none"} value={model.id}>
-                        {model.labelKey ? t(model.labelKey as Parameters<typeof t>[0]) : model.label}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {t("imageModelHint")}
-                  </p>
-                </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {(["", "global", "usa", "china", "africa"] as const).map(
+                        (r) => (
+                          <button
+                            key={r}
+                            type="button"
+                            onClick={() => {
+                              setTrendRegion(r);
+                              void fetchTrendPreview(r);
+                            }}
+                            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                              trendRegion === r
+                                ? "bg-blue-600 text-white"
+                                : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                            }`}
+                          >
+                            {r === ""
+                              ? "Off"
+                              : r === "global"
+                                ? "🌍 Global"
+                                : r === "usa"
+                                  ? "🇺🇸 USA"
+                                  : r === "china"
+                                    ? "🇨🇳 China"
+                                    : "🌍 Africa"}
+                          </button>
+                        ),
+                      )}
+                      {trendRegion && (
+                        <button
+                          type="button"
+                          onClick={() => void fetchTrendPreview(trendRegion)}
+                          className="px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                        >
+                          ↻ Refresh
+                        </button>
+                      )}
+                    </div>
+                    {trendRegion && (
+                      <p className="mt-1.5 text-xs text-blue-600 dark:text-blue-400">
+                        Each run will fetch today&apos;s top 3 news from{" "}
+                        {trendRegion === "global"
+                          ? "Global"
+                          : trendRegion.toUpperCase()}{" "}
+                        and generate a post connecting them to your business.
+                      </p>
+                    )}
+
+                    {/* Trending preview list */}
+                    {trendRegion && (
+                      <div className="mt-2">
+                        {trendPreviewLoading && (
+                          <div className="flex items-center gap-2 text-gray-500 text-xs py-2">
+                            <svg
+                              className="animate-spin h-3.5 w-3.5"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                            Loading trending topics...
+                          </div>
+                        )}
+                        {trendPreviewError && (
+                          <p className="text-xs text-red-500 dark:text-red-400 py-1">
+                            ❌ {trendPreviewError}
+                          </p>
+                        )}
+                        {!trendPreviewLoading && trendPreview.length > 0 && (
+                          <div className="space-y-1.5 mt-1">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                              {trendPreview.length} current trending topics:
+                            </p>
+                            {trendPreview.slice(0, 10).map((trend, i) => (
+                              <div
+                                key={i}
+                                className="flex items-start gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-700"
+                              >
+                                <span className="text-xs font-mono text-gray-400 mt-0.5 w-4 shrink-0">
+                                  {i + 1}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-gray-900 dark:text-white leading-snug">
+                                    {trend.name}
+                                  </p>
+                                  {trend.description && (
+                                    <p className="text-xs text-gray-400 mt-0.5">
+                                      {trend.description}
+                                    </p>
+                                  )}
+                                </div>
+                                {trend.url && (
+                                  <a
+                                    href={trend.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-500 hover:underline shrink-0"
+                                  >
+                                    ↗
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={handleGenerateFromTrends}
+                              disabled={isGeneratingSample}
+                              className="mt-2 w-full px-3 py-2 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5"
+                            >
+                              {isGeneratingSample ? (
+                                <>
+                                  <svg
+                                    className="animate-spin h-3 w-3"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <circle
+                                      className="opacity-25"
+                                      cx="12"
+                                      cy="12"
+                                      r="10"
+                                      stroke="currentColor"
+                                      strokeWidth="4"
+                                    />
+                                    <path
+                                      className="opacity-75"
+                                      fill="currentColor"
+                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    />
+                                  </svg>
+                                  Generating...
+                                </>
+                              ) : (
+                                "⚡ Generate from 1 Random Trend"
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-            )}
+              <div>
+                <label
+                  htmlFor="aiLanguage"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                >
+                  {t("aiLanguage")}
+                </label>
+                <input
+                  type="text"
+                  id="aiLanguage"
+                  value={aiLanguage}
+                  onChange={(e) => setAiLanguage(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  placeholder={t("aiLanguagePlaceholder")}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="imageModelId"
+                  className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                >
+                  {t("imageModel")}
+                </label>
+                <select
+                  id="imageModelId"
+                  value={imageModelId}
+                  onChange={(e) => setImageModelId(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                >
+                  {IMAGE_MODELS_IDS.map((model) => (
+                    <option key={model.id || "none"} value={model.id}>
+                      {model.labelKey
+                        ? t(model.labelKey as Parameters<typeof t>[0])
+                        : model.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {t("imageModelHint")}
+                </p>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -582,14 +965,30 @@ export default function RecurringPage() {
                   id="frequency"
                   value={frequency}
                   onChange={(e) =>
-                    setFrequency(e.target.value as "daily" | "weekly" | "monthly")
+                    setFrequency(e.target.value as ScheduleFrequency)
                   }
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 >
-                  <option value="daily">{t("daily")}</option>
-                  <option value="weekly">{t("weekly")}</option>
-                  <option value="monthly">{t("monthly")}</option>
+                  {FREQUENCY_OPTIONS.map((option) => {
+                    const unlocked = canUseFrequencyOption(option.value);
+                    const minTierText = option.minTier
+                      ? ` (${option.minTier.toUpperCase()}+)`
+                      : "";
+                    return (
+                      <option
+                        key={option.value}
+                        value={option.value}
+                        disabled={!unlocked}
+                      >
+                        {t(option.labelKey as Parameters<typeof t>[0])}
+                        {!unlocked ? minTierText : ""}
+                      </option>
+                    );
+                  })}
                 </select>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {t("hourlyFrequencyHint")}
+                </p>
               </div>
               <div>
                 <label
@@ -598,45 +997,55 @@ export default function RecurringPage() {
                 >
                   {t("time")}
                 </label>
-                <input
-                  type="time"
-                  id="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                />
-                <div className="mt-2">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">
-                    {t("recommendedTimes")}
+                {isHourlyFrequency(frequency) ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
+                    {t("hourlyNoTimeNeeded")}
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { label: "08:00", desc: "🌅" },
-                      { label: "12:00", desc: "☀️" },
-                      { label: "17:00", desc: "🌆" },
-                      { label: "20:00", desc: "🌙" },
-                    ].map(({ label, desc }) => (
-                      <button
-                        key={label}
-                        type="button"
-                        onClick={() => setTime(label)}
-                        className={`px-2 py-1 text-xs rounded border transition-colors ${
-                          time === label
-                            ? "bg-blue-600 text-white border-blue-600"
-                            : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-blue-400 hover:text-blue-600"
-                        }`}
-                      >
-                        {desc} {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    <input
+                      type="time"
+                      id="time"
+                      value={time}
+                      onChange={(e) => setTime(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    />
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                        {t("recommendedTimes")}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { label: "08:00", desc: "🌅" },
+                          { label: "12:00", desc: "☀️" },
+                          { label: "17:00", desc: "🌆" },
+                          { label: "20:00", desc: "🌙" },
+                        ].map(({ label, desc }) => (
+                          <button
+                            key={label}
+                            type="button"
+                            onClick={() => setTime(label)}
+                            className={`px-2 py-1 text-xs rounded border transition-colors ${
+                              time === label
+                                ? "bg-blue-600 text-white border-blue-600"
+                                : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-blue-400 hover:text-blue-600"
+                            }`}
+                          >
+                            {desc} {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
             {error && (
               <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-                <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+                <p className="text-red-600 dark:text-red-400 text-sm">
+                  {error}
+                </p>
               </div>
             )}
 
@@ -647,7 +1056,9 @@ export default function RecurringPage() {
                 disabled={isGeneratingSample}
                 className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50"
               >
-                {isGeneratingSample ? t("generatingSample") : t("generateSample")}
+                {isGeneratingSample
+                  ? t("generatingSample")
+                  : t("generateSample")}
               </button>
             </div>
 
@@ -665,7 +1076,7 @@ export default function RecurringPage() {
             <div className="flex justify-end">
               <button
                 type="submit"
-                disabled={isSubmitting || (!useAi && charCount > 280)}
+                disabled={isSubmitting}
                 className="px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isSubmitting ? t("saving") : t("saveTask")}
@@ -702,7 +1113,7 @@ export default function RecurringPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-gray-900 dark:text-white line-clamp-2">
                       {schedule.useAi
-                        ? `${t("aiLabel")} ${schedule.aiPrompt ? `: ${schedule.aiPrompt}` : ""}`
+                        ? `${t("aiLabel")}${schedule.trendRegion ? ` 🔥 ${schedule.trendRegion.toUpperCase()}` : ""}${schedule.aiPrompt ? `: ${schedule.aiPrompt}` : ""}`
                         : schedule.content}
                     </p>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
@@ -716,11 +1127,16 @@ export default function RecurringPage() {
                         </span>
                       )}
                       <span className="capitalize">
-                        {schedule.frequency === "daily" ? t("daily") : schedule.frequency === "weekly" ? t("weekly") : t("monthly")}
+                        {getFrequencyLabel(schedule.frequency)}
                       </span>
-                      <span>{t("at")} {schedule.cronExpr}</span>
+                      {!isHourlyFrequency(schedule.frequency) && (
+                        <span>
+                          {t("at")} {schedule.cronExpr}
+                        </span>
+                      )}
                       <span>
-                        {t("nextLabel")} {format(new Date(schedule.nextRunAt), "PPp")}
+                        {t("nextLabel")}{" "}
+                        {format(new Date(schedule.nextRunAt), "PPp")}
                       </span>
                     </div>
                     {scheduleTestResults[schedule.id]?.content && (
@@ -748,7 +1164,8 @@ export default function RecurringPage() {
                         )}
                         {scheduleTestResults[schedule.id].imageError && (
                           <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                            {t("imageLabel")} {scheduleTestResults[schedule.id].imageError}
+                            {t("imageLabel")}{" "}
+                            {scheduleTestResults[schedule.id].imageError}
                           </p>
                         )}
                         <div className="flex items-center gap-3 pt-1">
@@ -770,11 +1187,15 @@ export default function RecurringPage() {
                             </div>
                           ) : (
                             <button
-                              onClick={() => handlePublishTestResult(schedule.id)}
+                              onClick={() =>
+                                handlePublishTestResult(schedule.id)
+                              }
                               disabled={publishingScheduleId === schedule.id}
                               className="px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 transition-colors"
                             >
-                              {publishingScheduleId === schedule.id ? t("publishing") : t("publishNow")}
+                              {publishingScheduleId === schedule.id
+                                ? t("publishing")
+                                : t("publishNow")}
                             </button>
                           )}
                           {publishResults[schedule.id]?.error && (
@@ -802,7 +1223,9 @@ export default function RecurringPage() {
                               <textarea
                                 rows={3}
                                 value={editAiPrompt}
-                                onChange={(e) => setEditAiPrompt(e.target.value)}
+                                onChange={(e) =>
+                                  setEditAiPrompt(e.target.value)
+                                }
                                 className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white resize-none"
                                 placeholder={t("editAiPromptPlaceholder")}
                               />
@@ -813,15 +1236,214 @@ export default function RecurringPage() {
                               </label>
                               <select
                                 value={editImageModelId}
-                                onChange={(e) => setEditImageModelId(e.target.value)}
+                                onChange={(e) =>
+                                  setEditImageModelId(e.target.value)
+                                }
                                 className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                               >
                                 {IMAGE_MODELS_IDS.map((model) => (
-                                  <option key={model.id || "none"} value={model.id}>
-                                    {model.labelKey ? t(model.labelKey as Parameters<typeof t>[0]) : model.label}
+                                  <option
+                                    key={model.id || "none"}
+                                    value={model.id}
+                                  >
+                                    {model.labelKey
+                                      ? t(
+                                          model.labelKey as Parameters<
+                                            typeof t
+                                          >[0],
+                                        )
+                                      : model.label}
                                   </option>
                                 ))}
                               </select>
+                            </div>
+                            {/* Trending region for edit */}
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                                🔥 Auto Trending News
+                              </label>
+                              <div className="flex flex-wrap gap-1.5">
+                                {(
+                                  [
+                                    "",
+                                    "global",
+                                    "usa",
+                                    "china",
+                                    "africa",
+                                  ] as const
+                                ).map((r) => (
+                                  <button
+                                    key={r}
+                                    type="button"
+                                    onClick={() => {
+                                      setEditTrendRegion(r);
+                                      void fetchEditTrendPreview(r);
+                                    }}
+                                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                                      editTrendRegion === r
+                                        ? "bg-blue-600 text-white"
+                                        : "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                    }`}
+                                  >
+                                    {r === ""
+                                      ? "Off"
+                                      : r === "global"
+                                        ? "🌍 Global"
+                                        : r === "usa"
+                                          ? "🇺🇸 USA"
+                                          : r === "china"
+                                            ? "🇨🇳 China"
+                                            : "🌍 Africa"}
+                                  </button>
+                                ))}
+                                {editTrendRegion && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void fetchEditTrendPreview(
+                                        editTrendRegion,
+                                      )
+                                    }
+                                    className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-200 transition-colors"
+                                  >
+                                    ↻
+                                  </button>
+                                )}
+                              </div>
+                              {editTrendPreviewLoading && (
+                                <div className="flex items-center gap-1.5 text-gray-400 text-xs mt-2">
+                                  <svg
+                                    className="animate-spin h-3 w-3"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <circle
+                                      className="opacity-25"
+                                      cx="12"
+                                      cy="12"
+                                      r="10"
+                                      stroke="currentColor"
+                                      strokeWidth="4"
+                                    />
+                                    <path
+                                      className="opacity-75"
+                                      fill="currentColor"
+                                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    />
+                                  </svg>
+                                  Loading...
+                                </div>
+                              )}
+                              {editTrendPreviewError && (
+                                <p className="text-xs text-red-500 mt-1">
+                                  ❌ {editTrendPreviewError}
+                                </p>
+                              )}
+                              {!editTrendPreviewLoading &&
+                                editTrendPreview.length > 0 && (
+                                  <div className="mt-2 space-y-1">
+                                    <p className="text-xs text-gray-400">
+                                      {editTrendPreview.length} trending topics:
+                                    </p>
+                                    {editTrendPreview
+                                      .slice(0, 8)
+                                      .map((trend, i) => (
+                                        <div
+                                          key={i}
+                                          className="flex items-start gap-1.5 px-2.5 py-1.5 rounded bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700"
+                                        >
+                                          <span className="text-xs font-mono text-gray-400 shrink-0 w-3.5 mt-0.5">
+                                            {i + 1}
+                                          </span>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-xs text-gray-900 dark:text-white leading-snug">
+                                              {trend.name}
+                                            </p>
+                                            {trend.description && (
+                                              <p className="text-xs text-gray-400">
+                                                {trend.description}
+                                              </p>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-1 shrink-0">
+                                            {trend.url && (
+                                              <a
+                                                href={trend.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs text-blue-500 hover:underline"
+                                              >
+                                                ↗
+                                              </a>
+                                            )}
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                void handleTestSchedule(
+                                                  editingScheduleId!,
+                                                  trend.name,
+                                                )
+                                              }
+                                              disabled={
+                                                testingScheduleId ===
+                                                editingScheduleId
+                                              }
+                                              className="px-1.5 py-0.5 text-xs rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 hover:bg-orange-200 disabled:opacity-40 transition-colors"
+                                              title="Full test with this trending topic"
+                                            >
+                                              {testingScheduleId ===
+                                              editingScheduleId
+                                                ? "…"
+                                                : "⚡Test"}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    <button
+                                      type="button"
+                                      onClick={handleGenerateFromEditTrends}
+                                      disabled={isGeneratingEditSample}
+                                      className="mt-1 w-full px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-1"
+                                    >
+                                      {isGeneratingEditSample ? (
+                                        <>
+                                          <svg
+                                            className="animate-spin h-3 w-3"
+                                            fill="none"
+                                            viewBox="0 0 24 24"
+                                          >
+                                            <circle
+                                              className="opacity-25"
+                                              cx="12"
+                                              cy="12"
+                                              r="10"
+                                              stroke="currentColor"
+                                              strokeWidth="4"
+                                            />
+                                            <path
+                                              className="opacity-75"
+                                              fill="currentColor"
+                                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                            />
+                                          </svg>
+                                          Generating...
+                                        </>
+                                      ) : (
+                                        "⚡ Generate from 1 Random Trend"
+                                      )}
+                                    </button>
+                                    {editSampleContent && (
+                                      <div className="mt-2 p-2.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600">
+                                        <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">
+                                          Preview
+                                        </p>
+                                        <p className="text-xs text-gray-900 dark:text-white whitespace-pre-wrap">
+                                          {editSampleContent}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                             </div>
                           </>
                         )}
@@ -832,44 +1454,79 @@ export default function RecurringPage() {
                             </label>
                             <select
                               value={editFrequency}
-                              onChange={(e) => setEditFrequency(e.target.value as "daily" | "weekly" | "monthly")}
+                              onChange={(e) =>
+                                setEditFrequency(
+                                  e.target.value as ScheduleFrequency,
+                                )
+                              }
                               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                             >
-                              <option value="daily">{t("daily")}</option>
-                              <option value="weekly">{t("weekly")}</option>
-                              <option value="monthly">{t("monthly")}</option>
+                              {FREQUENCY_OPTIONS.map((option) => {
+                                const unlocked = canUseFrequencyOption(
+                                  option.value,
+                                );
+                                const minTierText = option.minTier
+                                  ? ` (${option.minTier.toUpperCase()}+)`
+                                  : "";
+                                return (
+                                  <option
+                                    key={option.value}
+                                    value={option.value}
+                                    disabled={!unlocked}
+                                  >
+                                    {t(
+                                      option.labelKey as Parameters<
+                                        typeof t
+                                      >[0],
+                                    )}
+                                    {!unlocked ? minTierText : ""}
+                                  </option>
+                                );
+                              })}
                             </select>
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
                               {t("time")}
                             </label>
-                            <input
-                              type="time"
-                              value={editTime}
-                              onChange={(e) => setEditTime(e.target.value)}
-                              className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                            />
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                              {["08:00", "12:00", "17:00", "20:00"].map((t_) => (
-                                <button
-                                  key={t_}
-                                  type="button"
-                                  onClick={() => setEditTime(t_)}
-                                  className={`px-1.5 py-0.5 text-xs rounded border transition-colors ${
-                                    editTime === t_
-                                      ? "bg-blue-600 text-white border-blue-600"
-                                      : "border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-600"
-                                  }`}
-                                >
-                                  {t_}
-                                </button>
-                              ))}
-                            </div>
+                            {isHourlyFrequency(editFrequency) ? (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 py-2">
+                                {t("hourlyNoTimeNeeded")}
+                              </p>
+                            ) : (
+                              <>
+                                <input
+                                  type="time"
+                                  value={editTime}
+                                  onChange={(e) => setEditTime(e.target.value)}
+                                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                />
+                                <div className="mt-1.5 flex flex-wrap gap-1">
+                                  {["08:00", "12:00", "17:00", "20:00"].map(
+                                    (t_) => (
+                                      <button
+                                        key={t_}
+                                        type="button"
+                                        onClick={() => setEditTime(t_)}
+                                        className={`px-1.5 py-0.5 text-xs rounded border transition-colors ${
+                                          editTime === t_
+                                            ? "bg-blue-600 text-white border-blue-600"
+                                            : "border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-600"
+                                        }`}
+                                      >
+                                        {t_}
+                                      </button>
+                                    ),
+                                  )}
+                                </div>
+                              </>
+                            )}
                           </div>
                         </div>
                         {editError && (
-                          <p className="text-sm text-red-600 dark:text-red-400">{editError}</p>
+                          <p className="text-sm text-red-600 dark:text-red-400">
+                            {editError}
+                          </p>
                         )}
                         <div className="flex gap-2">
                           <button
@@ -877,7 +1534,9 @@ export default function RecurringPage() {
                             disabled={updatingScheduleId === schedule.id}
                             className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                           >
-                            {updatingScheduleId === schedule.id ? t("saving") : t("save")}
+                            {updatingScheduleId === schedule.id
+                              ? t("saving")
+                              : t("save")}
                           </button>
                           <button
                             onClick={handleCancelEdit}
@@ -899,17 +1558,23 @@ export default function RecurringPage() {
                       }
                       className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
                     >
-                      {editingScheduleId === schedule.id ? t("closeEdit") : t("edit")}
+                      {editingScheduleId === schedule.id
+                        ? t("closeEdit")
+                        : t("edit")}
                     </button>
                     <button
                       onClick={() => handleTestSchedule(schedule.id)}
                       disabled={testingScheduleId === schedule.id}
                       className="px-3 py-1.5 text-sm border border-blue-600 text-blue-600 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50"
                     >
-                      {testingScheduleId === schedule.id ? t("testing") : t("test")}
+                      {testingScheduleId === schedule.id
+                        ? t("testing")
+                        : t("test")}
                     </button>
                     <button
-                      onClick={() => handleToggle(schedule.id, schedule.isActive)}
+                      onClick={() =>
+                        handleToggle(schedule.id, schedule.isActive)
+                      }
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         schedule.isActive
                           ? "bg-blue-600"

@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 export default function AdminMembershipManager() {
   const t = useTranslations("admin");
   const [email, setEmail] = useState("");
-  const [tier, setTier] = useState<string>("air");
+  const [tier, setTier] = useState<string>("wood");
   const [status, setStatus] = useState<string>("active");
   const [periodEnd, setPeriodEnd] = useState("");
   const [note, setNote] = useState("");
@@ -27,7 +27,7 @@ export default function AdminMembershipManager() {
     };
   } | null>(null);
 
-  const tiers = ["air", "bronze", "iron", "silver", "gold"];
+  const tiers = ["wood", "bronze", "iron", "silver", "gold"];
   const statuses = ["active", "cancelled", "past_due"];
 
   async function handleSubmit(e: React.FormEvent) {
@@ -61,7 +61,7 @@ export default function AdminMembershipManager() {
         });
         // Reset form
         setEmail("");
-        setTier("air");
+        setTier("wood");
         setStatus("active");
         setPeriodEnd("");
         setNote("");

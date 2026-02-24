@@ -6,6 +6,7 @@ import { generateTweet } from "@/lib/openai";
 import { trackTokenUsage, trackWavespeedUsage } from "@/lib/usage-tracking";
 import { hasCredits, deductCredits, getCreditBalance, getWavespeedFeeCents, deductWavespeedCredits } from "@/lib/credits";
 import { decodeRecurringAiPrompt } from "@/lib/recurring-ai";
+import { buildTrendPrompt } from "@/lib/trending";
 import { submitImageTask } from "@/lib/wavespeed";
 import { waitForImageOutput } from "@/lib/scheduler";
 
@@ -21,6 +22,17 @@ export async function POST(
   }
 
   const { id } = await params;
+
+  // 可选：客户端传入指定新闻话题，覆盖 schedule.trendRegion 自动抓取
+  let bodyTrendName: string | undefined;
+  try {
+    const body = await request.json().catch(() => ({}));
+    if (typeof body?.trendName === "string" && body.trendName.trim()) {
+      bodyTrendName = body.trendName.trim();
+    }
+  } catch {
+    // body 为空也正常
+  }
 
   const schedule = await prisma.recurringSchedule.findFirst({
     where: { id, userId: user.id },
@@ -77,9 +89,28 @@ export async function POST(
     })
     .join("\n\n---\n\n");
 
+  // 注入热点方向：优先使用客户端传入的指定话题，否则按 trendRegion 自动抓取
+  let effectivePrompt = decodedAiPrompt.prompt || undefined;
+  if (bodyTrendName) {
+    const trendContext = `Today's trending news: "${bodyTrendName}". Connect this topic naturally to my business context and create an engaging post.`;
+    effectivePrompt = decodedAiPrompt.prompt
+      ? `${trendContext} Additional direction: ${decodedAiPrompt.prompt}`
+      : trendContext;
+  } else if (schedule.trendRegion) {
+    try {
+      effectivePrompt = await buildTrendPrompt(
+        user.id,
+        schedule.trendRegion,
+        decodedAiPrompt.prompt,
+      );
+    } catch (trendErr) {
+      console.warn("Failed to fetch trends for test, using base prompt:", trendErr);
+    }
+  }
+
   const generated = await generateTweet(
     knowledgeContext,
-    decodedAiPrompt.prompt || undefined,
+    effectivePrompt,
     schedule.aiLanguage || undefined
   );
 

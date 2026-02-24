@@ -244,7 +244,11 @@ export default function LandingContent({
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+          <h1
+            className={`font-bold text-gray-900 dark:text-white ${
+              lang === "zh" ? "text-xl" : "text-2xl"
+            }`}
+          >
             {t("appName")}
           </h1>
           <div className="flex items-center gap-4 text-sm">
@@ -621,11 +625,11 @@ export default function LandingContent({
                       d="M5 13l4 4L19 7"
                     />
                   </svg>
-                  {lang === "zh" ? "1 个账号" : "1 account"}
+                  {lang === "zh" ? "按需购买积分" : "Buy credits as needed"}
                 </li>
                 <li className="flex items-center gap-2">
                   <svg
-                    className="w-4 h-4 text-green-500 shrink-0"
+                    className="w-4 h-4 text-gray-300 shrink-0"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -634,10 +638,12 @@ export default function LandingContent({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M5 13l4 4L19 7"
+                      d="M6 18L18 6M6 6l12 12"
                     />
                   </svg>
-                  {lang === "zh" ? "按需购买积分" : "Buy credits as needed"}
+                  {lang === "zh"
+                    ? "不支持社交账号自动发布"
+                    : "No social auto-posting"}
                 </li>
                 <li className="flex items-center gap-2">
                   <svg
@@ -663,51 +669,51 @@ export default function LandingContent({
                 {lang === "zh" ? "开始使用" : "Get Started"}
               </Link>
             </div>
-            {(["air", "bronze", "iron", "silver", "gold"] as const).map(
+            {(["wood", "bronze", "iron", "silver", "gold"] as const).map(
               (tier) => {
                 const tiers = {
-                  air: {
-                    labelEn: "Air",
-                    labelZh: "轻量",
-                    price: 1,
+                  wood: {
+                    labelEn: "Wood",
+                    labelZh: "木头",
+                    price: 3,
                     accounts: "1",
                     accountsZh: "1 个账号",
                     popular: false,
-                    color: "sky",
+                    color: "green",
                   },
                   bronze: {
                     labelEn: "Bronze",
                     labelZh: "青铜",
-                    price: 3,
-                    accounts: "5",
-                    accountsZh: "5 个账号",
+                    price: 5,
+                    accounts: "2",
+                    accountsZh: "2 个账号",
                     popular: false,
                     color: "amber",
                   },
                   iron: {
                     labelEn: "Iron",
                     labelZh: "钢铁",
-                    price: 5,
-                    accounts: "30",
-                    accountsZh: "30 个账号",
+                    price: 8,
+                    accounts: "3",
+                    accountsZh: "3 个账号",
                     popular: false,
                     color: "slate",
                   },
                   silver: {
                     labelEn: "Silver",
                     labelZh: "白银",
-                    price: 10,
-                    accounts: "100",
-                    accountsZh: "100 个账号",
+                    price: 18,
+                    accounts: "5",
+                    accountsZh: "5 个账号",
                     popular: true,
                     color: "blue",
                   },
                   gold: {
                     labelEn: "Gold",
                     labelZh: "黄金",
-                    price: 100,
-                    accounts: lang === "zh" ? "无限" : "Unlimited",
-                    accountsZh: "无限账号",
+                    price: 188,
+                    accounts: "10",
+                    accountsZh: "10 个账号",
                     popular: false,
                     color: "yellow",
                   },
@@ -816,8 +822,8 @@ export default function LandingContent({
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 {lang === "zh"
-                  ? "专属定制方案，适合团队与企业客户——更多账号、更高配额、私有部署支持"
-                  : "Custom solutions for teams & enterprises — more accounts, higher limits, and dedicated support"}
+                  ? "专属定制方案，适合月预算 $15k+ 的团队与企业客户——更多账号、更高配额、私有部署支持"
+                  : "Custom solutions for teams & enterprises with $15k+ monthly budget — more accounts, higher limits, and dedicated support"}
               </p>
             </div>
             <a

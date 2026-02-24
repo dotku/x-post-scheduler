@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { addDays, addWeeks, addMonths } from "date-fns";
+import { addDays, addWeeks, addMonths, addHours } from "date-fns";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { getUserXCredentials } from "@/lib/user-credentials";
 import { IMAGE_MODELS } from "@/lib/wavespeed";
 import { decodeRecurringAiPrompt, encodeRecurringAiPrompt } from "@/lib/recurring-ai";
+import { isTierAtLeast, HOURLY_FREQUENCIES } from "@/lib/subscription";
+
+const ALL_FREQUENCIES = ["daily", "weekly", "monthly", ...Object.keys(HOURLY_FREQUENCIES)];
 
 function calculateNextRun(frequency: string, cronExpr: string): Date {
   const now = new Date();
 
-  const [hours, minutes] = cronExpr.split(":").map(Number);
+  // Hourly interval frequencies — start N hours from now
+  if (frequency in HOURLY_FREQUENCIES) {
+    return addHours(now, HOURLY_FREQUENCIES[frequency].hours);
+  }
 
+  const [hours, minutes] = cronExpr.split(":").map(Number);
   let nextRun = new Date(now);
   nextRun.setHours(hours, minutes, 0, 0);
 
@@ -64,6 +71,7 @@ export async function GET() {
       ...schedule,
       aiPrompt: decoded.prompt,
       imageModelId: decoded.imageModelId,
+      trendRegion: schedule.trendRegion ?? null,
     };
   });
 
@@ -97,6 +105,7 @@ export async function POST(request: NextRequest) {
     aiLanguage,
     xAccountId,
     imageModelId,
+    trendRegion,
   } =
     body;
   const isAiMode = Boolean(useAi);
@@ -107,6 +116,11 @@ export async function POST(request: NextRequest) {
     typeof aiLanguage === "string" ? aiLanguage.trim() : undefined;
   const normalizedImageModelId =
     typeof imageModelId === "string" ? imageModelId.trim() : undefined;
+  const validTrendRegions = ["global", "usa", "china", "africa"];
+  const normalizedTrendRegion =
+    typeof trendRegion === "string" && validTrendRegions.includes(trendRegion)
+      ? trendRegion
+      : null;
 
   if (!isAiMode) {
     if (!normalizedContent) {
@@ -139,18 +153,47 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (!frequency || !["daily", "weekly", "monthly"].includes(frequency)) {
+  if (!frequency || !ALL_FREQUENCIES.includes(frequency)) {
     return NextResponse.json(
       { error: "Invalid frequency" },
       { status: 400 }
     );
   }
 
-  if (!cronExpr) {
+  if (!(frequency in HOURLY_FREQUENCIES) && !cronExpr) {
     return NextResponse.json(
       { error: "Time is required" },
       { status: 400 }
     );
+  }
+
+  // Check tier requirements for trendRegion and hourly frequencies
+  const needsTierCheck = normalizedTrendRegion || frequency in HOURLY_FREQUENCIES;
+  if (needsTierCheck) {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { subscriptionTier: true, subscriptionStatus: true },
+    });
+    const isActive = dbUser?.subscriptionStatus === "active";
+
+    // trendRegion 功能仅限白银及以上会员
+    if (normalizedTrendRegion && (!isTierAtLeast(dbUser?.subscriptionTier, "silver") || !isActive)) {
+      return NextResponse.json(
+        { error: "TIER_REQUIRED", minTier: "silver" },
+        { status: 403 },
+      );
+    }
+
+    // Hourly frequency tier check
+    if (frequency in HOURLY_FREQUENCIES) {
+      const required = HOURLY_FREQUENCIES[frequency].minTier;
+      if (!isTierAtLeast(dbUser?.subscriptionTier, required) || !isActive) {
+        return NextResponse.json(
+          { error: "TIER_REQUIRED", minTier: required },
+          { status: 403 },
+        );
+      }
+    }
   }
 
   const nextRunAt = calculateNextRun(frequency, cronExpr);
@@ -173,6 +216,7 @@ export async function POST(request: NextRequest) {
           })
         : null,
       aiLanguage: isAiMode ? normalizedLanguage : null,
+      trendRegion: isAiMode ? normalizedTrendRegion : null,
       frequency,
       cronExpr,
       nextRunAt,
