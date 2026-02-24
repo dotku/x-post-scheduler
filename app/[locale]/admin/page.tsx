@@ -4,6 +4,8 @@ import { formatDistanceToNow } from "date-fns";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin";
 import { getWavespeedFeeCents } from "@/lib/credits";
+import AdminCreditTopup from "@/components/AdminCreditTopup";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
@@ -154,6 +156,8 @@ export default async function AdminPage() {
     }
     redirect("/dashboard");
   }
+
+  const t = await getTranslations("admin");
 
   const now = new Date();
   const nowTs = now.getTime();
@@ -400,46 +404,46 @@ export default async function AdminPage() {
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-            Admin Dashboard
+            {t("title")}
           </h1>
           <Link
             href="/dashboard"
             className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
           >
-            Back
+            {t("back")}
           </Link>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card title="Runs (24h)" value={runs24h.toLocaleString()} />
-          <Card title="Runs (7d)" value={runs7d.toLocaleString()} />
-          <Card title="Success Rate (7d)" value={`${successRate7d.toFixed(1)}%`} />
-          <Card title="Failures (7d)" value={failure7d.toLocaleString()} />
+          <Card title={t("runs24h")} value={runs24h.toLocaleString()} />
+          <Card title={t("runs7d")} value={runs7d.toLocaleString()} />
+          <Card title={t("successRate7d")} value={`${successRate7d.toFixed(1)}%`} />
+          <Card title={t("failures7d")} value={failure7d.toLocaleString()} />
         </section>
 
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card title="Total Users" value={totalUsers.toLocaleString()} />
-          <Card title="Recurring Users" value={recurringUsers.length.toLocaleString()} />
-          <Card title="Active Schedules" value={activeSchedules.toLocaleString()} />
+          <Card title={t("totalUsers")} value={totalUsers.toLocaleString()} />
+          <Card title={t("recurringUsers")} value={recurringUsers.length.toLocaleString()} />
+          <Card title={t("activeSchedules")} value={activeSchedules.toLocaleString()} />
         </section>
 
         <section className="bg-white dark:bg-gray-800 rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Website Traffic
+              {t("websiteTraffic")}
             </h2>
           </div>
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Card title="Pageviews (24h)" value={webVisits24h.toLocaleString()} />
-              <Card title="Pageviews (30d)" value={webVisits30d.toLocaleString()} />
+              <Card title={t("pageviews24h")} value={webVisits24h.toLocaleString()} />
+              <Card title={t("pageviews30d")} value={webVisits30d.toLocaleString()} />
             </div>
             {topPages30d.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Top Pages (30d)
+                  {t("topPages30d")}
                 </p>
                 {topPages30d.map((row: { path: string; visits: bigint }) => (
                   <div
@@ -450,7 +454,7 @@ export default async function AdminPage() {
                       {row.path}
                     </span>
                     <span className="text-gray-900 dark:text-white shrink-0">
-                      {toCountNumber(row.visits).toLocaleString()} visits
+                      {toCountNumber(row.visits).toLocaleString()} {t("visits")}
                     </span>
                   </div>
                 ))}
@@ -462,137 +466,130 @@ export default async function AdminPage() {
         <section className="bg-white dark:bg-gray-800 rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Revenue
+              {t("revenue")}
             </h2>
           </div>
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card title="Revenue (24h)" value={`$${(revenue24hCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
-              <Card title="Revenue (30d)" value={`$${(revenue30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
-              <Card title="Revenue (All-time)" value={`$${(revenueAllTimeCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
-              <Card title="ARPPU (30d)" value={`$${(arppu30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+              <Card title={t("revenue24h")} value={`$${(revenue24hCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+              <Card title={t("revenue30d")} value={`$${(revenue30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+              <Card title={t("revenueAllTime")} value={`$${(revenueAllTimeCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
+              <Card title={t("arppu30d")} value={`$${(arppu30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Card title="Paying Users (30d)" value={payingUsers30dCount.toLocaleString()} />
-              <Card title="Paying Users (All-time)" value={payingUsersAllTimeCount.toLocaleString()} />
+              <Card title={t("payingUsers30d")} value={payingUsers30dCount.toLocaleString()} />
+              <Card title={t("payingUsersAllTime")} value={payingUsersAllTimeCount.toLocaleString()} />
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Revenue is based on successful credit top-ups (`CreditTransaction.type = topup`).
+              {t("revenueNote")}
             </p>
             <div className="pt-2">
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                Revenue Estimate (Assume All Usage Is Paid)
+                {t("revenueEstimateTitle")}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card
-                  title="Estimate (7d)"
+                  title={t("estimate7d")}
                   value={`$${(estRevenue7dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
                 <Card
-                  title="Estimate (30d)"
+                  title={t("estimate30d")}
                   value={`$${(estRevenue30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
                 <Card
-                  title="Estimate (90d)"
+                  title={t("estimate90d")}
                   value={`$${(estRevenue90dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
                 <Card
-                  title="Estimate (12m)"
+                  title={t("estimate12m")}
                   value={`$${(estRevenue12mCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                Estimated from last 30 days usage volume with current pricing: $
-                {(usageBilled30dCents / 100).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                (OpenAI ${(openAiCharge30dCents / 100).toFixed(2)} + WaveSpeed{" "}
-                ${(wavespeedCharge30dCents / 100).toFixed(2)}).
+                {t("revenueEstimateNote", {
+                  total: (usageBilled30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                  openai: (openAiCharge30dCents / 100).toFixed(2),
+                  wavespeed: (wavespeedCharge30dCents / 100).toFixed(2),
+                })}
               </p>
             </div>
             <div className="pt-2">
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                Cost Estimate (Model Cost Run Rate)
+                {t("costEstimateTitle")}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card
-                  title="Cost Estimate (7d)"
+                  title={t("costEstimate7d")}
                   value={`$${(estCost7dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
                 <Card
-                  title="Cost Estimate (30d)"
+                  title={t("costEstimate30d")}
                   value={`$${(estCost30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
                 <Card
-                  title="Cost Estimate (90d)"
+                  title={t("costEstimate90d")}
                   value={`$${(estCost90dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
                 <Card
-                  title="Cost Estimate (12m)"
+                  title={t("costEstimate12m")}
                   value={`$${(estCost12mCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
               </div>
             </div>
             <div className="pt-2">
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                Operating Profit Estimate (Before AD Cost)
+                {t("operatingProfitTitle")}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card
-                  title="Operating Profit (7d)"
+                  title={t("operatingProfit7d")}
                   value={`$${(operatingProfit7dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
                 <Card
-                  title="Operating Profit (30d)"
+                  title={t("operatingProfit30d")}
                   value={`$${(operatingProfit30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
                 <Card
-                  title="Operating Profit (90d)"
+                  title={t("operatingProfit90d")}
                   value={`$${(operatingProfit90dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
                 <Card
-                  title="Operating Profit (12m)"
+                  title={t("operatingProfit12m")}
                   value={`$${(operatingProfit12mCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
               </div>
             </div>
             <div className="pt-2">
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                Net Profit Estimate (After AD Cost)
+                {t("netProfitTitle")}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <Card
-                  title="Profit Estimate (7d)"
+                  title={t("profitEstimate7d")}
                   value={`$${(estProfit7dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
                 <Card
-                  title="Profit Estimate (30d)"
+                  title={t("profitEstimate30d")}
                   value={`$${(estProfit30dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
                 <Card
-                  title="Profit Estimate (90d)"
+                  title={t("profitEstimate90d")}
                   value={`$${(estProfit90dCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
                 <Card
-                  title="Profit Estimate (12m)"
+                  title={t("profitEstimate12m")}
                   value={`$${(estProfit12mCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 />
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                Cost baseline (30d): OpenAI ${openAiCostUsd30d.toFixed(2)}
-                {" + "}
-                WaveSpeed ${wavespeedCostUsd30d.toFixed(2)}
-                {" = "}
-                ${(estimatedCost30dCents / 100).toFixed(2)}.
-                {" "}Promo subsidy deducted: ${(promoCostTotalCents / 100).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })} ({totalUsers.toLocaleString()} users × $5.00).
-                {" "}Revenue estimate here uses billed usage deductions (not actual top-up cash timing).
-                {wavespeedUsage.enabled && wavespeedUsage.available === false
-                  ? " WaveSpeed cost unavailable, so profit is likely overstated."
-                  : ""}
+                {t("netProfitNote", {
+                  openai: openAiCostUsd30d.toFixed(2),
+                  wavespeed: wavespeedCostUsd30d.toFixed(2),
+                  total: (estimatedCost30dCents / 100).toFixed(2),
+                  promo: (promoCostTotalCents / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                  users: totalUsers.toLocaleString(),
+                })}
+                {wavespeedUsage.enabled && wavespeedUsage.available === false ? t("wavespeedCostUnavailable") : ""}
               </p>
             </div>
           </div>
@@ -601,25 +598,39 @@ export default async function AdminPage() {
         <section className="bg-white dark:bg-gray-800 rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              WaveSpeed Platform Usage (30d)
+              {t("manualTopup")}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              {t("manualTopupDesc")}
+            </p>
+          </div>
+          <div className="p-6">
+            <AdminCreditTopup />
+          </div>
+        </section>
+
+        <section className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t("wavespeedUsage")}
             </h2>
           </div>
           <div className="p-6 space-y-4">
             {!wavespeedUsage.enabled ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                WAVESPEED_API_KEY is not configured.
+                {t("wavespeedNoKey")}
               </p>
             ) : wavespeedUsage.available === false ? (
               <p className="text-sm text-red-600 dark:text-red-400">
-                Failed to load usage stats: {wavespeedUsage.error || "Unknown error"}
+                {t("wavespeedLoadError", { error: wavespeedUsage.error ?? "Unknown error" })}
               </p>
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Card title="WaveSpeed Requests" value={wavespeedUsage.summary.totalRequests.toLocaleString()} />
-                  <Card title="WaveSpeed Tasks" value={wavespeedUsage.summary.totalTasks.toLocaleString()} />
+                  <Card title={t("wavespeedRequests")} value={wavespeedUsage.summary.totalRequests.toLocaleString()} />
+                  <Card title={t("wavespeedTasks")} value={wavespeedUsage.summary.totalTasks.toLocaleString()} />
                   <Card
-                    title="WaveSpeed Cost (USD)"
+                    title={t("wavespeedCost")}
                     value={`$${wavespeedUsage.summary.totalCostUsd.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 4,
@@ -629,7 +640,7 @@ export default async function AdminPage() {
                 {wavespeedUsage.topModels.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Top Models
+                      {t("topModels")}
                     </p>
                     {wavespeedUsage.topModels.map((item: { model: string; requests: number; costUsd: number }, index: number) => (
                       <div
@@ -640,7 +651,7 @@ export default async function AdminPage() {
                           {item.model}
                         </span>
                         <span className="text-gray-900 dark:text-white shrink-0">
-                          {item.requests.toLocaleString()} req · ${item.costUsd.toFixed(4)}
+                          {t("reqCost", { req: item.requests.toLocaleString(), cost: item.costUsd.toFixed(4) })}
                         </span>
                       </div>
                     ))}
@@ -654,24 +665,24 @@ export default async function AdminPage() {
         <section className="bg-white dark:bg-gray-800 rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              OpenAI Usage (30d)
+              {t("openaiUsage")}
             </h2>
           </div>
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <Card title="OpenAI Requests" value={openAiRequests30d.toLocaleString()} />
-              <Card title="Prompt Tokens" value={openAiPromptTokens30d.toLocaleString()} />
-              <Card title="Completion Tokens" value={openAiCompletionTokens30d.toLocaleString()} />
-              <Card title="Est. Cost (USD)" value={`$${openAiCostUsd30d.toFixed(4)}`} />
+              <Card title={t("openaiRequests")} value={openAiRequests30d.toLocaleString()} />
+              <Card title={t("promptTokens")} value={openAiPromptTokens30d.toLocaleString()} />
+              <Card title={t("completionTokens")} value={openAiCompletionTokens30d.toLocaleString()} />
+              <Card title={t("estCostUsd")} value={`$${openAiCostUsd30d.toFixed(4)}`} />
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Cost uses configured model pricing (currently gpt-4o rates) based on tracked tokens.
+              {t("openaiNote")}
             </p>
 
             {openAiByModel30d.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  By Model
+                  {t("byModel")}
                 </p>
                 {openAiByModel30d.map((item: { model: string | null; _sum: { promptTokens: number | null; completionTokens: number | null; totalTokens: number | null } }) => {
                   const promptTokens = item._sum.promptTokens ?? 0;
@@ -690,8 +701,7 @@ export default async function AdminPage() {
                         {item.model ?? "unknown"}
                       </span>
                       <span className="text-gray-900 dark:text-white shrink-0">
-                        {(item._sum.totalTokens ?? 0).toLocaleString()} tokens · $
-                        {estCost.toFixed(4)}
+                        {t("tokensCost", { tokens: (item._sum.totalTokens ?? 0).toLocaleString(), cost: estCost.toFixed(4) })}
                       </span>
                     </div>
                   );
@@ -700,7 +710,7 @@ export default async function AdminPage() {
             )}
             {openAiTotalTokens30d === 0 && (
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                No OpenAI usage recorded in the last 30 days.
+                {t("noOpenaiUsage")}
               </p>
             )}
           </div>
@@ -709,12 +719,12 @@ export default async function AdminPage() {
         <section className="bg-white dark:bg-gray-800 rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Job Volume (Last 30 Days)
+              {t("jobVolume")}
             </h2>
           </div>
           <div className="p-6">
             {byJob30d.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-400">No runs logged yet.</p>
+              <p className="text-gray-500 dark:text-gray-400">{t("noRuns")}</p>
             ) : (
               <div className="space-y-3">
                 {byJob30d.map((item: { jobName: string; _count: { _all: number }; _avg: { durationMs: number | null } }) => (
@@ -724,9 +734,7 @@ export default async function AdminPage() {
                   >
                     <p className="font-medium text-gray-900 dark:text-white">{item.jobName}</p>
                     <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {item._count._all.toLocaleString()} runs
-                      {" · "}
-                      avg {Math.round(item._avg.durationMs ?? 0)}ms
+                      {t("runsSuffix", { runs: item._count._all.toLocaleString(), avg: Math.round(item._avg.durationMs ?? 0) })}
                     </p>
                   </div>
                 ))}
@@ -738,12 +746,12 @@ export default async function AdminPage() {
         <section className="bg-white dark:bg-gray-800 rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Recent Failures
+              {t("recentFailures")}
             </h2>
           </div>
           <div className="p-6">
             {recentFailures.length === 0 ? (
-              <p className="text-gray-500 dark:text-gray-400">No failures recorded.</p>
+              <p className="text-gray-500 dark:text-gray-400">{t("noFailures")}</p>
             ) : (
               <div className="space-y-3">
                 {recentFailures.map((item: { id: string; jobName: string; statusCode: number | null; error: string | null; triggeredBy: string | null; createdAt: Date }) => (

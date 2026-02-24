@@ -19,12 +19,21 @@ function parseSet(raw: string | undefined): Set<string> {
     raw
       .split(",")
       .map((v) => v.trim().toLowerCase())
-      .filter(Boolean)
+      .filter(Boolean),
   );
 }
 
 function normalizeRole(value: string) {
   return value.trim().toLowerCase();
+}
+
+function isTruthy(value: string | undefined) {
+  if (!value) return false;
+  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+}
+
+function isAuth0AdminOnlyEnabled() {
+  return isTruthy(process.env.AUTH0_ADMIN_ONLY);
 }
 
 function getRolesFromSessionUser(user: unknown): string[] {
@@ -45,10 +54,7 @@ function getRolesFromSessionUser(user: unknown): string[] {
         .filter(Boolean);
     }
     if (typeof raw === "string") {
-      return raw
-        .split(",")
-        .map(normalizeRole)
-        .filter(Boolean);
+      return raw.split(",").map(normalizeRole).filter(Boolean);
     }
   }
   return [];
@@ -81,6 +87,45 @@ function getPermissionsFromSessionUser(user: unknown): string[] {
   return [];
 }
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payload = Buffer.from(parts[1], "base64url").toString("utf8");
+    const parsed = JSON.parse(payload);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function getIdTokenPayloadFromSession(
+  session: unknown,
+): Record<string, unknown> | null {
+  if (!session || typeof session !== "object") return null;
+  const sessionObj = session as Record<string, unknown>;
+  const tokenSet =
+    sessionObj.tokenSet && typeof sessionObj.tokenSet === "object"
+      ? (sessionObj.tokenSet as Record<string, unknown>)
+      : null;
+  if (!tokenSet) return null;
+
+  const idToken =
+    (typeof tokenSet.idToken === "string" && tokenSet.idToken) ||
+    (typeof tokenSet.id_token === "string" && tokenSet.id_token) ||
+    null;
+  if (!idToken) return null;
+
+  return decodeJwtPayload(idToken);
+}
+
+function uniqueLowerCase(values: string[]) {
+  return Array.from(
+    new Set(values.map((item) => item.trim().toLowerCase()).filter(Boolean)),
+  );
+}
+
 function isAdminByIdentityFallback(params: {
   email?: string | null;
   auth0Sub?: string | null;
@@ -89,7 +134,9 @@ function isAdminByIdentityFallback(params: {
   const adminSubs = parseSet(process.env.ADMIN_AUTH0_SUBS);
   const email = params.email?.toLowerCase();
   const sub = params.auth0Sub?.toLowerCase();
-  return Boolean((email && adminEmails.has(email)) || (sub && adminSubs.has(sub)));
+  return Boolean(
+    (email && adminEmails.has(email)) || (sub && adminSubs.has(sub)),
+  );
 }
 
 export async function requireAdmin() {
@@ -98,20 +145,29 @@ export async function requireAdmin() {
     throw new Error("UNAUTHORIZED");
   }
 
-  const roles = getRolesFromSessionUser(session.user);
-  const permissions = getPermissionsFromSessionUser(session.user);
+  const idTokenPayload = getIdTokenPayloadFromSession(session);
+  const roles = uniqueLowerCase([
+    ...getRolesFromSessionUser(session.user),
+    ...getRolesFromSessionUser(idTokenPayload),
+  ]);
+  const permissions = uniqueLowerCase([
+    ...getPermissionsFromSessionUser(session.user),
+    ...getPermissionsFromSessionUser(idTokenPayload),
+  ]);
   const isAdminByRole = roles.includes("admin");
   const isAdminByPermission =
     permissions.includes("admin") ||
     permissions.includes("read:admin") ||
     permissions.includes("manage:admin");
+  const auth0AdminOnly = isAuth0AdminOnlyEnabled();
   const isAdmin =
     isAdminByRole ||
     isAdminByPermission ||
-    isAdminByIdentityFallback({
-      email: session.user.email ?? null,
-      auth0Sub: session.user.sub ?? null,
-    });
+    (!auth0AdminOnly &&
+      isAdminByIdentityFallback({
+        email: session.user.email ?? null,
+        auth0Sub: session.user.sub ?? null,
+      }));
   if (!isAdmin) {
     throw new Error("FORBIDDEN");
   }
