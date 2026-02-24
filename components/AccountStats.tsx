@@ -18,6 +18,8 @@ interface AccountStat {
   label: string | null;
   username: string | null;
   isDefault: boolean;
+  followersCount: number | null;
+  lastSyncedAt: string | null;
   posted: number;
   scheduled: number;
   failed: number;
@@ -27,7 +29,14 @@ interface AccountStat {
 
 interface StatsData {
   period: number;
-  totals: { posted: number; scheduled: number; failed: number; total: number; views: number; impressions: number };
+  totals: {
+    posted: number;
+    scheduled: number;
+    failed: number;
+    total: number;
+    views: number;
+    impressions: number;
+  };
   accounts: AccountStat[];
 }
 
@@ -55,12 +64,18 @@ export default function AccountStats() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
+  const [syncingFollowers, setSyncingFollowers] = useState(false);
+  const [followerSyncMsg, setFollowerSyncMsg] = useState("");
 
   const fetchStats = useCallback(() => {
     setLoading(true);
     Promise.all([
-      fetch(`/api/analytics/account-stats?period=${period}`).then((r) => r.json()),
-      fetch(`/api/analytics/impressions-daily?period=${period}`).then((r) => r.json()),
+      fetch(`/api/analytics/account-stats?period=${period}`).then((r) =>
+        r.json(),
+      ),
+      fetch(`/api/analytics/impressions-daily?period=${period}`).then((r) =>
+        r.json(),
+      ),
     ])
       .then(([stats, daily]) => {
         setData(stats);
@@ -78,10 +93,18 @@ export default function AccountStats() {
     setSyncing(true);
     setSyncMsg("");
     try {
-      const res = await fetch(`/api/analytics/sync-tweet-metrics?period=${period}`, { method: "POST" });
+      const res = await fetch(
+        `/api/analytics/sync-tweet-metrics?period=${period}`,
+        { method: "POST" },
+      );
       const d = await res.json();
       if (res.ok) {
-        setSyncMsg(t("syncDone", { synced: d.synced, impressions: d.totalImpressions.toLocaleString() }));
+        setSyncMsg(
+          t("syncDone", {
+            synced: d.synced,
+            impressions: d.totalImpressions.toLocaleString(),
+          }),
+        );
         fetchStats();
         router.refresh();
       } else {
@@ -91,6 +114,33 @@ export default function AccountStats() {
       setSyncMsg(t("syncFailed"));
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleSyncFollowers = async () => {
+    setSyncingFollowers(true);
+    setFollowerSyncMsg("");
+    try {
+      const res = await fetch("/api/analytics/sync-followers", {
+        method: "POST",
+      });
+      const d = await res.json();
+      if (res.ok) {
+        setFollowerSyncMsg(
+          t("followersSynced", {
+            synced: d.synced,
+            total: d.totalFollowers.toLocaleString(),
+          }),
+        );
+        fetchStats();
+        router.refresh();
+      } else {
+        setFollowerSyncMsg(t("syncFailed"));
+      }
+    } catch {
+      setFollowerSyncMsg(t("syncFailed"));
+    } finally {
+      setSyncingFollowers(false);
     }
   };
 
@@ -117,10 +167,21 @@ export default function AccountStats() {
                     : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 }`}
               >
-                {p}{t("days")}
+                {p}
+                {t("days")}
               </button>
             ))}
           </div>
+          <button
+            onClick={handleSyncFollowers}
+            disabled={syncingFollowers}
+            title={t("syncFollowersTooltip")}
+            className="px-3 py-1 text-sm rounded border border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 disabled:opacity-50 transition-colors"
+          >
+            {syncingFollowers
+              ? "⟳ " + t("syncing")
+              : "👥 " + t("syncFollowers")}
+          </button>
           <button
             onClick={handleSync}
             disabled={syncing}
@@ -138,6 +199,12 @@ export default function AccountStats() {
         </div>
       )}
 
+      {followerSyncMsg && (
+        <div className="px-6 py-2 text-sm text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border-b border-purple-100 dark:border-purple-800">
+          {followerSyncMsg}
+        </div>
+      )}
+
       {loading ? (
         <div className="px-6 py-6 text-center text-gray-500 dark:text-gray-400 text-sm">
           {t("loadingStats")}
@@ -151,24 +218,44 @@ export default function AccountStats() {
           {/* Totals row */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{(data.totals.impressions ?? 0).toLocaleString()}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t("statsImpressions")}</p>
+              <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                {(data.totals.impressions ?? 0).toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {t("statsImpressions")}
+              </p>
             </div>
             <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-purple-700 dark:text-purple-400">{(data.totals.views ?? 0).toLocaleString()}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t("statsViews")}</p>
+              <p className="text-2xl font-bold text-purple-700 dark:text-purple-400">
+                {(data.totals.views ?? 0).toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {t("statsViews")}
+              </p>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">{data.totals.total}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t("statsTotalPosts")}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {data.totals.total}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {t("statsTotalPosts")}
+              </p>
             </div>
             <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-green-700 dark:text-green-400">{data.totals.posted}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t("posted")}</p>
+              <p className="text-2xl font-bold text-green-700 dark:text-green-400">
+                {data.totals.posted}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {t("posted")}
+              </p>
             </div>
             <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-red-700 dark:text-red-400">{data.totals.failed}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t("failed")}</p>
+              <p className="text-2xl font-bold text-red-700 dark:text-red-400">
+                {data.totals.failed}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {t("failed")}
+              </p>
             </div>
           </div>
 
@@ -180,8 +267,14 @@ export default function AccountStats() {
               </p>
               <div className="h-44">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(156,163,175,0.3)" />
+                  <LineChart
+                    data={chartData}
+                    margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(156,163,175,0.3)"
+                    />
                     <XAxis
                       dataKey="date"
                       tickFormatter={(v) => formatXTick(v, period)}
@@ -199,8 +292,8 @@ export default function AccountStats() {
                         v >= 1_000_000
                           ? `${(v / 1_000_000).toFixed(1)}m`
                           : v >= 1000
-                          ? `${(v / 1000).toFixed(0)}k`
-                          : String(v)
+                            ? `${(v / 1000).toFixed(0)}k`
+                            : String(v)
                       }
                     />
                     <Tooltip
@@ -211,8 +304,14 @@ export default function AccountStats() {
                         fontSize: "12px",
                         color: "rgb(209,213,219)",
                       }}
-                      labelStyle={{ color: "rgb(156,163,175)", marginBottom: "4px" }}
-                      formatter={(value: number) => [value.toLocaleString(), t("statsImpressions")]}
+                      labelStyle={{
+                        color: "rgb(156,163,175)",
+                        marginBottom: "4px",
+                      }}
+                      formatter={(value: number | undefined) => [
+                        (value ?? 0).toLocaleString(),
+                        t("statsImpressions"),
+                      ]}
                     />
                     <Line
                       type="monotone"
@@ -245,7 +344,15 @@ export default function AccountStats() {
                         {acc.label || acc.username || t("unknownAccount")}
                       </p>
                       {acc.username && acc.label && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">@{acc.username}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          @{acc.username}
+                        </p>
+                      )}
+                      {acc.followersCount !== null && (
+                        <p className="text-xs text-purple-600 dark:text-purple-400">
+                          👥 {acc.followersCount.toLocaleString()}{" "}
+                          {t("statsFollowers")}
+                        </p>
                       )}
                     </div>
                     <div className="flex-1 flex items-center gap-2 min-w-0">
@@ -253,7 +360,9 @@ export default function AccountStats() {
                         <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                           <div
                             className="h-full bg-blue-500 rounded-full transition-all"
-                            style={{ width: `${Math.round((acc.total / data.totals.total) * 100)}%` }}
+                            style={{
+                              width: `${Math.round((acc.total / data.totals.total) * 100)}%`,
+                            }}
                           />
                         </div>
                       ) : (
@@ -262,12 +371,26 @@ export default function AccountStats() {
                     </div>
                     <div className="flex items-center gap-3 shrink-0 text-xs text-gray-500 dark:text-gray-400">
                       {acc.impressions > 0 && (
-                        <span className="text-blue-600 dark:text-blue-400">👁 {acc.impressions.toLocaleString()}</span>
+                        <span className="text-blue-600 dark:text-blue-400">
+                          👁 {acc.impressions.toLocaleString()}
+                        </span>
                       )}
-                      <span className="text-green-600 dark:text-green-400">{acc.posted} ✓</span>
-                      {acc.scheduled > 0 && <span className="text-yellow-600 dark:text-yellow-400">{acc.scheduled} ⏱</span>}
-                      {acc.failed > 0 && <span className="text-red-600 dark:text-red-400">{acc.failed} ✕</span>}
-                      <span className="font-medium text-gray-700 dark:text-gray-300 w-8 text-right">{acc.total}</span>
+                      <span className="text-green-600 dark:text-green-400">
+                        {acc.posted} ✓
+                      </span>
+                      {acc.scheduled > 0 && (
+                        <span className="text-yellow-600 dark:text-yellow-400">
+                          {acc.scheduled} ⏱
+                        </span>
+                      )}
+                      {acc.failed > 0 && (
+                        <span className="text-red-600 dark:text-red-400">
+                          {acc.failed} ✕
+                        </span>
+                      )}
+                      <span className="font-medium text-gray-700 dark:text-gray-300 w-8 text-right">
+                        {acc.total}
+                      </span>
                     </div>
                   </div>
                 ))}

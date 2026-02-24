@@ -4,14 +4,22 @@ import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { getUserXCredentials } from "@/lib/user-credentials";
 import { generateTweet } from "@/lib/openai";
 import { trackTokenUsage, trackWavespeedUsage } from "@/lib/usage-tracking";
-import { hasCredits, deductCredits, getCreditBalance, getWavespeedFeeCents, deductWavespeedCredits } from "@/lib/credits";
+import {
+  hasCredits,
+  deductCredits,
+  getCreditBalance,
+  getWavespeedFeeCents,
+  deductWavespeedCredits,
+} from "@/lib/credits";
 import { decodeRecurringAiPrompt } from "@/lib/recurring-ai";
+import { buildTrendPrompt } from "@/lib/trending";
 import { submitImageTask } from "@/lib/wavespeed";
 import { waitForImageOutput } from "@/lib/scheduler";
+import { isVerifiedMember } from "@/lib/subscription";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   let user;
   try {
@@ -20,7 +28,35 @@ export async function POST(
     return unauthorizedResponse();
   }
 
+  const membership = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { subscriptionTier: true, subscriptionStatus: true },
+  });
+  if (
+    !isVerifiedMember(
+      membership?.subscriptionTier,
+      membership?.subscriptionStatus,
+    )
+  ) {
+    await prisma.recurringSchedule.updateMany({
+      where: { userId: user.id, isActive: true },
+      data: { isActive: false },
+    });
+    return NextResponse.json({ error: "MEMBERSHIP_REQUIRED" }, { status: 403 });
+  }
+
   const { id } = await params;
+
+  // 可选：客户端传入指定新闻话题，覆盖 schedule.trendRegion 自动抓取
+  let bodyTrendName: string | undefined;
+  try {
+    const body = await request.json().catch(() => ({}));
+    if (typeof body?.trendName === "string" && body.trendName.trim()) {
+      bodyTrendName = body.trendName.trim();
+    }
+  } catch {
+    // body 为空也正常
+  }
 
   const schedule = await prisma.recurringSchedule.findFirst({
     where: { id, userId: user.id },
@@ -34,14 +70,17 @@ export async function POST(
   if (!resolved) {
     return NextResponse.json(
       { error: "X API credentials not configured for this schedule account." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   if (schedule.useAi && !(await hasCredits(user.id))) {
     return NextResponse.json(
-      { error: "Insufficient credits. Please add credits in Settings to continue using AI generation." },
-      { status: 402 }
+      {
+        error:
+          "Insufficient credits. Please add credits in Settings to continue using AI generation.",
+      },
+      { status: 402 },
     );
   }
 
@@ -63,7 +102,7 @@ export async function POST(
   if (sources.length === 0) {
     return NextResponse.json(
       { error: "No knowledge sources found for AI schedule test." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -77,10 +116,32 @@ export async function POST(
     })
     .join("\n\n---\n\n");
 
+  // 注入热点方向：优先使用客户端传入的指定话题，否则按 trendRegion 自动抓取
+  let effectivePrompt = decodedAiPrompt.prompt || undefined;
+  if (bodyTrendName) {
+    const trendContext = `Today's trending news: "${bodyTrendName}". Connect this topic naturally to my business context and create an engaging post.`;
+    effectivePrompt = decodedAiPrompt.prompt
+      ? `${trendContext} Additional direction: ${decodedAiPrompt.prompt}`
+      : trendContext;
+  } else if (schedule.trendRegion) {
+    try {
+      effectivePrompt = await buildTrendPrompt(
+        user.id,
+        schedule.trendRegion,
+        decodedAiPrompt.prompt,
+      );
+    } catch (trendErr) {
+      console.warn(
+        "Failed to fetch trends for test, using base prompt:",
+        trendErr,
+      );
+    }
+  }
+
   const generated = await generateTweet(
     knowledgeContext,
-    decodedAiPrompt.prompt || undefined,
-    schedule.aiLanguage || undefined
+    effectivePrompt,
+    schedule.aiLanguage || undefined,
   );
 
   if (generated.usage) {
@@ -106,7 +167,7 @@ export async function POST(
   if (!generated.success || !generated.content) {
     return NextResponse.json(
       { error: generated.error || "Failed to generate sample content." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -126,15 +187,31 @@ export async function POST(
         });
       }
 
-      const task = await submitImageTask({ modelId: imageModelId, prompt: responseContent, aspectRatio: "16:9" });
+      const task = await submitImageTask({
+        modelId: imageModelId,
+        prompt: responseContent,
+        aspectRatio: "16:9",
+      });
       const pollKey = task.outputs?.[0] ? task.id : task.urls?.get || task.id;
       const settled = task.outputs?.[0]
         ? { outputUrl: task.outputs[0], taskId: task.id }
         : await waitForImageOutput(pollKey);
 
       try {
-        await deductWavespeedCredits({ userId: user.id, modelId: imageModelId, mediaType: "image", source: "recurring_item_test_image", taskId: settled.taskId });
-        await trackWavespeedUsage({ userId: user.id, source: "recurring_item_test_image", model: imageModelId, prompt: responseContent, metadata: { scheduleId: schedule.id, taskId: settled.taskId } });
+        await deductWavespeedCredits({
+          userId: user.id,
+          modelId: imageModelId,
+          mediaType: "image",
+          source: "recurring_item_test_image",
+          taskId: settled.taskId,
+        });
+        await trackWavespeedUsage({
+          userId: user.id,
+          source: "recurring_item_test_image",
+          model: imageModelId,
+          prompt: responseContent,
+          metadata: { scheduleId: schedule.id, taskId: settled.taskId },
+        });
       } catch (usageErr) {
         console.error("Failed to track/deduct test image usage:", usageErr);
       }
@@ -150,7 +227,8 @@ export async function POST(
         success: true,
         mode: "ai",
         content: responseContent,
-        imageError: imgErr instanceof Error ? imgErr.message : "Image generation failed",
+        imageError:
+          imgErr instanceof Error ? imgErr.message : "Image generation failed",
       });
     }
   }

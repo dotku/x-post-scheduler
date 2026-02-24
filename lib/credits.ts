@@ -99,7 +99,7 @@ async function getSubscriptionDiscount(userId: string): Promise<number> {
     select: { subscriptionTier: true, subscriptionStatus: true },
   });
   if (user?.subscriptionStatus !== "active") return 1.0;
-  if (user.subscriptionTier === "gold") return 0.90;
+  if (user.subscriptionTier === "gold") return 0.9;
   if (user.subscriptionTier === "silver") return 0.92;
   return 1.0;
 }
@@ -201,7 +201,10 @@ export async function deductFlatFee(params: {
   source: string;
 }): Promise<{ costCents: number; newBalance: number }> {
   const discountMultiplier = await getSubscriptionDiscount(params.userId);
-  const costCents = Math.max(1, Math.ceil(params.feeCents * discountMultiplier));
+  const costCents = Math.max(
+    1,
+    Math.ceil(params.feeCents * discountMultiplier),
+  );
   const savedCents = params.feeCents - costCents;
 
   const updatedUser = await prisma.user.update({
@@ -291,6 +294,7 @@ export async function addCredits(params: {
   userId: string;
   amountCents: number;
   stripeSessionId: string;
+  description?: string;
 }): Promise<number> {
   // Prevent double-crediting on webhook retries
   const existing = await prisma.creditTransaction.findFirst({
@@ -312,7 +316,9 @@ export async function addCredits(params: {
       type: "topup",
       amountCents: params.amountCents,
       balanceAfter: updatedUser.creditBalanceCents,
-      description: `Credit top-up $${(params.amountCents / 100).toFixed(2)}`,
+      description:
+        params.description ||
+        `Credit top-up $${(params.amountCents / 100).toFixed(2)}`,
       stripeSessionId: params.stripeSessionId,
     },
   });

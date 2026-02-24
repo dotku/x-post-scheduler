@@ -1,0 +1,1 @@
+ALTER TABLE "XAccount" ADD COLUMN IF NOT EXISTS "followingCount" INTEGER;

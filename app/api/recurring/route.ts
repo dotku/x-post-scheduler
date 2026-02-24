@@ -1,16 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { addDays, addWeeks, addMonths } from "date-fns";
+import { addDays, addWeeks, addMonths, addHours } from "date-fns";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { getUserXCredentials } from "@/lib/user-credentials";
 import { IMAGE_MODELS } from "@/lib/wavespeed";
-import { decodeRecurringAiPrompt, encodeRecurringAiPrompt } from "@/lib/recurring-ai";
+import {
+  decodeRecurringAiPrompt,
+  encodeRecurringAiPrompt,
+} from "@/lib/recurring-ai";
+import {
+  isTierAtLeast,
+  isVerifiedMember,
+  HOURLY_FREQUENCIES,
+} from "@/lib/subscription";
+
+const ALL_FREQUENCIES = [
+  "daily",
+  "weekly",
+  "monthly",
+  ...Object.keys(HOURLY_FREQUENCIES),
+];
+
+async function getMembership(userId: string) {
+  const membership = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { subscriptionTier: true, subscriptionStatus: true },
+  });
+
+  return {
+    tier: membership?.subscriptionTier ?? null,
+    status: membership?.subscriptionStatus ?? null,
+    active: isVerifiedMember(
+      membership?.subscriptionTier,
+      membership?.subscriptionStatus,
+    ),
+  };
+}
 
 function calculateNextRun(frequency: string, cronExpr: string): Date {
   const now = new Date();
 
-  const [hours, minutes] = cronExpr.split(":").map(Number);
+  // Hourly interval frequencies — start N hours from now
+  if (frequency in HOURLY_FREQUENCIES) {
+    return addHours(now, HOURLY_FREQUENCIES[frequency].hours);
+  }
 
+  const [hours, minutes] = cronExpr.split(":").map(Number);
   let nextRun = new Date(now);
   nextRun.setHours(hours, minutes, 0, 0);
 
@@ -39,6 +74,15 @@ export async function GET() {
     return unauthorizedResponse();
   }
 
+  const membership = await getMembership(user.id);
+
+  if (!membership.active) {
+    await prisma.recurringSchedule.updateMany({
+      where: { userId: user.id, isActive: true },
+      data: { isActive: false },
+    });
+  }
+
   const [schedules, recurringUsage, dbUser] = await Promise.all([
     prisma.recurringSchedule.findMany({
       where: { userId: user.id },
@@ -64,10 +108,14 @@ export async function GET() {
       ...schedule,
       aiPrompt: decoded.prompt,
       imageModelId: decoded.imageModelId,
+      trendRegion: schedule.trendRegion ?? null,
     };
   });
 
   return NextResponse.json({
+    membershipActive: membership.active,
+    membershipTier: membership.tier,
+    membershipStatus: membership.status,
     balanceCents: dbUser?.creditBalanceCents ?? 0,
     usage: {
       requests: recurringUsage._count._all,
@@ -87,6 +135,11 @@ export async function POST(request: NextRequest) {
     return unauthorizedResponse();
   }
 
+  const membership = await getMembership(user.id);
+  if (!membership.active) {
+    return NextResponse.json({ error: "MEMBERSHIP_REQUIRED" }, { status: 403 });
+  }
+
   const body = await request.json();
   const {
     content,
@@ -97,8 +150,8 @@ export async function POST(request: NextRequest) {
     aiLanguage,
     xAccountId,
     imageModelId,
-  } =
-    body;
+    trendRegion,
+  } = body;
   const isAiMode = Boolean(useAi);
   const normalizedContent = typeof content === "string" ? content.trim() : "";
   const normalizedPrompt =
@@ -107,50 +160,75 @@ export async function POST(request: NextRequest) {
     typeof aiLanguage === "string" ? aiLanguage.trim() : undefined;
   const normalizedImageModelId =
     typeof imageModelId === "string" ? imageModelId.trim() : undefined;
+  const validTrendRegions = ["global", "usa", "china", "africa"];
+  const normalizedTrendRegion =
+    typeof trendRegion === "string" && validTrendRegions.includes(trendRegion)
+      ? trendRegion
+      : null;
 
   if (!isAiMode) {
     if (!normalizedContent) {
       return NextResponse.json(
         { error: "Content is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (normalizedContent.length > 280) {
       return NextResponse.json(
         { error: "Content exceeds 280 characters" },
-        { status: 400 }
+        { status: 400 },
       );
     }
   } else if (normalizedPrompt && normalizedPrompt.length > 500) {
     return NextResponse.json(
       { error: "AI prompt exceeds 500 characters" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   if (normalizedImageModelId) {
-    const validModel = IMAGE_MODELS.find((model) => model.id === normalizedImageModelId);
+    const validModel = IMAGE_MODELS.find(
+      (model) => model.id === normalizedImageModelId,
+    );
     if (!validModel) {
       return NextResponse.json(
         { error: "Invalid image model selection" },
-        { status: 400 }
+        { status: 400 },
       );
     }
   }
 
-  if (!frequency || !["daily", "weekly", "monthly"].includes(frequency)) {
-    return NextResponse.json(
-      { error: "Invalid frequency" },
-      { status: 400 }
-    );
+  if (!frequency || !ALL_FREQUENCIES.includes(frequency)) {
+    return NextResponse.json({ error: "Invalid frequency" }, { status: 400 });
   }
 
-  if (!cronExpr) {
-    return NextResponse.json(
-      { error: "Time is required" },
-      { status: 400 }
-    );
+  if (!(frequency in HOURLY_FREQUENCIES) && !cronExpr) {
+    return NextResponse.json({ error: "Time is required" }, { status: 400 });
+  }
+
+  // Check tier requirements for trendRegion and hourly frequencies
+  const needsTierCheck =
+    normalizedTrendRegion || frequency in HOURLY_FREQUENCIES;
+  if (needsTierCheck) {
+    // trendRegion 功能仅限白银及以上会员
+    if (normalizedTrendRegion && !isTierAtLeast(membership.tier, "silver")) {
+      return NextResponse.json(
+        { error: "TIER_REQUIRED", minTier: "silver" },
+        { status: 403 },
+      );
+    }
+
+    // Hourly frequency tier check
+    if (frequency in HOURLY_FREQUENCIES) {
+      const required = HOURLY_FREQUENCIES[frequency].minTier;
+      if (!isTierAtLeast(membership.tier, required)) {
+        return NextResponse.json(
+          { error: "TIER_REQUIRED", minTier: required },
+          { status: 403 },
+        );
+      }
+    }
   }
 
   const nextRunAt = calculateNextRun(frequency, cronExpr);
@@ -158,7 +236,7 @@ export async function POST(request: NextRequest) {
   if (!resolvedAccount) {
     return NextResponse.json(
       { error: "Please select a valid connected X account." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -173,6 +251,7 @@ export async function POST(request: NextRequest) {
           })
         : null,
       aiLanguage: isAiMode ? normalizedLanguage : null,
+      trendRegion: isAiMode ? normalizedTrendRegion : null,
       frequency,
       cronExpr,
       nextRunAt,

@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { runScheduler } from "../lib/scheduler";
 
-console.log("Starting X Post Scheduler background worker...");
+console.log("Starting xPilot background worker...");
 
 // Run every minute to check for due posts
 cron.schedule("* * * * *", async () => {
@@ -9,7 +9,7 @@ cron.schedule("* * * * *", async () => {
   const result = await runScheduler();
   if (result.success) {
     console.log(
-      `Processed ${result.postsProcessed} posts, ${result.schedulesProcessed} recurring schedules`
+      `Processed ${result.postsProcessed} posts, ${result.schedulesProcessed} recurring schedules`,
     );
   } else {
     console.error("Scheduler error:", result.error);

@@ -19,6 +19,9 @@ interface XAccount {
   username: string | null;
   isDefault: boolean;
   createdAt: string;
+  followersCount: number | null;
+  followingCount: number | null;
+  lastSyncedAt: string | null;
 }
 
 type VerifyStatus = "idle" | "checking" | "ok" | "error";
@@ -113,6 +116,7 @@ export default function SettingsPage() {
   const [accountLimit, setAccountLimit] = useState<number>(1);
   const [subLoading, setSubLoading] = useState<string | null>(null);
   const [syncingSubscription, setSyncingSubscription] = useState(false);
+  const [syncingFollowers, setSyncingFollowers] = useState(false);
   const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">(
     "monthly",
   );
@@ -162,16 +166,16 @@ export default function SettingsPage() {
         ),
       });
       window.history.replaceState({}, "", window.location.pathname);
-      
+
       // Poll for subscription update (webhook might take a few seconds)
       const pollSubscription = async () => {
         let attempts = 0;
         const maxAttempts = 10; // Try for up to 10 seconds
-        
+
         const poll = async () => {
           attempts++;
           await fetchData();
-          
+
           // Check if subscription is updated
           const subRes = await fetch("/api/me/subscription");
           if (subRes.ok) {
@@ -188,7 +192,7 @@ export default function SettingsPage() {
               return true;
             }
           }
-          
+
           if (attempts < maxAttempts) {
             setTimeout(() => void poll(), 1000);
           } else {
@@ -202,10 +206,10 @@ export default function SettingsPage() {
           }
           return false;
         };
-        
+
         void poll();
       };
-      
+
       void pollSubscription();
       return;
     }
@@ -508,6 +512,22 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleSyncFollowers() {
+    setSyncingFollowers(true);
+    try {
+      const res = await fetch("/api/analytics/sync-followers", {
+        method: "POST",
+      });
+      if (res.ok) {
+        await fetchData();
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      setSyncingFollowers(false);
+    }
+  }
+
   function handleStartEdit(account: XAccount) {
     setEditState({
       accountId: account.id,
@@ -736,79 +756,80 @@ export default function SettingsPage() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {tr("Profile", "个人信息")}
-          </h2>
-          <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-4">
-            {user.picture && (
-              <img
-                src={user.picture}
-                alt={user.name || "User"}
-                className="w-14 h-14 rounded-full border border-gray-200 dark:border-gray-700"
-              />
-            )}
-            <div className="min-w-0">
-              <p className="text-base font-semibold text-gray-900 dark:text-white truncate">
-                {user.name || tr("Unnamed user", "未命名用户")}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                {user.email || "—"}
-              </p>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {tr("Profile", "个人信息")}
+            </h2>
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-4">
+              {user.picture && (
+                <img
+                  src={user.picture}
+                  alt={user.name || "User"}
+                  className="w-14 h-14 rounded-full border border-gray-200 dark:border-gray-700"
+                />
+              )}
+              <div className="min-w-0">
+                <p className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                  {user.name || tr("Unnamed user", "未命名用户")}
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                  {user.email || "—"}
+                </p>
+              </div>
+              <div className="sm:ml-auto text-sm text-gray-600 dark:text-gray-300">
+                <p>
+                  {tr("Membership:", "会员等级：")}{" "}
+                  {subTier
+                    ? appLanguage === "zh"
+                      ? getTierInfo(subTier)?.labelZh
+                      : getTierInfo(subTier)?.label
+                    : tr("None", "未订阅")}
+                </p>
+                <p>
+                  {tr("Status:", "状态：")} {subStatus || "—"}
+                </p>
+                <button
+                  onClick={handleSyncSubscription}
+                  disabled={syncingSubscription}
+                  className="mt-2 px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+                >
+                  {syncingSubscription
+                    ? tr("Syncing...", "同步中...")
+                    : tr("Sync Subscription", "同步订阅")}
+                </button>
+              </div>
             </div>
-            <div className="sm:ml-auto text-sm text-gray-600 dark:text-gray-300">
-              <p>
-                {tr("Membership:", "会员等级：")}{" "}
-                {subTier
-                  ? appLanguage === "zh"
-                    ? getTierInfo(subTier)?.labelZh
-                    : getTierInfo(subTier)?.label
-                  : tr("None", "未订阅")}
-              </p>
-              <p>
-                {tr("Status:", "状态：")} {subStatus || "—"}
-              </p>
-              <button
-                onClick={handleSyncSubscription}
-                disabled={syncingSubscription}
-                className="mt-2 px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {tr("Language", "语言")}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {tr(
+                "Choose your preferred language for supported pages.",
+                "选择你的页面显示语言。",
+              )}
+            </p>
+            <div className="mt-4 flex flex-col sm:flex-row gap-3">
+              <select
+                value={appLanguage}
+                onChange={(e) => setAppLanguage(e.target.value as AppLanguage)}
+                className="w-full sm:w-56 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               >
-                {syncingSubscription
-                  ? tr("Syncing...", "同步中...")
-                  : tr("Sync Subscription", "同步订阅")}
+                <option value="en">English</option>
+                <option value="zh">简体中文</option>
+              </select>
+              <button
+                type="button"
+                onClick={handleSaveLanguage}
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                {tr("Save Language", "保存语言")}
               </button>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {tr("Language", "语言")}
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            {tr(
-              "Choose your preferred language for supported pages.",
-              "选择你的页面显示语言。",
-            )}
-          </p>
-          <div className="mt-4 flex flex-col sm:flex-row gap-3">
-            <select
-              value={appLanguage}
-              onChange={(e) => setAppLanguage(e.target.value as AppLanguage)}
-              className="w-full sm:w-56 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            >
-              <option value="en">English</option>
-              <option value="zh">简体中文</option>
-            </select>
-            <button
-              type="button"
-              onClick={handleSaveLanguage}
-              className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              {tr("Save Language", "保存语言")}
-            </button>
-          </div>
-        </div>
-        </div>{/* end Profile+Language grid */}
+        {/* end Profile+Language grid */}
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
           <div className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -823,9 +844,26 @@ export default function SettingsPage() {
                 )}
               </p>
             </div>
-            <span className="inline-flex items-center self-start px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-              {tr(`${accounts.length} connected`, `${accounts.length} 已连接`)}
-            </span>
+            <div className="flex items-center gap-2 self-start">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                {tr(
+                  `${accounts.length} connected`,
+                  `${accounts.length} 已连接`,
+                )}
+              </span>
+              {accounts.length > 0 && (
+                <button
+                  onClick={() => void handleSyncFollowers()}
+                  disabled={syncingFollowers}
+                  className="px-3 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                  title={tr("Sync follower counts", "同步粉丝数")}
+                >
+                  {syncingFollowers
+                    ? tr("Syncing...", "同步中...")
+                    : tr("Sync Followers", "同步粉丝数")}
+                </button>
+              )}
+            </div>
           </div>
 
           {accounts.length === 0 ? (
@@ -882,6 +920,9 @@ export default function SettingsPage() {
                               : tr("No username", "无用户名")}
                             {account.isDefault
                               ? tr(" • Default", " • 默认")
+                              : ""}
+                            {account.lastSyncedAt != null
+                              ? ` • ${(account.followersCount ?? 0).toLocaleString()} ${tr("followers", "粉丝")} / ${(account.followingCount ?? 0).toLocaleString()} ${tr("following", "关注")}`
                               : ""}
                           </p>
                           {status === "error" && verifyError[account.id] && (
@@ -1097,7 +1138,10 @@ export default function SettingsPage() {
                     type="text"
                     value={label}
                     onChange={(e) => setLabel(e.target.value)}
-                    placeholder={tr("e.g. Brand Main, Personal", "例如：品牌主号、个人号")}
+                    placeholder={tr(
+                      "e.g. Brand Main, Personal",
+                      "例如：品牌主号、个人号",
+                    )}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 </div>
@@ -1348,7 +1392,12 @@ export default function SettingsPage() {
                     : "Yearly saves 2 months"}
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">
+                {appLanguage === "zh"
+                  ? "提示：AI Post Scheduler（自动发布）仅订阅会员可用。"
+                  : "Note: AI Post Scheduler (auto-post) is available to subscribed members only."}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {/* Pay as you go option */}
                 <div className="rounded-xl border-2 border-gray-200 dark:border-gray-700 p-4 flex flex-col gap-2">
                   <p className="font-bold text-gray-900 dark:text-white">
@@ -1360,13 +1409,15 @@ export default function SettingsPage() {
                   <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 flex-1">
                     <li>
                       ✓{" "}
-                      {appLanguage === "zh" ? "1 个账号" : "1 account"}
-                    </li>
-                    <li>
-                      ✓{" "}
                       {appLanguage === "zh"
                         ? "按需购买积分"
                         : "Buy credits as needed"}
+                    </li>
+                    <li className="text-gray-400 dark:text-gray-500">
+                      ✗{" "}
+                      {appLanguage === "zh"
+                        ? "不支持社交账号自动发布"
+                        : "No social auto-posting"}
                     </li>
                     <li className="text-gray-400 dark:text-gray-500">
                       ✗{" "}
@@ -1462,8 +1513,8 @@ export default function SettingsPage() {
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
                     {appLanguage === "zh"
-                      ? "专属定制方案，适合团队与企业用户"
-                      : "Custom solutions for teams and enterprises"}
+                      ? "专属定制方案，适合月预算 $15k+ 的团队与企业用户"
+                      : "Custom solutions for teams & enterprises with $15k+ monthly budget"}
                   </p>
                 </div>
                 <a
@@ -1480,160 +1531,165 @@ export default function SettingsPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-start">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {tr("Credits & Billing", "积分与账单")}
-          </h2>
-          <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
-            <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {tr("Current Balance", "当前余额")}
-              </p>
-              <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                ${(credits.balanceCents / 100).toFixed(2)}
-              </p>
-              {(subTier === "gold" || subTier === "silver") && credits.totalSavedCents > 0 && (
-                <p className="text-sm text-green-600 dark:text-green-400 mt-1">
-                  {appLanguage === "zh"
-                    ? `会员折扣已节省 $${(credits.totalSavedCents / 100).toFixed(2)}`
-                    : `Saved $${(credits.totalSavedCents / 100).toFixed(2)} with membership discount`}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {tr("Credits & Billing", "积分与账单")}
+            </h2>
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
+              <div>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {tr("Current Balance", "当前余额")}
                 </p>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {([500, 1000, 2500] as const).map((amount) => (
-                <button
-                  key={amount}
-                  onClick={() => handleTopup(amount)}
-                  disabled={topupLoading !== null}
-                  className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                  {topupLoading === amount
-                    ? tr("Loading...", "加载中...")
-                    : tr(
-                        `Add $${(amount / 100).toFixed(2)}`,
-                        `充值 $${(amount / 100).toFixed(2)}`,
-                      )}
-                </button>
-              ))}
-            </div>
-          </div>
-          {credits.transactions.length > 0 && (
-            <div className="mt-4">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                {tr("Recent Transactions", "最近交易")}
-              </p>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                {credits.transactions.map((tx) => (
-                  <div
-                    key={tx.id}
-                    className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-sm py-1"
+                <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                  ${(credits.balanceCents / 100).toFixed(2)}
+                </p>
+                {(subTier === "gold" || subTier === "silver") &&
+                  credits.totalSavedCents > 0 && (
+                    <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                      {appLanguage === "zh"
+                        ? `会员折扣已节省 $${(credits.totalSavedCents / 100).toFixed(2)}`
+                        : `Saved $${(credits.totalSavedCents / 100).toFixed(2)} with membership discount`}
+                    </p>
+                  )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {([500, 1000, 2500] as const).map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => handleTopup(amount)}
+                    disabled={topupLoading !== null}
+                    className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className={`font-mono font-medium shrink-0 ${tx.amountCents >= 0 ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}
-                      >
-                        {tx.amountCents >= 0 ? "+" : ""}$
-                        {(tx.amountCents / 100).toFixed(2)}
-                      </span>
-                      <span className="text-gray-600 dark:text-gray-400 truncate">
-                        {tx.description || tx.type}
-                      </span>
-                    </div>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 ml-2">
-                      {format(new Date(tx.createdAt), "MMM d, h:mm a")}
-                    </span>
-                  </div>
+                    {topupLoading === amount
+                      ? tr("Loading...", "加载中...")
+                      : tr(
+                          `Add $${(amount / 100).toFixed(2)}`,
+                          `充值 $${(amount / 100).toFixed(2)}`,
+                        )}
+                  </button>
                 ))}
               </div>
             </div>
-          )}
-        </div>
-
-        {usage && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {tr("AI Usage", "AI 使用情况")}
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {tr(
-                `Token consumption in the last ${usage.rangeDays} days.`,
-                `最近 ${usage.rangeDays} 天的 token 消耗。`,
-              )}
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {tr("Requests", "请求次数")}
-                </p>
-                <p className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {usage.window.requests}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {tr("Prompt tokens", "提示 token")}
-                </p>
-                <p className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {usage.window.promptTokens.toLocaleString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {tr("Completion tokens", "输出 token")}
-                </p>
-                <p className="text-xl font-semibold text-gray-900 dark:text-white">
-                  {usage.window.completionTokens.toLocaleString()}
-                </p>
-              </div>
-            </div>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mt-4">
-              {tr("Total tokens (30d): ", "30天总 token：")}
-              <span className="font-semibold">
-                {usage.window.totalTokens.toLocaleString()}
-              </span>
-              {tr(" • All-time total: ", " • 历史总计：")}
-              <span className="font-semibold">
-                {usage.allTime.totalTokens.toLocaleString()}
-              </span>
-            </p>
-            {(usage.byModel?.length ?? 0) > 0 && (
-              <div className="mt-5">
+            {credits.transactions.length > 0 && (
+              <div className="mt-4">
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {tr(
-                    `Usage by Model (${usage.rangeDays}d)`,
-                    `模型使用量（${usage.rangeDays} 天）`,
-                  )}
+                  {tr("Recent Transactions", "最近交易")}
                 </p>
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {usage.byModel!.map((item) => {
-                    const displayProvider = item.provider === "wavespeed" ? "bytedance" : item.provider;
-                    return (
+                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                  {credits.transactions.map((tx) => (
                     <div
-                      key={`${item.provider}:${item.model}`}
-                      className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2"
+                      key={tx.id}
+                      className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-sm py-1"
                     >
-                      <p className="text-sm text-gray-900 dark:text-white break-all">
-                        <span className="text-xs uppercase text-gray-500 dark:text-gray-400 mr-2">
-                          {displayProvider}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className={`font-mono font-medium shrink-0 ${tx.amountCents >= 0 ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}
+                        >
+                          {tx.amountCents >= 0 ? "+" : ""}$
+                          {(tx.amountCents / 100).toFixed(2)}
                         </span>
-                        {item.model}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {tr(
-                          `${item.requests.toLocaleString()} req • ${item.totalTokens.toLocaleString()} tokens`,
-                          `${item.requests.toLocaleString()} 次请求 • ${item.totalTokens.toLocaleString()} token`,
-                        )}
-                      </p>
+                        <span className="text-gray-600 dark:text-gray-400 truncate">
+                          {tx.description || tx.type}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0 ml-2">
+                        {format(new Date(tx.createdAt), "MMM d, h:mm a")}
+                      </span>
                     </div>
-                    );
-                  })}
+                  ))}
                 </div>
               </div>
             )}
           </div>
-        )}
-        </div>{/* end Credits+AI Usage grid */}
+
+          {usage && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {tr("AI Usage", "AI 使用情况")}
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {tr(
+                  `Token consumption in the last ${usage.rangeDays} days.`,
+                  `最近 ${usage.rangeDays} 天的 token 消耗。`,
+                )}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {tr("Requests", "请求次数")}
+                  </p>
+                  <p className="text-xl font-semibold text-gray-900 dark:text-white">
+                    {usage.window.requests}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {tr("Prompt tokens", "提示 token")}
+                  </p>
+                  <p className="text-xl font-semibold text-gray-900 dark:text-white">
+                    {usage.window.promptTokens.toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {tr("Completion tokens", "输出 token")}
+                  </p>
+                  <p className="text-xl font-semibold text-gray-900 dark:text-white">
+                    {usage.window.completionTokens.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mt-4">
+                {tr("Total tokens (30d): ", "30天总 token：")}
+                <span className="font-semibold">
+                  {usage.window.totalTokens.toLocaleString()}
+                </span>
+                {tr(" • All-time total: ", " • 历史总计：")}
+                <span className="font-semibold">
+                  {usage.allTime.totalTokens.toLocaleString()}
+                </span>
+              </p>
+              {(usage.byModel?.length ?? 0) > 0 && (
+                <div className="mt-5">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    {tr(
+                      `Usage by Model (${usage.rangeDays}d)`,
+                      `模型使用量（${usage.rangeDays} 天）`,
+                    )}
+                  </p>
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {usage.byModel!.map((item) => {
+                      const displayProvider =
+                        item.provider === "wavespeed"
+                          ? "bytedance"
+                          : item.provider;
+                      return (
+                        <div
+                          key={`${item.provider}:${item.model}`}
+                          className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2"
+                        >
+                          <p className="text-sm text-gray-900 dark:text-white break-all">
+                            <span className="text-xs uppercase text-gray-500 dark:text-gray-400 mr-2">
+                              {displayProvider}
+                            </span>
+                            {item.model}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {tr(
+                              `${item.requests.toLocaleString()} req • ${item.totalTokens.toLocaleString()} tokens`,
+                              `${item.requests.toLocaleString()} 次请求 • ${item.totalTokens.toLocaleString()} token`,
+                            )}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        {/* end Credits+AI Usage grid */}
 
         {message && (
           <div
@@ -1646,7 +1702,6 @@ export default function SettingsPage() {
             {message.text}
           </div>
         )}
-
       </main>
     </div>
   );

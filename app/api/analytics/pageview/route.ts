@@ -17,11 +17,16 @@ function trimOrNull(value: string | undefined, max = 512) {
 
 function isMissingWebVisitRelationError(error: unknown) {
   if (!error || typeof error !== "object") return false;
-  const candidate = error as { message?: unknown; meta?: unknown };
+  const candidate = error as {
+    message?: unknown;
+    meta?: unknown;
+    code?: unknown;
+  };
   const message =
     typeof candidate.message === "string" ? candidate.message : "";
   const meta = JSON.stringify(candidate.meta ?? {});
   return (
+    candidate.code === "P2021" ||
     message.includes("42P01") ||
     message.includes('relation "WebVisit" does not exist') ||
     meta.includes("42P01")
@@ -65,10 +70,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await prisma.$executeRaw`
-      INSERT INTO "WebVisit" ("path", "referrer", "sessionId", "userAgent", "country", "userId")
-      VALUES (${path}, ${referrer}, ${sessionId}, ${userAgent}, ${country}, ${userId})
-    `;
+    await prisma.webVisit.create({
+      data: {
+        path,
+        referrer,
+        sessionId,
+        userAgent,
+        country,
+        userId,
+      },
+    });
   } catch (error) {
     if (!isMissingWebVisitRelationError(error)) {
       console.error("Failed to insert pageview:", error);

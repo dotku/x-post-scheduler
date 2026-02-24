@@ -1,4 +1,4 @@
-name = "x-post-scheduler-cron"
+name = "xpilot-cron"
 main = "src/index.ts"
 compatibility_date = "2026-02-18"
 
@@ -16,7 +16,7 @@ crons = ["* * * * *", "0 0 * * *"]
 # Secrets: npx wrangler secret put APP_BASE_URL --env dev
 #          npx wrangler secret put CRON_SECRET --env dev
 [env.dev]
-name = "x-post-scheduler-cron-dev"
+name = "xpilot-cron-dev"
 
 [env.dev.triggers]
 crons = ["*/5 * * * *"]

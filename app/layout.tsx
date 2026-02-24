@@ -1,4 +1,28 @@
-// Root layout — minimal shell. All pages live under app/[locale]/ which provides html/body.
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "xPilot - Your Social Marketing Copilot AI",
+  description: "Schedule and automate your X (Twitter) posts",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return (
+    <html suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        {children}
+      </body>
+    </html>
+  );
 }

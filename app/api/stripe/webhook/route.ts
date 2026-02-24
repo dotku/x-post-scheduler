@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     }
 
     case "invoice.payment_succeeded": {
-      const invoice = event.data.object as Stripe.Invoice;
+      const invoice = event.data.object as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null };
       // Only credit for recurring subscriptions (not initial subscription creation)
       // Initial subscription is handled by checkout.session.completed
       if (

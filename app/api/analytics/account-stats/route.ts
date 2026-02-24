@@ -12,7 +12,9 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const periodParam = searchParams.get("period") ?? "30";
-  const period = [7, 30, 90].includes(Number(periodParam)) ? Number(periodParam) : 30;
+  const period = [7, 30, 90].includes(Number(periodParam))
+    ? Number(periodParam)
+    : 30;
 
   const since = new Date();
   since.setDate(since.getDate() - period);
@@ -20,7 +22,14 @@ export async function GET(request: NextRequest) {
   const [accounts, posts, siteViews] = await Promise.all([
     prisma.xAccount.findMany({
       where: { userId: user.id },
-      select: { id: true, label: true, username: true, isDefault: true },
+      select: {
+        id: true,
+        label: true,
+        username: true,
+        isDefault: true,
+        followersCount: true,
+        lastSyncedAt: true,
+      },
     }),
     prisma.post.findMany({
       where: {
@@ -35,11 +44,19 @@ export async function GET(request: NextRequest) {
   ]);
 
   // Aggregate counts by account
-  const accountMap = new Map<string, { posted: number; scheduled: number; failed: number; impressions: number }>();
+  const accountMap = new Map<
+    string,
+    { posted: number; scheduled: number; failed: number; impressions: number }
+  >();
   for (const post of posts) {
     const key = post.xAccountId ?? "__none__";
     if (!accountMap.has(key)) {
-      accountMap.set(key, { posted: 0, scheduled: 0, failed: 0, impressions: 0 });
+      accountMap.set(key, {
+        posted: 0,
+        scheduled: 0,
+        failed: 0,
+        impressions: 0,
+      });
     }
     const entry = accountMap.get(key)!;
     if (post.status === "posted") entry.posted++;
@@ -49,12 +66,19 @@ export async function GET(request: NextRequest) {
   }
 
   const accountStats = accounts.map((acc) => {
-    const counts = accountMap.get(acc.id) ?? { posted: 0, scheduled: 0, failed: 0, impressions: 0 };
+    const counts = accountMap.get(acc.id) ?? {
+      posted: 0,
+      scheduled: 0,
+      failed: 0,
+      impressions: 0,
+    };
     return {
       accountId: acc.id,
       label: acc.label,
       username: acc.username,
       isDefault: acc.isDefault,
+      followersCount: acc.followersCount ?? null,
+      lastSyncedAt: acc.lastSyncedAt ?? null,
       ...counts,
       total: counts.posted + counts.scheduled + counts.failed,
     };

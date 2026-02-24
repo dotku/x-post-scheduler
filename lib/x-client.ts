@@ -36,7 +36,7 @@ export interface TweetMedia {
 
 export async function getTweetWithMedia(
   tweetId: string,
-  credentials: XCredentials
+  credentials: XCredentials,
 ): Promise<{ mediaUrls: string[] }> {
   const client = createXClient(credentials);
   const response = await client.v2.singleTweet(tweetId, {
@@ -47,8 +47,9 @@ export async function getTweetWithMedia(
   const mediaItems = response.includes?.media ?? [];
   const urls: string[] = [];
   for (const m of mediaItems) {
-    const url = (m as { url?: string; preview_image_url?: string }).url
-      ?? (m as { url?: string; preview_image_url?: string }).preview_image_url;
+    const url =
+      (m as { url?: string; preview_image_url?: string }).url ??
+      (m as { url?: string; preview_image_url?: string }).preview_image_url;
     if (url) urls.push(url);
   }
   return { mediaUrls: urls };
@@ -56,7 +57,7 @@ export async function getTweetWithMedia(
 
 export async function postTweet(
   content: string,
-  credentials: XCredentials
+  credentials: XCredentials,
 ): Promise<PostResult> {
   try {
     const client = createXClient(credentials);
@@ -80,7 +81,7 @@ export async function postTweet(
 export async function getRecentTweets(
   limit: number,
   excludeTweetIds: Set<string>,
-  credentials: XCredentials
+  credentials: XCredentials,
 ): Promise<TimelineTweet[]> {
   if (limit <= 0) return [];
 
@@ -115,7 +116,7 @@ export async function postTweetWithMedia(
   content: string,
   imageBuffer: Buffer,
   mimeType: string,
-  credentials: XCredentials
+  credentials: XCredentials,
 ): Promise<PostResult> {
   try {
     const client = createXClient(credentials);
@@ -159,7 +160,7 @@ export interface TweetMetricsResult {
  */
 export async function batchTweetMetrics(
   tweetIds: string[],
-  credentials: XCredentials
+  credentials: XCredentials,
 ): Promise<Map<string, TweetMetricsResult>> {
   const result = new Map<string, TweetMetricsResult>();
   if (tweetIds.length === 0) return result;
@@ -176,7 +177,11 @@ export async function batchTweetMetrics(
       const response = await client.v2.tweets(chunk, {
         "tweet.fields": ["public_metrics"],
       });
-      const tweets = Array.isArray(response.data) ? response.data : (response.data ? [response.data] : []);
+      const tweets = Array.isArray(response.data)
+        ? response.data
+        : response.data
+          ? [response.data]
+          : [];
       for (const tweet of tweets) {
         const m = tweet.public_metrics;
         result.set(tweet.id, {
