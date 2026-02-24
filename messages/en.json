@@ -2,9 +2,9 @@
   "nav": {
     "gallery": "Community",
     "toolbox": "Media Studio",
-    "generate": "AI Writer",
+    "generate": "AI Post Scheduler",
     "compose": "Compose Post",
-    "autoPost": "Auto Post Manager",
+    "autoPost": "AI Post Scheduler",
     "knowledge": "Knowledge Base",
     "appTitle": "xPilot"
   },
@@ -223,6 +223,9 @@
     "sampleContent": "Sample Content",
     "saveTask": "Save Task",
     "yourSchedules": "Your Schedules",
+    "subscribeReminderTitle": "Auto schedules are paused",
+    "subscribeReminderBody": "Your membership is inactive. Subscribe to enable auto post schedules.",
+    "subscribeNow": "Subscribe now",
     "loading": "Loading…",
     "noSchedules": "No auto posts yet. Create one above!",
     "aiLabel": "AI",

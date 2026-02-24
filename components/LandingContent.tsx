@@ -595,10 +595,15 @@ export default function LandingContent({
           <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">
             {t("pricingTitle")}
           </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-10 max-w-xl mx-auto">
+          <p className="text-gray-600 dark:text-gray-400 mb-3 max-w-xl mx-auto">
             {t("pricingSubtitle")}
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+          <p className="text-xs text-amber-600 dark:text-amber-400 mb-10 max-w-2xl mx-auto">
+            {lang === "zh"
+              ? "提示：AI Post Scheduler（自动发布）仅订阅会员可用。"
+              : "Note: AI Post Scheduler (auto-post) is available to subscribed members only."}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Pay as you go plan */}
             <div className="relative rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-6 flex flex-col text-left">
               <p className="text-base font-bold text-gray-900 dark:text-white mb-1">

@@ -8,7 +8,11 @@ import {
   decodeRecurringAiPrompt,
   encodeRecurringAiPrompt,
 } from "@/lib/recurring-ai";
-import { isTierAtLeast, HOURLY_FREQUENCIES } from "@/lib/subscription";
+import {
+  isTierAtLeast,
+  isVerifiedMember,
+  HOURLY_FREQUENCIES,
+} from "@/lib/subscription";
 
 const ALL_FREQUENCIES = [
   "daily",
@@ -78,6 +82,24 @@ export async function PATCH(
   }
 
   const { id } = await params;
+
+  const membership = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { subscriptionTier: true, subscriptionStatus: true },
+  });
+  const membershipActive = isVerifiedMember(
+    membership?.subscriptionTier,
+    membership?.subscriptionStatus,
+  );
+
+  if (!membershipActive) {
+    await prisma.recurringSchedule.updateMany({
+      where: { userId: user.id, isActive: true },
+      data: { isActive: false },
+    });
+    return NextResponse.json({ error: "MEMBERSHIP_REQUIRED" }, { status: 403 });
+  }
+
   const body = await request.json();
   const validTrendRegions = ["global", "usa", "china", "africa"];
   const updateData: {
@@ -222,15 +244,9 @@ export async function PATCH(
 
   // Keep tier checks aligned with POST behavior.
   if (nextTrendRegion || nextFrequency in HOURLY_FREQUENCIES) {
-    const dbUser = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { subscriptionTier: true, subscriptionStatus: true },
-    });
-    const isActive = dbUser?.subscriptionStatus === "active";
-
     if (
       nextTrendRegion &&
-      (!isTierAtLeast(dbUser?.subscriptionTier, "silver") || !isActive)
+      !isTierAtLeast(membership?.subscriptionTier, "silver")
     ) {
       return NextResponse.json(
         { error: "TIER_REQUIRED", minTier: "silver" },
@@ -240,7 +256,7 @@ export async function PATCH(
 
     if (nextFrequency in HOURLY_FREQUENCIES) {
       const required = HOURLY_FREQUENCIES[nextFrequency].minTier;
-      if (!isTierAtLeast(dbUser?.subscriptionTier, required) || !isActive) {
+      if (!isTierAtLeast(membership?.subscriptionTier, required)) {
         return NextResponse.json(
           { error: "TIER_REQUIRED", minTier: required },
           { status: 403 },

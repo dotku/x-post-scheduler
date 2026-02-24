@@ -11,12 +11,14 @@ import {
   getWavespeedFeeCents,
 } from "./credits";
 import { addDays, addWeeks, addMonths, addHours } from "date-fns";
-import { HOURLY_FREQUENCIES } from "./subscription";
+import { HOURLY_FREQUENCIES, isVerifiedMember } from "./subscription";
 import { decodeRecurringAiPrompt } from "./recurring-ai";
 import { submitImageTask, getVideoTask } from "./wavespeed";
 import { buildTrendPrompt } from "./trending";
 
-async function fetchBinary(url: string): Promise<{ buffer: Buffer; mimeType: string }> {
+async function fetchBinary(
+  url: string,
+): Promise<{ buffer: Buffer; mimeType: string }> {
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to fetch generated image (${response.status})`);
@@ -58,7 +60,9 @@ export async function processScheduledPosts() {
   console.log(`Found ${duePosts.length} posts to process`);
 
   for (const post of duePosts) {
-    console.log(`Processing post ${post.id}: ${post.content.substring(0, 50)}...`);
+    console.log(
+      `Processing post ${post.id}: ${post.content.substring(0, 50)}...`,
+    );
 
     const resolved = await getUserXCredentials(post.userId!, post.xAccountId);
     if (!resolved) {
@@ -85,7 +89,7 @@ export async function processScheduledPosts() {
           post.content,
           Buffer.from(media.data),
           media.mimeType,
-          resolved.credentials
+          resolved.credentials,
         );
       } else {
         result = await postTweet(post.content, resolved.credentials);
@@ -105,7 +109,7 @@ export async function processScheduledPosts() {
     });
 
     console.log(
-      `Post ${post.id} ${result.success ? "posted successfully" : "failed"}`
+      `Post ${post.id} ${result.success ? "posted successfully" : "failed"}`,
     );
   }
 
@@ -114,6 +118,7 @@ export async function processScheduledPosts() {
 
 export async function processRecurringSchedules() {
   const now = new Date();
+  const membershipCache = new Map<string, boolean>();
 
   const dueSchedules = await prisma.recurringSchedule.findMany({
     where: {
@@ -128,9 +133,31 @@ export async function processRecurringSchedules() {
   for (const schedule of dueSchedules) {
     console.log(`Processing recurring schedule ${schedule.id}`);
 
+    let membershipActive = membershipCache.get(schedule.userId!);
+    if (membershipActive === undefined) {
+      const user = await prisma.user.findUnique({
+        where: { id: schedule.userId! },
+        select: { subscriptionTier: true, subscriptionStatus: true },
+      });
+      membershipActive = isVerifiedMember(
+        user?.subscriptionTier,
+        user?.subscriptionStatus,
+      );
+      membershipCache.set(schedule.userId!, membershipActive);
+    }
+
+    if (!membershipActive) {
+      await prisma.recurringSchedule.update({
+        where: { id: schedule.id },
+        data: { isActive: false },
+      });
+      console.log(`Schedule ${schedule.id} paused: membership inactive`);
+      continue;
+    }
+
     const resolved = await getUserXCredentials(
       schedule.userId!,
-      schedule.xAccountId
+      schedule.xAccountId,
     );
     if (!resolved) {
       console.log(`Schedule ${schedule.id} skipped: no credentials`);
@@ -184,7 +211,10 @@ export async function processRecurringSchedules() {
                 decodedAiPrompt.prompt,
               );
             } catch (trendErr) {
-              console.warn("Failed to fetch trends for scheduler, using base prompt:", trendErr);
+              console.warn(
+                "Failed to fetch trends for scheduler, using base prompt:",
+                trendErr,
+              );
             }
           }
 
@@ -192,7 +222,7 @@ export async function processRecurringSchedules() {
             knowledgeContext,
             effectivePrompt,
             schedule.aiLanguage || undefined,
-            recentPosts
+            recentPosts,
           );
 
           if (generated.usage) {
@@ -211,12 +241,16 @@ export async function processRecurringSchedules() {
                 source: "recurring_scheduler_ai",
               });
             } catch (error) {
-              console.error("Failed to track/deduct recurring AI usage:", error);
+              console.error(
+                "Failed to track/deduct recurring AI usage:",
+                error,
+              );
             }
           }
 
           if (!generated.success || !generated.content) {
-            generationError = generated.error || "Failed to generate AI content";
+            generationError =
+              generated.error || "Failed to generate AI content";
           } else {
             contentToPost = generated.content;
           }
@@ -227,7 +261,11 @@ export async function processRecurringSchedules() {
       | { success: true; tweetId?: string; error?: string }
       | { success: false; tweetId?: string | null; error?: string | null };
     if (generationError) {
-      result = { success: false as const, error: generationError, tweetId: null };
+      result = {
+        success: false as const,
+        error: generationError,
+        tweetId: null,
+      };
     } else if (imageModelId) {
       try {
         const imageFeeCents = getWavespeedFeeCents(imageModelId, "image");
@@ -236,7 +274,7 @@ export async function processRecurringSchedules() {
           throw new Error(
             `Insufficient credits for recurring image generation (need $${(
               imageFeeCents / 100
-            ).toFixed(2)})`
+            ).toFixed(2)})`,
           );
         }
 
@@ -254,7 +292,7 @@ export async function processRecurringSchedules() {
           contentToPost,
           media.buffer,
           media.mimeType,
-          resolved.credentials
+          resolved.credentials,
         );
 
         if (result.success) {
@@ -278,13 +316,19 @@ export async function processRecurringSchedules() {
               },
             });
           } catch (usageError) {
-            console.error("Failed to track/deduct recurring image usage:", usageError);
+            console.error(
+              "Failed to track/deduct recurring image usage:",
+              usageError,
+            );
           }
         }
       } catch (error) {
         result = {
           success: false,
-          error: error instanceof Error ? error.message : "Recurring image generation failed",
+          error:
+            error instanceof Error
+              ? error.message
+              : "Recurring image generation failed",
           tweetId: null,
         };
       }
@@ -309,7 +353,10 @@ export async function processRecurringSchedules() {
     nextRun.setHours(hours, minutes, 0, 0);
 
     if (schedule.frequency in HOURLY_FREQUENCIES) {
-      nextRun = addHours(new Date(), HOURLY_FREQUENCIES[schedule.frequency].hours);
+      nextRun = addHours(
+        new Date(),
+        HOURLY_FREQUENCIES[schedule.frequency].hours,
+      );
     } else {
       switch (schedule.frequency) {
         case "daily":
@@ -332,7 +379,7 @@ export async function processRecurringSchedules() {
     console.log(
       `Recurring schedule ${schedule.id} ${
         result.success ? "posted successfully" : "failed"
-      }, next run: ${nextRun}`
+      }, next run: ${nextRun}`,
     );
   }
 

@@ -846,7 +846,10 @@ export default function SettingsPage() {
             </div>
             <div className="flex items-center gap-2 self-start">
               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                {tr(`${accounts.length} connected`, `${accounts.length} 已连接`)}
+                {tr(
+                  `${accounts.length} connected`,
+                  `${accounts.length} 已连接`,
+                )}
               </span>
               {accounts.length > 0 && (
                 <button
@@ -1389,7 +1392,12 @@ export default function SettingsPage() {
                     : "Yearly saves 2 months"}
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">
+                {appLanguage === "zh"
+                  ? "提示：AI Post Scheduler（自动发布）仅订阅会员可用。"
+                  : "Note: AI Post Scheduler (auto-post) is available to subscribed members only."}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {/* Pay as you go option */}
                 <div className="rounded-xl border-2 border-gray-200 dark:border-gray-700 p-4 flex flex-col gap-2">
                   <p className="font-bold text-gray-900 dark:text-white">
@@ -1399,7 +1407,12 @@ export default function SettingsPage() {
                     $0/mo
                   </p>
                   <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 flex-1">
-                    <li>✓ {appLanguage === "zh" ? "按需购买积分" : "Buy credits as needed"}</li>
+                    <li>
+                      ✓{" "}
+                      {appLanguage === "zh"
+                        ? "按需购买积分"
+                        : "Buy credits as needed"}
+                    </li>
                     <li className="text-gray-400 dark:text-gray-500">
                       ✗{" "}
                       {appLanguage === "zh"

@@ -124,6 +124,8 @@ export default function RecurringPage() {
   >("");
   const [canUseTrending, setCanUseTrending] = useState(false);
   const [userTier, setUserTier] = useState<TierKey | null>(null);
+  const [membershipReady, setMembershipReady] = useState(false);
+  const [membershipActive, setMembershipActive] = useState(false);
   const [trendPreview, setTrendPreview] = useState<Trend[]>([]);
   const [trendPreviewLoading, setTrendPreviewLoading] = useState(false);
   const [trendPreviewError, setTrendPreviewError] = useState("");
@@ -180,12 +182,17 @@ export default function RecurringPage() {
     void fetchAccounts();
     void (async () => {
       const res = await fetch("/api/me/subscription");
-      if (!res.ok) return;
+      if (!res.ok) {
+        setMembershipReady(true);
+        setMembershipActive(false);
+        return;
+      }
       const sub = await res.json();
-      const activeTier =
-        sub.status === "active" && TIER_ORDER.includes(sub.tier)
-          ? (sub.tier as TierKey)
-          : null;
+      const hasMembership =
+        sub.status === "active" && TIER_ORDER.includes(sub.tier);
+      const activeTier = hasMembership ? (sub.tier as TierKey) : null;
+      setMembershipReady(true);
+      setMembershipActive(hasMembership);
       setUserTier(activeTier);
       setCanUseTrending(
         activeTier ? isTierAtLeast(activeTier, "silver") : false,
@@ -1091,6 +1098,20 @@ export default function RecurringPage() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               {t("yourSchedules")}
             </h2>
+            {membershipReady && !membershipActive && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                <p className="font-medium">{t("subscribeReminderTitle")}</p>
+                <p className="mt-0.5">
+                  {t("subscribeReminderBody")}{" "}
+                  <Link
+                    href={`${prefix}/settings`}
+                    className="underline underline-offset-2"
+                  >
+                    {t("subscribeNow")}
+                  </Link>
+                </p>
+              </div>
+            )}
           </div>
 
           {isLoading ? (

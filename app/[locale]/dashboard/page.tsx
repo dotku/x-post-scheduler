@@ -174,12 +174,6 @@ export default async function Dashboard({
                 {tNav("toolbox")}
               </Link>
               <Link
-                href={`${prefix}/generate`}
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-              >
-                {tNav("generate")}
-              </Link>
-              <Link
                 href={`${prefix}/recurring`}
                 className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
               >

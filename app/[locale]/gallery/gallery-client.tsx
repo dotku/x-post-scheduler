@@ -35,7 +35,13 @@ interface GalleryItem {
   likeCount?: number;
   commentCount?: number;
   currentUserLiked?: boolean;
-  user?: { id?: string; name: string | null; picture: string | null; subscriptionTier?: string | null; subscriptionStatus?: string | null };
+  user?: {
+    id?: string;
+    name: string | null;
+    picture: string | null;
+    subscriptionTier?: string | null;
+    subscriptionStatus?: string | null;
+  };
 }
 
 type Tab = "public" | "mine";
@@ -62,6 +68,7 @@ const TEXT = {
     makePublic: "Make public",
     delete: "Delete",
     details: "Details",
+    textContent: "Text",
     deletingFailed: "Failed to delete item",
     loading: "Loading...",
     noPublic: "No public items yet - be the first to generate one!",
@@ -98,6 +105,7 @@ const TEXT = {
     makePublic: "设为公开",
     delete: "删除",
     details: "详情",
+    textContent: "文字内容",
     deletingFailed: "删除失败",
     loading: "加载中...",
     noPublic: "还没有公开作品，快来生成第一条吧！",
@@ -133,7 +141,9 @@ function useMasonryColumns(): number {
   return cols;
 }
 
-function aspectRatioStyle(ratio: string | null | undefined): React.CSSProperties {
+function aspectRatioStyle(
+  ratio: string | null | undefined,
+): React.CSSProperties {
   if (!ratio) return {};
   const [w, h] = ratio.split(":").map(Number);
   if (!w || !h) return {};
@@ -207,7 +217,9 @@ function MediaCard({
     setLiked(!prevLiked);
     setLikeCount(prevCount + (prevLiked ? -1 : 1));
     try {
-      const res = await fetch(`/api/gallery/${item.id}/like`, { method: "POST" });
+      const res = await fetch(`/api/gallery/${item.id}/like`, {
+        method: "POST",
+      });
       const data = await res.json();
       if (res.ok) {
         setLiked(data.liked);
@@ -280,7 +292,9 @@ function MediaCard({
     const prev = following;
     setFollowing(!prev);
     try {
-      const res = await fetch(`/api/users/${authorId}/follow`, { method: "POST" });
+      const res = await fetch(`/api/users/${authorId}/follow`, {
+        method: "POST",
+      });
       const data = await res.json();
       if (res.ok) setFollowing(data.following);
       else setFollowing(prev);
@@ -306,15 +320,21 @@ function MediaCard({
             loop
             playsInline
             onMouseEnter={(e) => {
-              const v = e.currentTarget as HTMLVideoElement & { _playP?: Promise<void> };
+              const v = e.currentTarget as HTMLVideoElement & {
+                _playP?: Promise<void>;
+              };
               v._playP = v.play() ?? Promise.resolve();
             }}
             onMouseLeave={(e) => {
-              const v = e.currentTarget as HTMLVideoElement & { _playP?: Promise<void> };
-              void (v._playP ?? Promise.resolve()).catch(() => {}).then(() => {
-                v.pause();
-                v.currentTime = 0;
-              });
+              const v = e.currentTarget as HTMLVideoElement & {
+                _playP?: Promise<void>;
+              };
+              void (v._playP ?? Promise.resolve())
+                .catch(() => {})
+                .then(() => {
+                  v.pause();
+                  v.currentTime = 0;
+                });
             }}
           />
         ) : (
@@ -343,13 +363,22 @@ function MediaCard({
         >
           {t.details}
         </Link>
-        <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 leading-snug">
-          {item.prompt}
-        </p>
+        <div className="space-y-1">
+          <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            {t.textContent}
+          </p>
+          <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-4 leading-snug whitespace-pre-wrap break-words">
+            {item.prompt}
+          </p>
+        </div>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs text-gray-400 truncate">{item.modelLabel}</span>
+          <span className="text-xs text-gray-400 truncate">
+            {item.modelLabel}
+          </span>
           <span className="text-xs text-gray-400 shrink-0">
-            {new Date(item.createdAt).toLocaleDateString(lang === "zh" ? "zh-CN" : "en-US")}
+            {new Date(item.createdAt).toLocaleDateString(
+              lang === "zh" ? "zh-CN" : "en-US",
+            )}
           </span>
         </div>
 
@@ -358,8 +387,16 @@ function MediaCard({
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-gray-400 truncate flex items-center gap-1">
               {t.by} {item.user.name}
-              {isVerifiedMember(item.user.subscriptionTier, item.user.subscriptionStatus) && (
-                <span className="text-blue-500 font-bold" title={item.user.subscriptionTier ?? ""}>✓</span>
+              {isVerifiedMember(
+                item.user.subscriptionTier,
+                item.user.subscriptionStatus,
+              ) && (
+                <span
+                  className="text-blue-500 font-bold"
+                  title={item.user.subscriptionTier ?? ""}
+                >
+                  ✓
+                </span>
               )}
             </p>
             {authorId && !isOwnContent && (
@@ -426,9 +463,13 @@ function MediaCard({
         {commentOpen && (
           <div className="border-t border-gray-100 dark:border-gray-700 pt-2 space-y-2">
             {commentLoading ? (
-              <p className="text-xs text-gray-400 text-center py-2">{t.loading}</p>
+              <p className="text-xs text-gray-400 text-center py-2">
+                {t.loading}
+              </p>
             ) : comments.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-1">{t.noComments}</p>
+              <p className="text-xs text-gray-400 text-center py-1">
+                {t.noComments}
+              </p>
             ) : (
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {comments.map((c) => (
@@ -480,8 +521,10 @@ function MediaCard({
               </div>
             ) : (
               <p className="text-xs text-center text-gray-400">
-                <Link href="/login" className="text-blue-500 hover:underline">{t.signIn}</Link>
-                {" "}{t.signInToInteract}
+                <Link href="/login" className="text-blue-500 hover:underline">
+                  {t.signIn}
+                </Link>{" "}
+                {t.signInToInteract}
               </p>
             )}
           </div>
@@ -507,7 +550,8 @@ export default function GalleryClientPage() {
   const t = TEXT[lang];
 
   useEffect(() => {
-    const saved = localStorage.getItem("app-lang") || localStorage.getItem("gallery-lang");
+    const saved =
+      localStorage.getItem("app-lang") || localStorage.getItem("gallery-lang");
     if (saved === "zh" || saved === "en") {
       setLang(saved);
       return;
@@ -551,7 +595,10 @@ export default function GalleryClientPage() {
       : "/api/gallery/public";
     const r = await fetch(url);
     if (!r.ok) throw new Error(`Failed to load gallery (${r.status})`);
-    return r.json() as Promise<{ items: GalleryItem[]; nextCursor: string | null }>;
+    return r.json() as Promise<{
+      items: GalleryItem[];
+      nextCursor: string | null;
+    }>;
   }, []);
 
   const fetchPublic = useCallback(() => {
@@ -593,11 +640,11 @@ export default function GalleryClientPage() {
       body: JSON.stringify({ isPublic }),
     });
     if (!r.ok) {
-      const d = await r.json().catch(() => ({} as { error?: string }));
+      const d = await r.json().catch(() => ({}) as { error?: string });
       throw new Error(d.error || t.failedUpdate);
     }
     setMyItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, isPublic } : item))
+      prev.map((item) => (item.id === id ? { ...item, isPublic } : item)),
     );
     if (!isPublic) {
       setPublicItems((prev) => prev.filter((item) => item.id !== id));
@@ -619,9 +666,9 @@ export default function GalleryClientPage() {
   const masonryColumns = useMemo(
     () =>
       Array.from({ length: masonryCols }, (_, ci) =>
-        displayedItems.filter((_, idx) => idx % masonryCols === ci)
+        displayedItems.filter((_, idx) => idx % masonryCols === ci),
       ),
-    [displayedItems, masonryCols]
+    [displayedItems, masonryCols],
   );
 
   return (
@@ -630,8 +677,12 @@ export default function GalleryClientPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{t.title}</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t.subtitle}</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+                {t.title}
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                {t.subtitle}
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               <div className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600 overflow-hidden">
@@ -656,16 +707,25 @@ export default function GalleryClientPage() {
                   中文
                 </button>
               </div>
-              <Link href="/toolbox" className="text-sm text-purple-600 dark:text-purple-400 hover:underline">
+              <Link
+                href="/toolbox"
+                className="text-sm text-purple-600 dark:text-purple-400 hover:underline"
+              >
                 {t.create}
               </Link>
               {isLoggedIn && (
-                <Link href="/dashboard" className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+                <Link
+                  href="/dashboard"
+                  className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                >
                   {t.dashboard}
                 </Link>
               )}
               {isLoggedIn === false && (
-                <Link href="/login" className="text-sm text-blue-600 hover:underline">
+                <Link
+                  href="/login"
+                  className="text-sm text-blue-600 hover:underline"
+                >
                   {t.signIn}
                 </Link>
               )}
@@ -720,16 +780,34 @@ export default function GalleryClientPage() {
 
         {loading ? (
           <div className="flex justify-center py-16">
-            <svg className="w-10 h-10 animate-spin text-purple-500" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            <svg
+              className="w-10 h-10 animate-spin text-purple-500"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
             </svg>
           </div>
         ) : displayedItems.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
             <p className="text-4xl mb-3">🖼</p>
             <p>{tab === "public" ? t.noPublic : t.noMine}</p>
-            <Link href="/toolbox" className="mt-4 inline-block text-purple-600 hover:underline text-sm">
+            <Link
+              href="/toolbox"
+              className="mt-4 inline-block text-purple-600 hover:underline text-sm"
+            >
               {t.toToolbox}
             </Link>
           </div>

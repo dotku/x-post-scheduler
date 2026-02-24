@@ -2,9 +2,9 @@
   "nav": {
     "gallery": "作品社区",
     "toolbox": "媒体工作室",
-    "generate": "AI 创作",
+    "generate": "AI 发帖调度",
     "compose": "创作帖子",
-    "autoPost": "自动发布管理",
+    "autoPost": "AI 发帖调度",
     "knowledge": "知识库",
     "appTitle": "X 推创"
   },
@@ -223,6 +223,9 @@
     "sampleContent": "示例内容",
     "saveTask": "保存任务",
     "yourSchedules": "我的计划",
+    "subscribeReminderTitle": "自动计划已暂停",
+    "subscribeReminderBody": "你的会员状态未激活，请先订阅后再启用自动发帖计划。",
+    "subscribeNow": "立即订阅",
     "loading": "加载中…",
     "noSchedules": "暂无自动发帖，在上方创建一个吧！",
     "aiLabel": "AI",
