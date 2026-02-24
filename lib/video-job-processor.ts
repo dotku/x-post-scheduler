@@ -39,16 +39,15 @@ interface JobSegment {
   prompt?: string;
 }
 
-
 function refreshBlobUrlIfNeeded(url: string, origin: string): string {
   // If not our blob proxy, return as is
   if (!url.includes("/api/toolbox/blob-proxy")) return url;
-  
+
   try {
     const urlObj = new URL(url);
     const u = urlObj.searchParams.get("u");
     if (!u) return url;
-    
+
     // Check if expired or expiring soon (within 5 mins)
     const exp = Number(urlObj.searchParams.get("exp"));
     const now = Math.floor(Date.now() / 1000);
@@ -59,7 +58,7 @@ function refreshBlobUrlIfNeeded(url: string, origin: string): string {
   } catch (e) {
     console.warn(`[VideoJob] Failed to parse/refresh blob URL: ${url}`, e);
   }
-  
+
   return url;
 }
 
@@ -96,7 +95,11 @@ export async function processVideoJob(jobId: string) {
     console.log(`[VideoJob] Model: ${job.modelId}`);
     console.log(`[VideoJob] Prompt: ${job.prompt.substring(0, 50)}...`);
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL || "https://x-post-scheduler.jytech.us";
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_PUBLIC_URL ||
+      process.env.NEXT_PUBLIC_APP_LOCAL_URL ||
+      process.env.APP_BASE_URL ||
+      "https://x-post-scheduler.jytech.us";
 
     // Refresh i2vImageUrl if needed
     if (job.i2vImageUrl) {
@@ -106,7 +109,7 @@ export async function processVideoJob(jobId: string) {
         // Optionally update DB
         await prisma.videoJob.update({
           where: { id: jobId },
-          data: { i2vImageUrl: refreshedUrl }
+          data: { i2vImageUrl: refreshedUrl },
         });
       }
     }
@@ -234,17 +237,26 @@ export async function processVideoJob(jobId: string) {
             // Extract last frame for I2V continuity between segments
             if (segment.index < job.segmentCount && i2vContinuityModelId) {
               try {
-                console.log(`[VideoJob] Extracting last frame from segment ${segment.index} for I2V continuity...`);
+                console.log(
+                  `[VideoJob] Extracting last frame from segment ${segment.index} for I2V continuity...`,
+                );
                 const frameBuffer = await extractLastFrame(outputUrl);
                 const framePut = await put(
                   `frames/continuity-${Date.now()}-${segment.index}.jpg`,
                   frameBuffer,
-                  { access: "public", contentType: "image/jpeg", addRandomSuffix: false },
+                  {
+                    access: "public",
+                    contentType: "image/jpeg",
+                    addRandomSuffix: false,
+                  },
                 );
                 prevFrameUrl = framePut.url;
                 console.log(`[VideoJob] Continuity frame: ${prevFrameUrl}`);
               } catch (frameErr) {
-                console.warn(`[VideoJob] Failed to extract last frame, continuity skipped:`, frameErr);
+                console.warn(
+                  `[VideoJob] Failed to extract last frame, continuity skipped:`,
+                  frameErr,
+                );
                 prevFrameUrl = null;
               }
             }
@@ -402,11 +414,15 @@ export async function processAllPendingJobs() {
     take: 5, // Process max 5 at a time
   });
 
-  console.log(`Processing ${pendingJobs.length} pending video jobs in parallel`);
+  console.log(
+    `Processing ${pendingJobs.length} pending video jobs in parallel`,
+  );
 
   // Different jobs have no inter-dependencies, run them concurrently.
   // Segments within each job still run sequentially (I2V frame continuity).
-  await Promise.all(pendingJobs.map((job: { id: string }) => processVideoJob(job.id)));
+  await Promise.all(
+    pendingJobs.map((job: { id: string }) => processVideoJob(job.id)),
+  );
 
   return { processed: pendingJobs.length };
 }

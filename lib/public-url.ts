@@ -10,7 +10,9 @@ export function toPublicUrl(url: string | null | undefined): string | null {
     // Replace localhost with public domain
     if (url.includes("localhost:")) {
       const publicUrl =
-        process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL;
+        process.env.NEXT_PUBLIC_APP_PUBLIC_URL ||
+        process.env.NEXT_PUBLIC_APP_LOCAL_URL ||
+        process.env.APP_BASE_URL;
       if (publicUrl) {
         return url.replace(/http:\/\/localhost:\d+/, publicUrl);
       }
@@ -19,7 +21,10 @@ export function toPublicUrl(url: string | null | undefined): string | null {
   }
 
   // Relative URL - prepend public domain
-  const publicUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL;
+  const publicUrl =
+    process.env.NEXT_PUBLIC_APP_PUBLIC_URL ||
+    process.env.NEXT_PUBLIC_APP_LOCAL_URL ||
+    process.env.APP_BASE_URL;
   if (publicUrl) {
     return `${publicUrl}${url}`;
   }

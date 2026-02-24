@@ -566,31 +566,108 @@ export default function LandingContent({
           <p className="text-gray-600 dark:text-gray-400 mb-10 max-w-xl mx-auto">
             {t("pricingSubtitle")}
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {(["bronze", "iron", "silver", "gold"] as const).map((tier) => {
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+            {/* Pay as you go plan */}
+            <div className="relative rounded-2xl border-2 border-gray-200 dark:border-gray-700 p-6 flex flex-col text-left">
+              <p className="text-base font-bold text-gray-900 dark:text-white mb-1">
+                {lang === "zh" ? "按需付费" : "Pay as you go"}
+              </p>
+              <p className="text-3xl font-extrabold text-gray-900 dark:text-white">
+                $0
+                <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                  /mo
+                </span>
+              </p>
+              <ul className="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-400 flex-1">
+                <li className="flex items-center gap-2">
+                  <svg
+                    className="w-4 h-4 text-green-500 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  {lang === "zh" ? "1 个账号" : "1 account"}
+                </li>
+                <li className="flex items-center gap-2">
+                  <svg
+                    className="w-4 h-4 text-green-500 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  {lang === "zh" ? "按需购买积分" : "Buy credits as needed"}
+                </li>
+                <li className="flex items-center gap-2">
+                  <svg
+                    className="w-4 h-4 text-gray-300 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                  {lang === "zh" ? "无认证标识" : "No verified badge"}
+                </li>
+              </ul>
+              <Link
+                href={isLoggedIn ? `${prefix}/settings` : `${prefix}/login`}
+                className="mt-5 block text-center py-2 rounded-lg text-sm font-semibold transition-colors bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-600"
+              >
+                {lang === "zh" ? "开始使用" : "Get Started"}
+              </Link>
+            </div>
+            {(["air", "bronze", "iron", "silver", "gold"] as const).map((tier) => {
               const tiers = {
-                bronze: {
-                  labelEn: "Bronze",
-                  labelZh: "青铜",
+                air: {
+                  labelEn: "Air",
+                  labelZh: "轻量",
                   price: 1,
                   accounts: "1",
                   accountsZh: "1 个账号",
+                  popular: false,
+                  color: "sky",
+                },
+                bronze: {
+                  labelEn: "Bronze",
+                  labelZh: "青铜",
+                  price: 3,
+                  accounts: "5",
+                  accountsZh: "5 个账号",
                   popular: false,
                   color: "amber",
                 },
                 iron: {
                   labelEn: "Iron",
                   labelZh: "钢铁",
-                  price: 3,
-                  accounts: "3",
-                  accountsZh: "3 个账号",
+                  price: 5,
+                  accounts: "30",
+                  accountsZh: "30 个账号",
                   popular: false,
                   color: "slate",
                 },
                 silver: {
                   labelEn: "Silver",
                   labelZh: "白银",
-                  price: 8,
+                  price: 10,
                   accounts: "100",
                   accountsZh: "100 个账号",
                   popular: true,
@@ -697,6 +774,28 @@ export default function LandingContent({
                 </div>
               );
             })}
+          </div>
+
+          {/* Enterprise plan */}
+          <div className="mt-6 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600 p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 text-left">
+            <div>
+              <p className="text-lg font-bold text-gray-900 dark:text-white">
+                {lang === "zh" ? "企业版" : "Enterprise"}
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {lang === "zh"
+                  ? "专属定制方案，适合团队与企业客户——更多账号、更高配额、私有部署支持"
+                  : "Custom solutions for teams & enterprises — more accounts, higher limits, and dedicated support"}
+              </p>
+            </div>
+            <a
+              href="https://jytech.us"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 px-6 py-2.5 text-sm font-semibold rounded-lg border-2 border-gray-400 dark:border-gray-500 text-gray-700 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-colors text-center"
+            >
+              {lang === "zh" ? "联系我们" : "Contact Us"}
+            </a>
           </div>
         </div>
       </section>

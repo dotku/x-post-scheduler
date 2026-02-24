@@ -46,15 +46,17 @@ export async function POST(
 
     if (completedUrls.length < 2) {
       return NextResponse.json(
-        { 
-          error: `Not enough completed segments to stitch. Have ${completedUrls.length}, need at least 2.` 
+        {
+          error: `Not enough completed segments to stitch. Have ${completedUrls.length}, need at least 2.`,
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    console.log(`[VideoJob] Manually stitching job ${jobId} (${completedUrls.length} videos)...`);
-    
+    console.log(
+      `[VideoJob] Manually stitching job ${jobId} (${completedUrls.length} videos)...`,
+    );
+
     // Perform stitching - store raw blob URL in DB
     const stitchedUrl = await stitchVideos(completedUrls);
 
@@ -66,8 +68,14 @@ export async function POST(
 
     // Wrap in proxy for immediate display in the response
     let responseUrl = stitchedUrl;
-    if (stitchedUrl && stitchedUrl.includes(".private.blob.vercel-storage.com")) {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+    if (
+      stitchedUrl &&
+      stitchedUrl.includes(".private.blob.vercel-storage.com")
+    ) {
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_LOCAL_URL ||
+        process.env.APP_BASE_URL ||
+        new URL(request.url).origin;
       try {
         responseUrl = buildSignedBlobProxyUrl(baseUrl, stitchedUrl);
       } catch (e) {
@@ -80,7 +88,6 @@ export async function POST(
       stitchedUrl: responseUrl,
       message: "Videos stitched successfully!",
     });
-
   } catch (error) {
     console.error(`Failed to stitch job ${jobId}:`, error);
     const errorMsg = error instanceof Error ? error.message : String(error);

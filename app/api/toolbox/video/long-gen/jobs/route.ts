@@ -36,8 +36,11 @@ export async function GET(request: NextRequest) {
       prisma.videoJob.count({ where: whereClause }),
     ]);
 
-    // Use NEXT_PUBLIC_APP_URL for signed URLs (accessible from browser)
-    const signOrigin = process.env.NEXT_PUBLIC_APP_URL || url.origin;
+    // Use local app URL for signed URLs (accessible from browser)
+    const signOrigin =
+      process.env.NEXT_PUBLIC_APP_LOCAL_URL ||
+      process.env.APP_BASE_URL ||
+      url.origin;
 
     const enrichedJobs = jobs.map((job) => {
       let stitchedUrl = job.stitchedUrl;

@@ -24,7 +24,10 @@ export async function PATCH(
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 },
+    );
   }
 
   if (!body.prompt && !body.segmentPrompts) {
@@ -48,7 +51,11 @@ export async function PATCH(
     }
 
     if (body.segmentPrompts && Object.keys(body.segmentPrompts).length > 0) {
-      const segments = JSON.parse(job.segments) as Array<{ index: number; prompt?: string; [key: string]: unknown }>;
+      const segments = JSON.parse(job.segments) as Array<{
+        index: number;
+        prompt?: string;
+        [key: string]: unknown;
+      }>;
       const updated = segments.map((s) => {
         const newPrompt = body.segmentPrompts![s.index];
         return newPrompt !== undefined ? { ...s, prompt: newPrompt.trim() } : s;
@@ -112,7 +119,10 @@ export async function GET(
       }
       if (rawBlobUrl.includes(".private.blob.vercel-storage.com")) {
         try {
-          const signOrigin = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+          const signOrigin =
+            process.env.NEXT_PUBLIC_APP_LOCAL_URL ||
+            process.env.APP_BASE_URL ||
+            new URL(request.url).origin;
           stitchedUrl = buildSignedBlobProxyUrl(signOrigin, rawBlobUrl);
         } catch (e) {
           console.warn("Failed to sign URL:", e);

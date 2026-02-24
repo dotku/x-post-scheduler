@@ -1,25 +1,33 @@
 export const TIERS = {
-  bronze: {
-    label: "Bronze",
-    labelZh: "青铜",
+  air: {
+    label: "Air",
+    labelZh: "轻量",
     priceMonthly: 100,
     priceYearly: 1000,
     accountLimit: 1,
+    color: "sky",
+  },
+  bronze: {
+    label: "Bronze",
+    labelZh: "青铜",
+    priceMonthly: 300,
+    priceYearly: 3000,
+    accountLimit: 5,
     color: "amber",
   },
   iron: {
     label: "Iron",
     labelZh: "钢铁",
-    priceMonthly: 300,
-    priceYearly: 3000,
-    accountLimit: 3,
+    priceMonthly: 500,
+    priceYearly: 5000,
+    accountLimit: 30,
     color: "slate",
   },
   silver: {
     label: "Silver",
     labelZh: "白银",
-    priceMonthly: 800,
-    priceYearly: 8000,
+    priceMonthly: 1000,
+    priceYearly: 10000,
     accountLimit: 100,
     color: "blue",
   },
@@ -35,7 +43,7 @@ export const TIERS = {
 
 export type TierKey = keyof typeof TIERS;
 
-export const TIER_ORDER: TierKey[] = ["bronze", "iron", "silver", "gold"];
+export const TIER_ORDER: TierKey[] = ["air", "bronze", "iron", "silver", "gold"];
 
 export function getAccountLimit(tier?: string | null): number {
   if (!tier || !(tier in TIERS)) return 1;

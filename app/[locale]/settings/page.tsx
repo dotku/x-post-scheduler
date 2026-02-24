@@ -59,6 +59,7 @@ interface UsageSummary {
 
 interface CreditData {
   balanceCents: number;
+  totalSavedCents: number;
   transactions: {
     id: string;
     type: string;
@@ -75,10 +76,12 @@ export default function SettingsPage() {
   const { user, isLoading: authLoading } = useUser();
   const router = useRouter();
   const pathname = usePathname();
+  const tr = (en: string, zh: string) => (appLanguage === "zh" ? zh : en);
   const [accounts, setAccounts] = useState<XAccount[]>([]);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [credits, setCredits] = useState<CreditData>({
     balanceCents: 0,
+    totalSavedCents: 0,
     transactions: [],
   });
   const [loading, setLoading] = useState(true);
@@ -109,6 +112,7 @@ export default function SettingsPage() {
   const [subPeriodEnd, setSubPeriodEnd] = useState<string | null>(null);
   const [accountLimit, setAccountLimit] = useState<number>(1);
   const [subLoading, setSubLoading] = useState<string | null>(null);
+  const [syncingSubscription, setSyncingSubscription] = useState(false);
   const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">(
     "monthly",
   );
@@ -119,6 +123,31 @@ export default function SettingsPage() {
     }
   }, [authLoading, user]);
 
+  // Auto-refresh subscription status when page becomes visible or gets focus
+  useEffect(() => {
+    if (!user) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void fetchData();
+      }
+    };
+
+    const handleFocus = () => {
+      void fetchData();
+    };
+
+    // Listen to visibility changes (tab switching)
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    // Listen to window focus (returning from external page like Stripe)
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [user]);
+
   // Language is loaded from the API (DB) in fetchData
 
   useEffect(() => {
@@ -127,9 +156,57 @@ export default function SettingsPage() {
     if (params.get("sub") === "success") {
       setMessage({
         type: "success",
-        text: "Subscription activated! Credits will be added shortly.",
+        text: tr(
+          "Subscription activated! Updating subscription status...",
+          "订阅已生效！正在更新订阅状态...",
+        ),
       });
       window.history.replaceState({}, "", window.location.pathname);
+      
+      // Poll for subscription update (webhook might take a few seconds)
+      const pollSubscription = async () => {
+        let attempts = 0;
+        const maxAttempts = 10; // Try for up to 10 seconds
+        
+        const poll = async () => {
+          attempts++;
+          await fetchData();
+          
+          // Check if subscription is updated
+          const subRes = await fetch("/api/me/subscription");
+          if (subRes.ok) {
+            const subData = await subRes.json();
+            if (subData.status === "active") {
+              // Subscription updated successfully
+              setMessage({
+                type: "success",
+                text: tr(
+                  "Subscription activated! Credits added successfully.",
+                  "订阅已生效！积分已成功到账。",
+                ),
+              });
+              return true;
+            }
+          }
+          
+          if (attempts < maxAttempts) {
+            setTimeout(() => void poll(), 1000);
+          } else {
+            setMessage({
+              type: "success",
+              text: tr(
+                "Subscription activated! If status doesn't update, try clicking 'Sync Subscription'.",
+                "订阅已生效！如果状态未更新，请点击“同步订阅”。",
+              ),
+            });
+          }
+          return false;
+        };
+        
+        void poll();
+      };
+      
+      void pollSubscription();
       return;
     }
 
@@ -138,7 +215,10 @@ export default function SettingsPage() {
 
     if (topup !== "success") {
       if (topup === "cancelled") {
-        setMessage({ type: "error", text: "Checkout cancelled." });
+        setMessage({
+          type: "error",
+          text: tr("Checkout cancelled.", "支付已取消。"),
+        });
         window.history.replaceState({}, "", "/settings");
       }
       return;
@@ -149,7 +229,10 @@ export default function SettingsPage() {
         if (!sessionId) {
           setMessage({
             type: "error",
-            text: "Missing Stripe session id. Credits may still be applied via webhook.",
+            text: tr(
+              "Missing Stripe session id. Credits may still be applied via webhook.",
+              "缺少 Stripe 会话 ID。积分可能仍会通过 webhook 入账。",
+            ),
           });
           return;
         }
@@ -166,7 +249,7 @@ export default function SettingsPage() {
             await fetchData();
             setMessage({
               type: "success",
-              text: "Credits added successfully!",
+              text: tr("Credits added successfully!", "积分已成功到账！"),
             });
             return;
           }
@@ -179,14 +262,21 @@ export default function SettingsPage() {
           setMessage({
             type: "error",
             text:
-              data.error || "Payment succeeded, but credit fulfillment failed.",
+              data.error ||
+              tr(
+                "Payment succeeded, but credit fulfillment failed.",
+                "支付成功，但积分入账失败。",
+              ),
           });
           return;
         }
       } catch {
         setMessage({
           type: "error",
-          text: "Payment succeeded, but credit fulfillment failed.",
+          text: tr(
+            "Payment succeeded, but credit fulfillment failed.",
+            "支付成功，但积分入账失败。",
+          ),
         });
       } finally {
         window.history.replaceState({}, "", "/settings");
@@ -246,11 +336,14 @@ export default function SettingsPage() {
       } else {
         setMessage({
           type: "error",
-          text: data.error || "Failed to start checkout",
+          text: data.error || tr("Failed to start checkout", "无法发起支付"),
         });
       }
     } catch {
-      setMessage({ type: "error", text: "Failed to start checkout" });
+      setMessage({
+        type: "error",
+        text: tr("Failed to start checkout", "无法发起支付"),
+      });
     } finally {
       setTopupLoading(null);
     }
@@ -270,16 +363,41 @@ export default function SettingsPage() {
         body: JSON.stringify({ tier, interval }),
       });
       const data = await res.json();
-      if (data.url) {
+      if (data.reactivated) {
+        // Subscription reactivated in-place — no redirect needed
+        setSubStatus("active");
+        setMessage({
+          type: "success",
+          text: tr(
+            "Subscription reactivated successfully!",
+            "订阅已成功恢复！",
+          ),
+        });
+        await fetchData();
+      } else if (data.url) {
+        // If portal=true, user has truly active subscription - redirect to portal to manage
+        if (data.portal) {
+          setMessage({
+            type: "success",
+            text: tr(
+              "Redirecting to subscription management portal to change your plan...",
+              "正在跳转到订阅管理页面以更改您的方案...",
+            ),
+          });
+        }
         window.location.href = data.url;
       } else {
         setMessage({
           type: "error",
-          text: data.error || "Failed to start subscription",
+          text:
+            data.error || tr("Failed to start subscription", "无法发起订阅"),
         });
       }
     } catch {
-      setMessage({ type: "error", text: "Failed to start subscription" });
+      setMessage({
+        type: "error",
+        text: tr("Failed to start subscription", "无法发起订阅"),
+      });
     } finally {
       setSubLoading(null);
     }
@@ -288,7 +406,10 @@ export default function SettingsPage() {
   async function handleCancelSubscription() {
     if (
       !confirm(
-        "Cancel subscription? You will keep access until the end of the billing period.",
+        tr(
+          "Cancel subscription? You will keep access until the end of the billing period.",
+          "确认取消订阅？你将继续使用到当前计费周期结束。",
+        ),
       )
     )
       return;
@@ -306,18 +427,58 @@ export default function SettingsPage() {
           : "";
         setMessage({
           type: "success",
-          text: `Subscription cancelled. Access continues until ${end}.`,
+          text: tr(
+            `Subscription cancelled. Access continues until ${end}.`,
+            `订阅已取消，可使用至 ${end}。`,
+          ),
         });
       } else {
         setMessage({
           type: "error",
-          text: data.error || "Failed to cancel subscription",
+          text:
+            data.error || tr("Failed to cancel subscription", "取消订阅失败"),
         });
       }
     } catch {
-      setMessage({ type: "error", text: "Failed to cancel subscription" });
+      setMessage({
+        type: "error",
+        text: tr("Failed to cancel subscription", "取消订阅失败"),
+      });
     } finally {
       setSubLoading(null);
+    }
+  }
+
+  async function handleSyncSubscription() {
+    setSyncingSubscription(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/stripe/sync-subscription", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSubTier(data.tier);
+        setSubStatus(data.status);
+        setSubPeriodEnd(data.periodEnd);
+        setMessage({
+          type: "success",
+          text: tr("Subscription synced successfully", "订阅状态已同步"),
+        });
+        await fetchData();
+      } else {
+        setMessage({
+          type: "error",
+          text: data.error || tr("Failed to sync subscription", "同步订阅失败"),
+        });
+      }
+    } catch {
+      setMessage({
+        type: "error",
+        text: tr("Failed to sync subscription", "同步订阅失败"),
+      });
+    } finally {
+      setSyncingSubscription(false);
     }
   }
 
@@ -335,12 +496,15 @@ export default function SettingsPage() {
         setVerifyStatus((s) => ({ ...s, [accountId]: "error" }));
         setVerifyError((e) => ({
           ...e,
-          [accountId]: data.error || "Verification failed",
+          [accountId]: data.error || tr("Verification failed", "验证失败"),
         }));
       }
     } catch {
       setVerifyStatus((s) => ({ ...s, [accountId]: "error" }));
-      setVerifyError((e) => ({ ...e, [accountId]: "Network error" }));
+      setVerifyError((e) => ({
+        ...e,
+        [accountId]: tr("Network error", "网络错误"),
+      }));
     }
   }
 
@@ -377,7 +541,10 @@ export default function SettingsPage() {
       if (res.ok) {
         setMessage({
           type: "success",
-          text: `Keys updated — connected as @${data.username || "unknown"}`,
+          text: tr(
+            `Keys updated — connected as @${data.username || "unknown"}`,
+            `已更新密钥 — 当前账号 @${data.username || "unknown"}`,
+          ),
         });
         setEditState(null);
         // Reset verify status so it shows fresh
@@ -386,11 +553,14 @@ export default function SettingsPage() {
       } else {
         setMessage({
           type: "error",
-          text: data.error || "Failed to update keys",
+          text: data.error || tr("Failed to update keys", "更新密钥失败"),
         });
       }
     } catch {
-      setMessage({ type: "error", text: "Failed to update keys" });
+      setMessage({
+        type: "error",
+        text: tr("Failed to update keys", "更新密钥失败"),
+      });
     } finally {
       setUpdating(false);
     }
@@ -420,7 +590,10 @@ export default function SettingsPage() {
       if (res.ok) {
         setMessage({
           type: "success",
-          text: `Account connected as @${data.username || "unknown"}`,
+          text: tr(
+            `Account connected as @${data.username || "unknown"}`,
+            `账号已连接：@${data.username || "unknown"}`,
+          ),
         });
         setLabel("");
         setXApiKey("");
@@ -430,10 +603,16 @@ export default function SettingsPage() {
         setSetAsDefault(false);
         await fetchData();
       } else {
-        setMessage({ type: "error", text: data.error || "Failed to connect" });
+        setMessage({
+          type: "error",
+          text: data.error || tr("Failed to connect", "连接失败"),
+        });
       }
     } catch {
-      setMessage({ type: "error", text: "Failed to save credentials" });
+      setMessage({
+        type: "error",
+        text: tr("Failed to save credentials", "保存凭据失败"),
+      });
     } finally {
       setSaving(false);
     }
@@ -448,12 +627,20 @@ export default function SettingsPage() {
     });
     if (res.ok) {
       await fetchData();
-      setMessage({ type: "success", text: "Default account updated" });
+      setMessage({
+        type: "success",
+        text: tr("Default account updated", "默认账号已更新"),
+      });
     }
   }
 
   async function handleRemove(accountId: string) {
-    if (!confirm("Remove this X account connection?")) return;
+    if (
+      !confirm(
+        tr("Remove this X account connection?", "确认移除该 X 账号连接？"),
+      )
+    )
+      return;
     setMessage(null);
     const res = await fetch(
       `/api/settings?accountId=${encodeURIComponent(accountId)}`,
@@ -461,7 +648,10 @@ export default function SettingsPage() {
     );
     if (res.ok) {
       await fetchData();
-      setMessage({ type: "success", text: "Account removed" });
+      setMessage({
+        type: "success",
+        text: tr("Account removed", "账号已移除"),
+      });
     }
   }
 
@@ -486,14 +676,14 @@ export default function SettingsPage() {
       } else {
         setMessage({
           type: "success",
-          text:
-            appLanguage === "zh"
-              ? "语言已更新为中文。"
-              : "Language updated to English.",
+          text: tr("Language updated to English.", "语言已更新为中文。"),
         });
       }
     } catch {
-      setMessage({ type: "error", text: "Failed to save language preference" });
+      setMessage({
+        type: "error",
+        text: tr("Failed to save language preference", "保存语言偏好失败"),
+      });
     }
   }
 
@@ -510,13 +700,16 @@ export default function SettingsPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Please sign in to manage your settings.
+            {tr(
+              "Please sign in to manage your settings.",
+              "请先登录以管理设置。",
+            )}
           </p>
           <a
             href="/auth/login"
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
-            Sign In
+            {tr("Sign In", "登录")}
           </a>
         </div>
       </div>
@@ -526,28 +719,76 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-              Settings
+              {tr("Settings", "设置")}
             </h1>
             <Link
               href={pathname.startsWith("/zh") ? "/zh/dashboard" : "/dashboard"}
               className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             >
-              ← Dashboard
+              {tr("← Dashboard", "← 控制台")}
             </Link>
           </div>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Language
+            {tr("Profile", "个人信息")}
+          </h2>
+          <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-4">
+            {user.picture && (
+              <img
+                src={user.picture}
+                alt={user.name || "User"}
+                className="w-14 h-14 rounded-full border border-gray-200 dark:border-gray-700"
+              />
+            )}
+            <div className="min-w-0">
+              <p className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                {user.name || tr("Unnamed user", "未命名用户")}
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                {user.email || "—"}
+              </p>
+            </div>
+            <div className="sm:ml-auto text-sm text-gray-600 dark:text-gray-300">
+              <p>
+                {tr("Membership:", "会员等级：")}{" "}
+                {subTier
+                  ? appLanguage === "zh"
+                    ? getTierInfo(subTier)?.labelZh
+                    : getTierInfo(subTier)?.label
+                  : tr("None", "未订阅")}
+              </p>
+              <p>
+                {tr("Status:", "状态：")} {subStatus || "—"}
+              </p>
+              <button
+                onClick={handleSyncSubscription}
+                disabled={syncingSubscription}
+                className="mt-2 px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
+              >
+                {syncingSubscription
+                  ? tr("Syncing...", "同步中...")
+                  : tr("Sync Subscription", "同步订阅")}
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {tr("Language", "语言")}
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Choose your preferred language for supported pages.
+            {tr(
+              "Choose your preferred language for supported pages.",
+              "选择你的页面显示语言。",
+            )}
           </p>
           <div className="mt-4 flex flex-col sm:flex-row gap-3">
             <select
@@ -563,32 +804,36 @@ export default function SettingsPage() {
               onClick={handleSaveLanguage}
               className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Save Language
+              {tr("Save Language", "保存语言")}
             </button>
           </div>
         </div>
+        </div>{/* end Profile+Language grid */}
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
+          <div className="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Connected X Accounts
+                {tr("Connected X Accounts", "已连接的 X 账号")}
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Connect multiple X accounts and choose one per post/schedule.
+                {tr(
+                  "Connect multiple X accounts and choose one per post/schedule.",
+                  "支持连接多个 X 账号，并在每条内容/定时任务中选择使用的账号。",
+                )}
               </p>
             </div>
             <span className="inline-flex items-center self-start px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-              {accounts.length} connected
+              {tr(`${accounts.length} connected`, `${accounts.length} 已连接`)}
             </span>
           </div>
 
           {accounts.length === 0 ? (
-            <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-              No X accounts connected yet.
+            <p className="px-6 pb-4 text-sm text-gray-500 dark:text-gray-400">
+              {tr("No X accounts connected yet.", "尚未连接任何 X 账号。")}
             </p>
           ) : (
-            <div className="mt-4 space-y-3">
+            <div className="px-6 pb-6 space-y-3">
               {accounts.map((account) => {
                 const status = verifyStatus[account.id] ?? "idle";
                 const isEditing = editState?.accountId === account.id;
@@ -604,38 +849,40 @@ export default function SettingsPage() {
                         {status === "ok" && (
                           <span
                             className="shrink-0 w-2 h-2 rounded-full bg-green-500"
-                            title="Connected"
+                            title={tr("Connected", "已连接")}
                           />
                         )}
                         {status === "error" && (
                           <span
                             className="shrink-0 w-2 h-2 rounded-full bg-red-500"
-                            title="Connection error"
+                            title={tr("Connection error", "连接错误")}
                           />
                         )}
                         {status === "checking" && (
                           <span
                             className="shrink-0 w-2 h-2 rounded-full bg-yellow-400 animate-pulse"
-                            title="Checking..."
+                            title={tr("Checking...", "检查中...")}
                           />
                         )}
                         {status === "idle" && (
                           <span
                             className="shrink-0 w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600"
-                            title="Not verified"
+                            title={tr("Not verified", "未验证")}
                           />
                         )}
                         <div className="min-w-0">
                           <p className="font-medium text-gray-900 dark:text-white truncate">
                             {account.label ||
                               account.username ||
-                              "Unnamed account"}
+                              tr("Unnamed account", "未命名账号")}
                           </p>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
                             {account.username
                               ? `@${account.username}`
-                              : "No username"}
-                            {account.isDefault ? " • Default" : ""}
+                              : tr("No username", "无用户名")}
+                            {account.isDefault
+                              ? tr(" • Default", " • 默认")
+                              : ""}
                           </p>
                           {status === "error" && verifyError[account.id] && (
                             <p className="text-xs text-red-500 mt-0.5">
@@ -650,7 +897,9 @@ export default function SettingsPage() {
                           disabled={status === "checking"}
                           className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
                         >
-                          {status === "checking" ? "Checking..." : "Verify"}
+                          {status === "checking"
+                            ? tr("Checking...", "检查中...")
+                            : tr("Verify", "验证")}
                         </button>
                         <button
                           onClick={() =>
@@ -660,21 +909,23 @@ export default function SettingsPage() {
                           }
                           className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
                         >
-                          {isEditing ? "Cancel" : "Update keys"}
+                          {isEditing
+                            ? tr("Cancel", "取消")
+                            : tr("Update keys", "更新密钥")}
                         </button>
                         {!account.isDefault && (
                           <button
                             onClick={() => handleSetDefault(account.id)}
                             className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
                           >
-                            Set default
+                            {tr("Set default", "设为默认")}
                           </button>
                         )}
                         <button
                           onClick={() => handleRemove(account.id)}
                           className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                         >
-                          Remove
+                          {tr("Remove", "移除")}
                         </button>
                       </div>
                     </div>
@@ -686,11 +937,14 @@ export default function SettingsPage() {
                         className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-4 space-y-3"
                       >
                         <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Update API keys for this account
+                          {tr(
+                            "Update API keys for this account",
+                            "更新该账号的 API 密钥",
+                          )}
                         </p>
                         <div>
                           <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                            Label (optional)
+                            {tr("Label (optional)", "标签（可选）")}
                           </label>
                           <input
                             type="text"
@@ -701,14 +955,17 @@ export default function SettingsPage() {
                                 label: e.target.value,
                               })
                             }
-                            placeholder="e.g. Brand Main, Personal"
+                            placeholder={tr(
+                              "e.g. Brand Main, Personal",
+                              "例如：品牌主号、个人号",
+                            )}
                             className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                           />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              API Key
+                              {tr("API Key", "API Key")}
                             </label>
                             <input
                               type="password"
@@ -720,13 +977,16 @@ export default function SettingsPage() {
                                 })
                               }
                               required
-                              placeholder="Paste new API Key"
+                              placeholder={tr(
+                                "Paste new API Key",
+                                "粘贴新的 API Key",
+                              )}
                               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                             />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              API Secret
+                              {tr("API Secret", "API Secret")}
                             </label>
                             <input
                               type="password"
@@ -738,13 +998,16 @@ export default function SettingsPage() {
                                 })
                               }
                               required
-                              placeholder="Paste new API Secret"
+                              placeholder={tr(
+                                "Paste new API Secret",
+                                "粘贴新的 API Secret",
+                              )}
                               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                             />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              Access Token
+                              {tr("Access Token", "Access Token")}
                             </label>
                             <input
                               type="password"
@@ -756,13 +1019,16 @@ export default function SettingsPage() {
                                 })
                               }
                               required
-                              placeholder="Paste new Access Token"
+                              placeholder={tr(
+                                "Paste new Access Token",
+                                "粘贴新的 Access Token",
+                              )}
                               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                             />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              Access Token Secret
+                              {tr("Access Token Secret", "Access Token Secret")}
                             </label>
                             <input
                               type="password"
@@ -774,7 +1040,10 @@ export default function SettingsPage() {
                                 })
                               }
                               required
-                              placeholder="Paste new Access Token Secret"
+                              placeholder={tr(
+                                "Paste new Access Token Secret",
+                                "粘贴新的 Access Token Secret",
+                              )}
                               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                             />
                           </div>
@@ -786,15 +1055,15 @@ export default function SettingsPage() {
                             className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                           >
                             {updating
-                              ? "Verifying & Saving..."
-                              : "Save New Keys"}
+                              ? tr("Verifying & Saving...", "验证并保存中...")
+                              : tr("Save New Keys", "保存新密钥")}
                           </button>
                           <button
                             type="button"
                             onClick={() => setEditState(null)}
                             className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
                           >
-                            Cancel
+                            {tr("Cancel", "取消")}
                           </button>
                         </div>
                       </form>
@@ -804,6 +1073,104 @@ export default function SettingsPage() {
               })}
             </div>
           )}
+
+          {/* Add X Account — inline below the accounts list */}
+          <div className="border-t border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {tr("Add X Account", "添加 X 账号")}
+              </h2>
+              <Link
+                href="/docs"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {tr("How to get API keys?", "如何获取 API 密钥？")}
+              </Link>
+            </div>
+            <form onSubmit={handleSave} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {tr("Account Label (optional)", "账号标签（可选）")}
+                  </label>
+                  <input
+                    type="text"
+                    value={label}
+                    onChange={(e) => setLabel(e.target.value)}
+                    placeholder={tr("e.g. Brand Main, Personal", "例如：品牌主号、个人号")}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {tr("API Key", "API Key")}
+                  </label>
+                  <input
+                    type="password"
+                    value={xApiKey}
+                    onChange={(e) => setXApiKey(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {tr("API Secret", "API Secret")}
+                  </label>
+                  <input
+                    type="password"
+                    value={xApiSecret}
+                    onChange={(e) => setXApiSecret(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {tr("Access Token", "Access Token")}
+                  </label>
+                  <input
+                    type="password"
+                    value={xAccessToken}
+                    onChange={(e) => setXAccessToken(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {tr("Access Token Secret", "Access Token Secret")}
+                  </label>
+                  <input
+                    type="password"
+                    value={xAccessTokenSecret}
+                    onChange={(e) => setXAccessTokenSecret(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={setAsDefault}
+                    onChange={(e) => setSetAsDefault(e.target.checked)}
+                  />
+                  {tr("Set as default account", "设为默认账号")}
+                </label>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {saving
+                    ? tr("Verifying & Saving...", "验证并保存中...")
+                    : tr("Add Account", "添加账号")}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
 
         {/* Membership / Subscription */}
@@ -824,7 +1191,9 @@ export default function SettingsPage() {
                         ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
                         : subTier === "iron"
                           ? "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200"
-                          : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                          : subTier === "bronze"
+                            ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                            : "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300"
                   }`}
                 >
                   ✓{" "}
@@ -877,6 +1246,69 @@ export default function SettingsPage() {
                 </button>
               </div>
             </div>
+          ) : subStatus === "cancelled" && subTier ? (
+            /* Cancelled subscription — resubscribe option */
+            <div className="space-y-4">
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  {appLanguage === "zh"
+                    ? `您的${getTierInfo(subTier)?.labelZh}会员已取消。${
+                        subPeriodEnd
+                          ? `会员权益将持续到 ${format(new Date(subPeriodEnd), "yyyy年M月d日")}。`
+                          : ""
+                      }`
+                    : `Your ${getTierInfo(subTier)?.label} membership was cancelled.${
+                        subPeriodEnd
+                          ? ` Access continues until ${format(new Date(subPeriodEnd), "MMM d, yyyy")}.`
+                          : ""
+                      }`}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  {appLanguage === "zh"
+                    ? "重新订阅即可恢复会员权益，或继续使用按需付费："
+                    : "Resubscribe to restore your membership benefits, or continue with pay-as-you-go:"}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {/* Pay as you go button */}
+                  <button
+                    disabled
+                    className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 cursor-default"
+                  >
+                    {appLanguage === "zh"
+                      ? "按需付费 $0/月（期满后默认）"
+                      : "Pay as you go $0/mo (default after expiry)"}
+                  </button>
+                  {TIER_ORDER.map((tier) => {
+                    const info = TIERS[tier as TierKey];
+                    const isCurrentTier = tier === subTier;
+                    return (
+                      <button
+                        key={tier}
+                        onClick={() => handleSubscribe(tier)}
+                        disabled={subLoading !== null}
+                        className={`px-4 py-2 text-sm font-medium rounded-lg disabled:opacity-50 transition-colors ${
+                          isCurrentTier
+                            ? "bg-blue-600 text-white hover:bg-blue-700"
+                            : "border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                        }`}
+                      >
+                        {subLoading === tier
+                          ? "…"
+                          : appLanguage === "zh"
+                            ? isCurrentTier
+                              ? `重订${info.labelZh} $${(info.priceMonthly / 100).toFixed(0)}/月`
+                              : `切换至${info.labelZh} $${(info.priceMonthly / 100).toFixed(0)}/月`
+                            : isCurrentTier
+                              ? `Resubscribe ${info.label} $${(info.priceMonthly / 100).toFixed(0)}/mo`
+                              : `Switch to ${info.label} $${(info.priceMonthly / 100).toFixed(0)}/mo`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           ) : (
             /* No active subscription — show tier cards */
             <div>
@@ -916,7 +1348,37 @@ export default function SettingsPage() {
                     : "Yearly saves 2 months"}
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {/* Pay as you go option */}
+                <div className="rounded-xl border-2 border-gray-200 dark:border-gray-700 p-4 flex flex-col gap-2">
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {appLanguage === "zh" ? "按需付费" : "Pay as you go"}
+                  </p>
+                  <p className="text-2xl font-extrabold text-gray-900 dark:text-white">
+                    $0/mo
+                  </p>
+                  <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 flex-1">
+                    <li>
+                      ✓{" "}
+                      {appLanguage === "zh" ? "1 个账号" : "1 account"}
+                    </li>
+                    <li>
+                      ✓{" "}
+                      {appLanguage === "zh"
+                        ? "按需购买积分"
+                        : "Buy credits as needed"}
+                    </li>
+                    <li className="text-gray-400 dark:text-gray-500">
+                      ✗{" "}
+                      {appLanguage === "zh"
+                        ? "无认证标识"
+                        : "No verified badge"}
+                    </li>
+                  </ul>
+                  <div className="mt-1 w-full py-2 text-sm font-semibold text-center text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg">
+                    {appLanguage === "zh" ? "当前方案" : "Current plan"}
+                  </div>
+                </div>
                 {TIER_ORDER.map((tier) => {
                   const info = TIERS[tier as TierKey];
                   const isYearly = billingInterval === "yearly";
@@ -991,22 +1453,52 @@ export default function SettingsPage() {
                   );
                 })}
               </div>
+
+              {/* Enterprise plan */}
+              <div className="mt-4 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="font-bold text-gray-900 dark:text-white">
+                    {appLanguage === "zh" ? "企业版" : "Enterprise"}
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                    {appLanguage === "zh"
+                      ? "专属定制方案，适合团队与企业用户"
+                      : "Custom solutions for teams and enterprises"}
+                  </p>
+                </div>
+                <a
+                  href="https://jytech.us"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 px-4 py-2 text-sm font-semibold rounded-lg border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-colors text-center"
+                >
+                  {appLanguage === "zh" ? "联系我们" : "Contact Us"}
+                </a>
+              </div>
             </div>
           )}
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-start">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Credits & Billing
+            {tr("Credits & Billing", "积分与账单")}
           </h2>
           <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Current Balance
+                {tr("Current Balance", "当前余额")}
               </p>
               <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                 ${(credits.balanceCents / 100).toFixed(2)}
               </p>
+              {(subTier === "gold" || subTier === "silver") && credits.totalSavedCents > 0 && (
+                <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                  {appLanguage === "zh"
+                    ? `会员折扣已节省 $${(credits.totalSavedCents / 100).toFixed(2)}`
+                    : `Saved $${(credits.totalSavedCents / 100).toFixed(2)} with membership discount`}
+                </p>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               {([500, 1000, 2500] as const).map((amount) => (
@@ -1017,8 +1509,11 @@ export default function SettingsPage() {
                   className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
                   {topupLoading === amount
-                    ? "Loading..."
-                    : `Add $${(amount / 100).toFixed(2)}`}
+                    ? tr("Loading...", "加载中...")
+                    : tr(
+                        `Add $${(amount / 100).toFixed(2)}`,
+                        `充值 $${(amount / 100).toFixed(2)}`,
+                      )}
                 </button>
               ))}
             </div>
@@ -1026,7 +1521,7 @@ export default function SettingsPage() {
           {credits.transactions.length > 0 && (
             <div className="mt-4">
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Recent Transactions
+                {tr("Recent Transactions", "最近交易")}
               </p>
               <div className="space-y-1.5 max-h-48 overflow-y-auto">
                 {credits.transactions.map((tx) => (
@@ -1056,17 +1551,20 @@ export default function SettingsPage() {
         </div>
 
         {usage && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              AI Usage
+              {tr("AI Usage", "AI 使用情况")}
             </h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Token consumption in the last {usage.rangeDays} days.
+              {tr(
+                `Token consumption in the last ${usage.rangeDays} days.`,
+                `最近 ${usage.rangeDays} 天的 token 消耗。`,
+              )}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Requests
+                  {tr("Requests", "请求次数")}
                 </p>
                 <p className="text-xl font-semibold text-gray-900 dark:text-white">
                   {usage.window.requests}
@@ -1074,7 +1572,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Prompt tokens
+                  {tr("Prompt tokens", "提示 token")}
                 </p>
                 <p className="text-xl font-semibold text-gray-900 dark:text-white">
                   {usage.window.promptTokens.toLocaleString()}
@@ -1082,7 +1580,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Completion tokens
+                  {tr("Completion tokens", "输出 token")}
                 </p>
                 <p className="text-xl font-semibold text-gray-900 dark:text-white">
                   {usage.window.completionTokens.toLocaleString()}
@@ -1090,11 +1588,11 @@ export default function SettingsPage() {
               </div>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-300 mt-4">
-              Total tokens (30d):{" "}
+              {tr("Total tokens (30d): ", "30天总 token：")}
               <span className="font-semibold">
                 {usage.window.totalTokens.toLocaleString()}
-              </span>{" "}
-              • All-time total:{" "}
+              </span>
+              {tr(" • All-time total: ", " • 历史总计：")}
               <span className="font-semibold">
                 {usage.allTime.totalTokens.toLocaleString()}
               </span>
@@ -1102,36 +1600,40 @@ export default function SettingsPage() {
             {(usage.byModel?.length ?? 0) > 0 && (
               <div className="mt-5">
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Cost by Model ({usage.rangeDays}d, estimated)
+                  {tr(
+                    `Usage by Model (${usage.rangeDays}d)`,
+                    `模型使用量（${usage.rangeDays} 天）`,
+                  )}
                 </p>
                 <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {usage.byModel!.map((item) => (
+                  {usage.byModel!.map((item) => {
+                    const displayProvider = item.provider === "wavespeed" ? "bytedance" : item.provider;
+                    return (
                     <div
                       key={`${item.provider}:${item.model}`}
                       className="rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-sm text-gray-900 dark:text-white break-all">
-                          <span className="text-xs uppercase text-gray-500 dark:text-gray-400 mr-2">
-                            {item.provider}
-                          </span>
-                          {item.model}
-                        </p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white whitespace-nowrap">
-                          ${(item.estimatedCostCents / 100).toFixed(2)}
-                        </p>
-                      </div>
+                      <p className="text-sm text-gray-900 dark:text-white break-all">
+                        <span className="text-xs uppercase text-gray-500 dark:text-gray-400 mr-2">
+                          {displayProvider}
+                        </span>
+                        {item.model}
+                      </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {item.requests.toLocaleString()} req •{" "}
-                        {item.totalTokens.toLocaleString()} tokens
+                        {tr(
+                          `${item.requests.toLocaleString()} req • ${item.totalTokens.toLocaleString()} tokens`,
+                          `${item.requests.toLocaleString()} 次请求 • ${item.totalTokens.toLocaleString()} token`,
+                        )}
                       </p>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
           </div>
         )}
+        </div>{/* end Credits+AI Usage grid */}
 
         {message && (
           <div
@@ -1145,96 +1647,6 @@ export default function SettingsPage() {
           </div>
         )}
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Add X Account
-            </h2>
-            <Link
-              href="/docs"
-              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              How to get API keys?
-            </Link>
-          </div>
-          <form onSubmit={handleSave} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Account Label (optional)
-              </label>
-              <input
-                type="text"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                placeholder="e.g. Brand Main, Personal"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                API Key
-              </label>
-              <input
-                type="password"
-                value={xApiKey}
-                onChange={(e) => setXApiKey(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                API Secret
-              </label>
-              <input
-                type="password"
-                value={xApiSecret}
-                onChange={(e) => setXApiSecret(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Access Token
-              </label>
-              <input
-                type="password"
-                value={xAccessToken}
-                onChange={(e) => setXAccessToken(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Access Token Secret
-              </label>
-              <input
-                type="password"
-                value={xAccessTokenSecret}
-                onChange={(e) => setXAccessTokenSecret(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                type="checkbox"
-                checked={setAsDefault}
-                onChange={(e) => setSetAsDefault(e.target.checked)}
-              />
-              Set as default account
-            </label>
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {saving ? "Verifying & Saving..." : "Add Account"}
-            </button>
-          </form>
-        </div>
       </main>
     </div>
   );

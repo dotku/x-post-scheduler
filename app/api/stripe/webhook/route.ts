@@ -31,8 +31,9 @@ export async function POST(request: NextRequest) {
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
-      // One-time topup only (subscription credits handled by invoice.payment_succeeded)
+
       if (session.mode === "payment") {
+        // One-time topup
         const userId = session.metadata?.userId;
         const amountCents = parseInt(session.metadata?.amountCents ?? "0", 10);
         if (userId && amountCents > 0) {
@@ -42,6 +43,20 @@ export async function POST(request: NextRequest) {
             stripeSessionId: session.id,
           });
           console.log(`Credits added: ${amountCents}¢ for user ${userId}`);
+        }
+      } else if (session.mode === "subscription" && session.amount_total) {
+        // Subscription - immediate credit on first purchase
+        const userId = session.metadata?.userId;
+        if (userId) {
+          await addCredits({
+            userId,
+            amountCents: session.amount_total, // amount in cents
+            stripeSessionId: session.id,
+            description: "Initial subscription purchase",
+          });
+          console.log(
+            `Initial subscription credits added: ${session.amount_total}¢ for user ${userId}`,
+          );
         }
       }
       break;
@@ -53,24 +68,40 @@ export async function POST(request: NextRequest) {
       const customerId =
         typeof sub.customer === "string" ? sub.customer : sub.customer.id;
       const priceId = sub.items.data[0]?.price.id;
-      const tier = priceId
-        ? (Object.entries({
-            ...SUBSCRIPTION_PRICE_IDS,
-            ...SUBSCRIPTION_YEARLY_PRICE_IDS,
-          }).find(([, id]) => id === priceId)?.[0] ?? null)
-        : null;
+      const periodEnd = sub.items.data[0]?.current_period_end;
+
+      // Create reverse mapping: price ID -> tier name
+      const priceToTier: Record<string, string> = {};
+      Object.entries(SUBSCRIPTION_PRICE_IDS).forEach(([tier, id]) => {
+        if (id) priceToTier[id] = tier;
+      });
+      Object.entries(SUBSCRIPTION_YEARLY_PRICE_IDS).forEach(([tier, id]) => {
+        if (id) priceToTier[id] = tier;
+      });
+
+      const tier = priceId ? (priceToTier[priceId] ?? null) : null;
+
+      // Determine status: if cancel_at_period_end is true, mark as cancelled
+      let status: string;
+      if (sub.cancel_at_period_end) {
+        status = "cancelled";
+      } else if (sub.status === "active") {
+        status = "active";
+      } else {
+        status = sub.status;
+      }
 
       await prisma.user.updateMany({
         where: { stripeCustomerId: customerId },
         data: {
           subscriptionTier: tier,
-          subscriptionStatus: sub.status === "active" ? "active" : sub.status,
+          subscriptionStatus: status,
           stripeSubscriptionId: sub.id,
-          subscriptionPeriodEnd: new Date(sub.current_period_end * 1000),
+          subscriptionPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
         },
       });
       console.log(
-        `Subscription ${event.type}: tier=${tier} status=${sub.status}`,
+        `Subscription ${event.type}: tier=${tier} status=${status} cancel_at_period_end=${sub.cancel_at_period_end}`,
       );
       break;
     }
@@ -94,7 +125,13 @@ export async function POST(request: NextRequest) {
 
     case "invoice.payment_succeeded": {
       const invoice = event.data.object as Stripe.Invoice;
-      if (invoice.subscription && invoice.amount_paid > 0) {
+      // Only credit for recurring subscriptions (not initial subscription creation)
+      // Initial subscription is handled by checkout.session.completed
+      if (
+        invoice.subscription &&
+        invoice.amount_paid > 0 &&
+        invoice.billing_reason === "subscription_cycle"
+      ) {
         const customerId =
           typeof invoice.customer === "string"
             ? invoice.customer
@@ -108,10 +145,10 @@ export async function POST(request: NextRequest) {
             userId: user.id,
             amountCents: invoice.amount_paid,
             stripeSessionId: invoice.id, // idempotency key
-            description: "Monthly subscription top-up",
+            description: "Subscription renewal top-up",
           });
           console.log(
-            `Monthly credits added: ${invoice.amount_paid}¢ for user ${user.id}`,
+            `Renewal credits added: ${invoice.amount_paid}¢ for user ${user.id}`,
           );
         }
       }

@@ -11,6 +11,7 @@ export const TOPUP_OPTIONS = [
 // Stripe Price IDs for subscription tiers (set in environment variables)
 // Create recurring monthly prices in Stripe Dashboard and add the IDs here
 export const SUBSCRIPTION_PRICE_IDS: Record<string, string | undefined> = {
+  air: process.env.STRIPE_PRICE_AIR,
   bronze: process.env.STRIPE_PRICE_BRONZE,
   iron: process.env.STRIPE_PRICE_IRON,
   silver: process.env.STRIPE_PRICE_SILVER,
@@ -19,6 +20,7 @@ export const SUBSCRIPTION_PRICE_IDS: Record<string, string | undefined> = {
 
 export const SUBSCRIPTION_YEARLY_PRICE_IDS: Record<string, string | undefined> =
   {
+    air: process.env.STRIPE_PRICE_AIR_YEARLY,
     bronze: process.env.STRIPE_PRICE_BRONZE_YEARLY,
     iron: process.env.STRIPE_PRICE_IRON_YEARLY,
     silver: process.env.STRIPE_PRICE_SILVER_YEARLY,

@@ -9,7 +9,7 @@ export function getPublicBlobUrl(url: string): string {
     return url;
   }
   // Relative URLs: prepend public domain
-  const publicUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const publicUrl = process.env.NEXT_PUBLIC_APP_PUBLIC_URL;
   if (publicUrl) {
     return `${publicUrl}${url}`;
   }
@@ -30,7 +30,8 @@ export function getBlobToken(type: "public" | "private"): string | undefined {
 }
 
 export function isLocalhost(): boolean {
-  const url = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL || "";
+  const url =
+    process.env.NEXT_PUBLIC_APP_LOCAL_URL || process.env.APP_BASE_URL || "";
   return url.includes("localhost") || url.includes("127.0.0.1");
 }
 
@@ -41,7 +42,7 @@ export function isLocalhost(): boolean {
 export function checkBlobPublicAccess() {
   const publicToken = getBlobToken("public");
   const isLocal = isLocalhost();
-  const publicUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const publicUrl = process.env.NEXT_PUBLIC_APP_PUBLIC_URL;
 
   return {
     hasPublicToken: !!publicToken,

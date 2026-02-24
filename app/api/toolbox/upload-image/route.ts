@@ -34,10 +34,11 @@ function getExtensionFromMime(mimeType: string): string {
 }
 
 function resolvePublicOrigin(requestOrigin: string) {
-  // For external provider access (Wavespeed), MUST use NEXT_PUBLIC_APP_URL (public domain)
+  // For external provider access (Wavespeed), MUST use NEXT_PUBLIC_APP_PUBLIC_URL (public domain)
   // Never use localhost, as external APIs cannot reach it
   const configured =
-    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_APP_PUBLIC_URL ||
+    process.env.NEXT_PUBLIC_APP_LOCAL_URL ||
     process.env.APP_BASE_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
   const origin = configured.trim() || requestOrigin;
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
       contentType: file.type,
       token: publicBlobToken,
     });
-    // Use NEXT_PUBLIC_APP_URL for external provider access
+    // Use NEXT_PUBLIC_APP_PUBLIC_URL for external provider access
     const publicUrl = uploaded.url;
     return NextResponse.json({ url: publicUrl });
   } catch (error) {

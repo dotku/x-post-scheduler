@@ -89,6 +89,21 @@ export function calculateCostCents(usage: TokenUsage, model?: string): number {
   return Math.max(1, Math.ceil(rawCents));
 }
 
+/**
+ * Returns a discount multiplier based on the user's active subscription tier.
+ * Gold: 10% off (0.90), Silver: 8% off (0.92), others: no discount (1.0).
+ */
+async function getSubscriptionDiscount(userId: string): Promise<number> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { subscriptionTier: true, subscriptionStatus: true },
+  });
+  if (user?.subscriptionStatus !== "active") return 1.0;
+  if (user.subscriptionTier === "gold") return 0.90;
+  if (user.subscriptionTier === "silver") return 0.92;
+  return 1.0;
+}
+
 /** Check if user has remaining credits (> 0). */
 export async function hasCredits(userId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({
@@ -147,7 +162,10 @@ export async function deductCredits(params: {
   model?: string;
   source: string;
 }): Promise<{ costCents: number; newBalance: number }> {
-  const costCents = calculateCostCents(params.usage, params.model);
+  const rawCostCents = calculateCostCents(params.usage, params.model);
+  const discountMultiplier = await getSubscriptionDiscount(params.userId);
+  const costCents = Math.max(1, Math.ceil(rawCostCents * discountMultiplier));
+  const savedCents = rawCostCents - costCents;
 
   const updatedUser = await prisma.user.update({
     where: { id: params.userId },
@@ -166,6 +184,7 @@ export async function deductCredits(params: {
         model: params.model,
         promptTokens: params.usage.promptTokens,
         completionTokens: params.usage.completionTokens,
+        ...(savedCents > 0 && { savedCents }),
       }),
     },
   });
@@ -181,9 +200,13 @@ export async function deductFlatFee(params: {
   feeCents: number;
   source: string;
 }): Promise<{ costCents: number; newBalance: number }> {
+  const discountMultiplier = await getSubscriptionDiscount(params.userId);
+  const costCents = Math.max(1, Math.ceil(params.feeCents * discountMultiplier));
+  const savedCents = params.feeCents - costCents;
+
   const updatedUser = await prisma.user.update({
     where: { id: params.userId },
-    data: { creditBalanceCents: { decrement: params.feeCents } },
+    data: { creditBalanceCents: { decrement: costCents } },
     select: { creditBalanceCents: true },
   });
 
@@ -191,14 +214,15 @@ export async function deductFlatFee(params: {
     data: {
       userId: params.userId,
       type: "deduction",
-      amountCents: -params.feeCents,
+      amountCents: -costCents,
       balanceAfter: updatedUser.creditBalanceCents,
       description: `AI generation (${params.source}) - flat fee`,
+      ...(savedCents > 0 && { metadata: JSON.stringify({ savedCents }) }),
     },
   });
 
   return {
-    costCents: params.feeCents,
+    costCents,
     newBalance: updatedUser.creditBalanceCents,
   };
 }
@@ -214,7 +238,10 @@ export async function deductWavespeedCredits(params: {
   source: string;
   taskId?: string;
 }): Promise<{ costCents: number; newBalance: number }> {
-  const costCents = getWavespeedFeeCents(params.modelId, params.mediaType);
+  const rawCostCents = getWavespeedFeeCents(params.modelId, params.mediaType);
+  const discountMultiplier = await getSubscriptionDiscount(params.userId);
+  const costCents = Math.max(1, Math.ceil(rawCostCents * discountMultiplier));
+  const savedCents = rawCostCents - costCents;
 
   const updated = await prisma.user.updateMany({
     where: {
@@ -248,6 +275,7 @@ export async function deductWavespeedCredits(params: {
         modelId: params.modelId,
         mediaType: params.mediaType,
         taskId: params.taskId ?? null,
+        ...(savedCents > 0 && { savedCents }),
       }),
     },
   });
