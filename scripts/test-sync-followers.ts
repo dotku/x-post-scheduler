@@ -59,8 +59,8 @@ async function main() {
     console.log(`  lastSyncedAt: ${account.lastSyncedAt}`);
 
     try {
-      const apiKey = decrypt(account.xApiKey);
-      const apiSecret = decrypt(account.xApiSecret);
+      const apiKey = account.xApiKey ? decrypt(account.xApiKey) : process.env.TWITTER_API_KEY!;
+      const apiSecret = account.xApiSecret ? decrypt(account.xApiSecret) : process.env.TWITTER_API_SECRET!;
       const accessToken = decrypt(account.xAccessToken);
       const accessTokenSecret = decrypt(account.xAccessTokenSecret);
 

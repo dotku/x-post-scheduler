@@ -158,6 +158,27 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    // Handle Twitter OAuth callback
+    if (params.get("connected") === "twitter") {
+      setMessage({
+        type: "success",
+        text: tr("X account connected successfully!", "X 账号连接成功！"),
+      });
+      window.history.replaceState({}, "", window.location.pathname);
+      void fetchData();
+      return;
+    }
+    if (params.get("error") === "oauth_failed") {
+      setMessage({
+        type: "error",
+        text: tr(
+          "X authorization failed. Please try again.",
+          "X 授权失败，请重试。",
+        ),
+      });
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
     // Handle subscription success redirect
     if (params.get("sub") === "success") {
       setMessage({
@@ -1119,17 +1140,44 @@ export default function SettingsPage() {
 
           {/* Add X Account — inline below the accounts list */}
           <div className="border-t border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {tr("Add X Account", "添加 X 账号")}
-              </h2>
-              <Link
-                href="/docs"
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              {tr("Add X Account", "添加 X 账号")}
+            </h2>
+
+            {/* Primary: Connect with X via OAuth */}
+            <div className="mb-6">
+              <a
+                href="/api/auth/twitter/connect"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-full font-semibold hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors"
               >
-                {tr("How to get API keys?", "如何获取 API 密钥？")}
-              </Link>
+                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.259 5.631L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
+                </svg>
+                {tr("Connect with X", "连接 X 账号")}
+              </a>
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                {tr(
+                  "Authorize via X OAuth — no API keys needed.",
+                  "通过 X OAuth 授权，无需填写 API 密钥。",
+                )}
+              </p>
             </div>
+
+            {/* Advanced: manual API key entry */}
+            <details className="group">
+              <summary className="cursor-pointer text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 select-none list-none flex items-center gap-1">
+                <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
+                {tr("Advanced: enter API keys manually", "高级：手动填写 API 密钥")}
+              </summary>
+              <div className="mt-3 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
+                <div className="flex justify-end mb-3">
+                  <Link
+                    href="/docs"
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {tr("How to get API keys?", "如何获取 API 密钥？")}
+                  </Link>
+                </div>
             <form onSubmit={handleSave} className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -1216,6 +1264,8 @@ export default function SettingsPage() {
                 </button>
               </div>
             </form>
+              </div>
+            </details>
           </div>
         </div>
 

@@ -74,8 +74,8 @@ export async function getUserXCredentials(
     return {
       accountId: account.id,
       credentials: {
-        apiKey: decrypt(account.xApiKey),
-        apiSecret: decrypt(account.xApiSecret),
+        apiKey: account.xApiKey ? decrypt(account.xApiKey) : undefined,
+        apiSecret: account.xApiSecret ? decrypt(account.xApiSecret) : undefined,
         accessToken: decrypt(account.xAccessToken),
         accessTokenSecret: decrypt(account.xAccessTokenSecret),
       },
@@ -109,10 +109,10 @@ export async function getUserXCredentials(
   return {
     accountId: null,
     credentials: {
-      apiKey: decrypt(user.xApiKey),
-      apiSecret: decrypt(user.xApiSecret),
-      accessToken: decrypt(user.xAccessToken),
-      accessTokenSecret: decrypt(user.xAccessTokenSecret),
+      apiKey: user.xApiKey ? decrypt(user.xApiKey) : undefined,
+      apiSecret: user.xApiSecret ? decrypt(user.xApiSecret) : undefined,
+      accessToken: decrypt(user.xAccessToken!),
+      accessTokenSecret: decrypt(user.xAccessTokenSecret!),
     },
   };
 }

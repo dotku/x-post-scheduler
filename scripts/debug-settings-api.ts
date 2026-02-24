@@ -46,8 +46,8 @@ async function main() {
   for (const account of accounts) {
     try {
       const client = new TwitterApi({
-        appKey: decrypt(account.xApiKey),
-        appSecret: decrypt(account.xApiSecret),
+        appKey: account.xApiKey ? decrypt(account.xApiKey) : process.env.TWITTER_API_KEY!,
+        appSecret: account.xApiSecret ? decrypt(account.xApiSecret) : process.env.TWITTER_API_SECRET!,
         accessToken: decrypt(account.xAccessToken),
         accessSecret: decrypt(account.xAccessTokenSecret),
       });

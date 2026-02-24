@@ -31,8 +31,8 @@ export async function POST() {
   for (const account of accounts) {
     try {
       const credentials = {
-        apiKey: decrypt(account.xApiKey),
-        apiSecret: decrypt(account.xApiSecret),
+        apiKey: account.xApiKey ? decrypt(account.xApiKey) : undefined,
+        apiSecret: account.xApiSecret ? decrypt(account.xApiSecret) : undefined,
         accessToken: decrypt(account.xAccessToken),
         accessTokenSecret: decrypt(account.xAccessTokenSecret),
       };

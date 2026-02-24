@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
   }
 
   const result = await verifyCredentials({
-    apiKey: decrypt(account.xApiKey),
-    apiSecret: decrypt(account.xApiSecret),
+    apiKey: account.xApiKey ? decrypt(account.xApiKey) : undefined,
+    apiSecret: account.xApiSecret ? decrypt(account.xApiSecret) : undefined,
     accessToken: decrypt(account.xAccessToken),
     accessTokenSecret: decrypt(account.xAccessTokenSecret),
   });

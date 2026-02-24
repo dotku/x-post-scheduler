@@ -59,8 +59,8 @@ export async function POST(request: NextRequest) {
     });
     for (const acc of accounts) {
       accountCredentials.set(acc.id, {
-        apiKey: decrypt(acc.xApiKey),
-        apiSecret: decrypt(acc.xApiSecret),
+        apiKey: acc.xApiKey ? decrypt(acc.xApiKey) : undefined,
+        apiSecret: acc.xApiSecret ? decrypt(acc.xApiSecret) : undefined,
         accessToken: decrypt(acc.xAccessToken),
         accessTokenSecret: decrypt(acc.xAccessTokenSecret),
       });
