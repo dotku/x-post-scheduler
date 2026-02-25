@@ -62,41 +62,10 @@ export default async function AnalyticsPage({
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
               <Link
                 href={`${prefix}/dashboard`}
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
+                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4 flex items-center gap-1"
               >
-                {t("backToDashboard")}
+               {t("backToDashboard")}
               </Link>
-              <Link
-                href={`${prefix}/gallery`}
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-              >
-                {tNav("gallery")}
-              </Link>
-              <Link
-                href={`${prefix}/toolbox`}
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-              >
-                {tNav("toolbox")}
-              </Link>
-              <Link
-                href={`${prefix}/generate`}
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-              >
-                {tNav("generate")}
-              </Link>
-              <Link
-                href={`${prefix}/recurring`}
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-              >
-                {tNav("autoPost")}
-              </Link>
-              <Link
-                href={`${prefix}/knowledge`}
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-              >
-                {tNav("knowledge")}
-              </Link>
-
               <div className="border-l border-gray-300 dark:border-gray-600 h-5 mx-1 hidden sm:block" />
               <LanguageSwitcher />
               <UserMenu />
