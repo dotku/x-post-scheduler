@@ -6,6 +6,7 @@
     "compose": "Compose Post",
     "autoPost": "AI Post Scheduler",
     "knowledge": "Knowledge Base",
+    "analytics": "Analytics",
     "appTitle": "xPilot"
   },
   "userMenu": {
@@ -506,5 +507,30 @@
     "embeddedHint": "Sign-in is not supported in embedded browsers. Please open this page in Safari or Chrome.",
     "copyLink": "Copy link",
     "linkCopied": "Link copied!"
+  },
+  "analytics": {
+    "title": "Analytics",
+    "backToDashboard": "← Dashboard",
+    "selectAccount": "Select X Account",
+    "allAccounts": "All Accounts",
+    "timeRange": "Time Range",
+    "last7Days": "Last 7 days",
+    "last30Days": "Last 30 days",
+    "last90Days": "Last 90 days",
+    "accountMetrics": "Account Metrics",
+    "totalFollowers": "Total Followers",
+    "newFollowers": "New Followers",
+    "totalPosts": "Posts",
+    "totalImpressions": "Impressions",
+    "totalEngagements": "Engagements",
+    "totalComments": "Comments",
+    "postPerformance": "Post Performance",
+    "post": "Post",
+    "likes": "Likes",
+    "engagementRate": "Engagement Rate",
+    "impressions": "Impressions",
+    "noData": "No data available for the selected period",
+    "loading": "Loading analytics...",
+    "viewOnX": "View on X ↗"
   }
 }
