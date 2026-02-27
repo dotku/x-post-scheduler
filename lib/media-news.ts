@@ -945,7 +945,7 @@ export async function saveSourceArticles(
       INSERT INTO "MediaNewsSource"
         ("id","reportDate","period","title","url","source","publishedAt","description","fullContent","imageUrl","createdAt")
       VALUES
-        (${id},${reportDate},${period},${article.title},${article.url},${article.source},${article.publishedAt},${article.description},${article.fullContent ?? null},${article.image ?? null},NOW())
+        (${id},${reportDate},${period},${article.title},${article.url},${article.source},${article.publishedAt},${article.description},${article.fullContent ?? article.description},${article.image ?? null},NOW())
       ON CONFLICT ("reportDate","period","url") DO NOTHING
     `;
   }
@@ -981,7 +981,16 @@ export async function translateAndStoreSourceArticlesZh(
     }
   }
 
-  // Pass 2: translate full body for Guardian articles missing fullContentZh
+  // Pre-pass 2: for articles still missing fullContent, copy description → fullContent
+  // (handles already-stored RSS articles before the saveSourceArticles fallback was added)
+  await prisma.$executeRaw`
+    UPDATE "MediaNewsSource"
+    SET "fullContent" = "description"
+    WHERE "reportDate" = ${reportDate} AND "period" = ${period}
+      AND "fullContent" IS NULL
+  `;
+
+  // Pass 2: translate full body for articles missing fullContentZh
   type FullRow = { id: string; title: string; description: string; fullContent: string };
   const fullRows = await prisma.$queryRaw<FullRow[]>`
     SELECT "id","title","description","fullContent"

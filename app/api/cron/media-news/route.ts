@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { detectCronTrigger, logCronRun } from "@/lib/cron-logging";
 import {
   generateAndStoreMediaIndustryReport,
+  translateAndStoreSourceArticlesZh,
   deleteOldMediaNewsData,
   type ReportPeriod,
 } from "@/lib/media-news";
@@ -79,6 +80,17 @@ async function handleRequest(request: NextRequest) {
   }
 
   const period = parsePeriod(request.nextUrl.searchParams.get("period"));
+  const translateOnly = request.nextUrl.searchParams.get("translateOnly") === "1";
+  const dateParam = request.nextUrl.searchParams.get("date"); // YYYY-MM-DD
+
+  // translateOnly mode: skip report generation, just backfill zh translations for a date
+  if (translateOnly) {
+    const targetDate = dateParam ?? new Date().toISOString().slice(0, 10);
+    const targetPeriod: ReportPeriod = period === "both" ? "daily" : period;
+    await translateAndStoreSourceArticlesZh(targetDate, targetPeriod);
+    return NextResponse.json({ success: true, translateOnly: true, date: targetDate, period: targetPeriod });
+  }
+
   const monthInput = request.nextUrl.searchParams.get("month");
   const parsedMonth = parseMonthParam(monthInput);
   if (monthInput && !parsedMonth) {
