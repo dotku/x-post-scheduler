@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getReportByDate, listStoredMediaIndustryReports } from "@/lib/media-news";
+import { getReportByDate, getSourceArticles, listStoredMediaIndustryReports } from "@/lib/media-news";
 
 export const revalidate = 1800;
 
@@ -31,10 +31,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ...(report.coverImageUrl ? { images: [report.coverImageUrl] } : {}),
     },
     alternates: {
-      canonical: `/${isZh ? "zh" : "en"}/media-news/${date}`,
+      canonical: `/${isZh ? "zh" : "en"}/news/${date}`,
       languages: {
-        "zh-CN": `/zh/media-news/${date}`,
-        "en-US": `/en/media-news/${date}`,
+        "zh-CN": `/zh/news/${date}`,
+        "en-US": `/en/news/${date}`,
       },
     },
   };
@@ -53,7 +53,10 @@ export default async function MediaNewsReportPage({ params }: Props) {
   // Validate date format
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) notFound();
 
-  const report = await getReportByDate(date, "daily");
+  const [report, sourceArticles] = await Promise.all([
+    getReportByDate(date, "daily"),
+    getSourceArticles(date, "daily"),
+  ]);
   if (!report) notFound();
 
   const highlights = isZh ? report.highlightsZh : report.highlightsEn;
@@ -87,7 +90,7 @@ export default async function MediaNewsReportPage({ params }: Props) {
             {isZh ? "首页" : "Home"}
           </Link>
           <span>/</span>
-          <Link href={`${prefix}/media-news`} className="hover:text-gray-700 dark:hover:text-gray-200">
+          <Link href={`${prefix}/news`} className="hover:text-gray-700 dark:hover:text-gray-200">
             {isZh ? "传媒行业日报" : "Media Industry Daily"}
           </Link>
           <span>/</span>
@@ -217,10 +220,50 @@ export default async function MediaNewsReportPage({ params }: Props) {
           </div>
         </article>
 
+        {/* Source Articles */}
+        {sourceArticles.length > 0 && (
+          <details className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden" open>
+            <summary className="px-6 py-4 cursor-pointer flex items-center justify-between border-b border-gray-100 dark:border-gray-700">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                {isZh ? `信源文章（${sourceArticles.length} 篇）` : `Source Articles (${sourceArticles.length})`}
+              </span>
+              <span className="text-xs text-gray-400">▾</span>
+            </summary>
+            <ol className="divide-y divide-gray-100 dark:divide-gray-700">
+              {sourceArticles.map((article, i) => (
+                <li key={i} className="px-6 py-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                      {article.source.replace(/\s*\[(INDUSTRY|CONTEXT)\]/, "")}
+                    </span>
+                    <span className="text-[10px] text-gray-300 dark:text-gray-600">·</span>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">
+                      {article.publishedAt}
+                    </span>
+                  </div>
+                  <a
+                    href={article.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-medium text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 leading-snug"
+                  >
+                    {article.title}
+                  </a>
+                  {article.description && (
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
+                      {article.description}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </details>
+        )}
+
         {/* Back link */}
         <div className="mt-6">
           <Link
-            href={`${prefix}/media-news`}
+            href={`${prefix}/news`}
             className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
           >
             ← {isZh ? "返回传媒行业日报" : "Back to Media Industry Daily"}

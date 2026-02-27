@@ -361,3 +361,22 @@ model MediaIndustryReport {
   @@index([period, reportDate])
 }
 
+// Raw source articles stored per report run.
+// Auto-cleaned after 90 days to keep DB lean.
+model MediaNewsSource {
+  id          String   @id @default(cuid())
+  reportDate  String   // YYYY-MM-DD — matches MediaIndustryReport.reportDate (date string)
+  period      String   // "daily" | "weekly"
+  title       String
+  url         String
+  source      String   // outlet name e.g. "The Guardian", "Digiday"
+  publishedAt String   // YYYY-MM-DD
+  description String
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+
+  @@unique([reportDate, period, url])
+  @@index([reportDate, period])
+  @@index([createdAt])
+}
+

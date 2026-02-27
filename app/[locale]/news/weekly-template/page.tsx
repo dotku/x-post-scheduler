@@ -29,7 +29,7 @@ export default async function WeeklyTemplatePage({
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <Link
-            href={`${prefix}/media-news`}
+            href={`${prefix}/news`}
             className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
           >
             ← {isZh ? "返回传媒行业日报" : "Back to Media Industry Daily"}

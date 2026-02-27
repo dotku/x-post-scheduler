@@ -20,7 +20,7 @@ export default async function USMainstreamMediaCaseStudyPage({
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <Link
-            href={`${isZh ? "/zh" : ""}/media-news`}
+            href={`${isZh ? "/zh" : ""}/news`}
             className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
           >
             ← {isZh ? "返回媒体资讯" : "Back to Media News"}
@@ -37,7 +37,7 @@ export default async function USMainstreamMediaCaseStudyPage({
           </p>
           <div className="mt-4">
             <Link
-              href={`${locale === "zh" ? "/zh" : ""}/media-news/social-media-landscape-2026`}
+              href={`${locale === "zh" ? "/zh" : ""}/news/social-media-landscape-2026`}
               className="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
               {isZh

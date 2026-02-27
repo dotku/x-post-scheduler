@@ -654,7 +654,7 @@ export default function LandingContent({
               {t("docs")}
             </Link>
             <Link
-              href={`${prefix}/media-news`}
+              href={`${prefix}/news`}
               className="text-blue-600 dark:text-blue-400 font-medium hover:underline underline-offset-4"
             >
               {locale === "zh" ? "传媒日报" : "Media Daily"}
@@ -735,7 +735,7 @@ export default function LandingContent({
                 {t("docs")}
               </Link>
               <Link
-                href={`${prefix}/media-news`}
+                href={`${prefix}/news`}
                 onClick={() => setNavMenuOpen(false)}
                 className="rounded-md px-2 py-2 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-50 dark:hover:bg-blue-900/30"
               >
@@ -855,7 +855,7 @@ export default function LandingContent({
                 {t("goToDashboard")}
               </Link>
               <Link
-                href={`${prefix}/media-news`}
+                href={`${prefix}/news`}
                 className="inline-flex items-center px-6 py-3 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 font-medium rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
               >
                 {locale === "zh" ? "今日传媒日报 →" : "Today's Media Brief →"}
@@ -870,7 +870,7 @@ export default function LandingContent({
                 {t("getStarted")}
               </Link>
               <Link
-                href={`${prefix}/media-news`}
+                href={`${prefix}/news`}
                 className="inline-flex items-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 {locale === "zh" ? "传媒行业日报 →" : "Media Industry Daily →"}

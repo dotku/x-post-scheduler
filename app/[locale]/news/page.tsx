@@ -379,7 +379,7 @@ export default async function MediaNewsPage({
                 {dailyArchive.slice(0, 14).map((item) => (
                   <li key={`d-${item.date}`} className="text-sm">
                     <Link
-                      href={`${prefix}/media-news/${item.date}`}
+                      href={`${prefix}/news/${item.date}`}
                       className="flex items-baseline gap-1.5 group"
                     >
                       <span className="shrink-0 font-medium text-gray-500 dark:text-gray-400 tabular-nums">
@@ -423,7 +423,7 @@ export default async function MediaNewsPage({
                   : "Platform scale, channel roles, and execution guidance."}
               </p>
               <Link
-                href={`${prefix}/media-news/social-media-landscape-2026`}
+                href={`${prefix}/news/social-media-landscape-2026`}
                 className="self-start text-sm text-blue-600 dark:text-blue-400 hover:underline"
               >
                 {isZh ? "阅读 →" : "Read →"}
@@ -445,7 +445,7 @@ export default async function MediaNewsPage({
                   : "TV, newspapers, digital-native, audio, and social distribution."}
               </p>
               <Link
-                href={`${prefix}/media-news/us-mainstream-media-2026`}
+                href={`${prefix}/news/us-mainstream-media-2026`}
                 className="self-start text-sm text-blue-600 dark:text-blue-400 hover:underline"
               >
                 {isZh ? "阅读 →" : "Read →"}

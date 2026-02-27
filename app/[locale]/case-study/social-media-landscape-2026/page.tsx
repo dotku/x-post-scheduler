@@ -14,5 +14,5 @@ export default async function SocialMediaCaseStudyPage({
 }) {
   const { locale } = await params;
   const prefix = locale === "zh" ? "/zh" : "";
-  redirect(`${prefix}/media-news/social-media-landscape-2026`);
+  redirect(`${prefix}/news/social-media-landscape-2026`);
 }

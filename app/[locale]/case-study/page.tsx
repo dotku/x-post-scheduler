@@ -7,5 +7,5 @@ export default async function CaseStudyPage({
 }) {
   const { locale } = await params;
   const prefix = locale === "zh" ? "/zh" : "";
-  redirect(`${prefix}/media-news`);
+  redirect(`${prefix}/news`);
 }

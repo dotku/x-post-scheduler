@@ -190,7 +190,7 @@ export default function UserMenu({
                 {tNav("knowledge")}
               </Link>
               <Link
-                href={`${prefix}/media-news`}
+                href={`${prefix}/news`}
                 onClick={() => setIsOpen(false)}
                 className="rounded-md px-2.5 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
               >

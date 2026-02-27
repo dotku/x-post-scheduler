@@ -49,7 +49,7 @@ export default async function MediaDailyWidget({
           )}
         </div>
         <Link
-          href={`${prefix}/media-news`}
+          href={`${prefix}/news`}
           className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
         >
           {isZh ? "查看完整日报 →" : "Full brief →"}

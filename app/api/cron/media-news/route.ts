@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { detectCronTrigger, logCronRun } from "@/lib/cron-logging";
 import {
   generateAndStoreMediaIndustryReport,
+  deleteOldMediaNewsData,
   type ReportPeriod,
 } from "@/lib/media-news";
 
@@ -137,6 +138,14 @@ async function handleRequest(request: NextRequest) {
       results.weekly = await generateAndStoreMediaIndustryReport("weekly");
     }
 
+    // Purge data older than 90 days (source articles + reports) — best-effort.
+    let cleaned: { sourcesDeleted: number; reportsDeleted: number } | null = null;
+    try {
+      cleaned = await deleteOldMediaNewsData(90);
+    } catch (err) {
+      console.error("Media-news cleanup error:", err);
+    }
+
     await logCronRun({
       jobName: "media-news-report",
       endpoint: "/api/cron/media-news",
@@ -152,6 +161,7 @@ async function handleRequest(request: NextRequest) {
         shouldRunWeekly,
         hasDaily: Boolean(results.daily),
         hasWeekly: Boolean(results.weekly),
+        cleaned,
       },
     });
 
@@ -165,6 +175,7 @@ async function handleRequest(request: NextRequest) {
         dailyStored: Boolean(results.daily),
         weeklyStored: Boolean(results.weekly),
         results,
+        cleaned,
       },
       { status: 200 },
     );

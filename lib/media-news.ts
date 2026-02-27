@@ -924,13 +924,124 @@ export async function saveMediaIndustryReport(
   }
 }
 
+// ── Source article persistence ────────────────────────────────────────────────
+
+export async function saveSourceArticles(
+  articles: MediaNewsArticle[],
+  reportDate: string,
+  period: ReportPeriod,
+): Promise<void> {
+  if (articles.length === 0) return;
+
+  // Upsert each article. Use ON CONFLICT DO NOTHING to skip duplicates cleanly.
+  for (const article of articles) {
+    if (!article.url || !article.title) continue;
+    const id = randomUUID();
+    await prisma.$executeRaw`
+      INSERT INTO "MediaNewsSource"
+        ("id","reportDate","period","title","url","source","publishedAt","description","imageUrl","createdAt")
+      VALUES
+        (${id},${reportDate},${period},${article.title},${article.url},${article.source},${article.publishedAt},${article.description},${article.image ?? null},NOW())
+      ON CONFLICT ("reportDate","period","url") DO NOTHING
+    `;
+  }
+}
+
+export async function getSourceArticles(
+  reportDate: string,
+  period: ReportPeriod,
+): Promise<MediaNewsArticle[]> {
+  type Row = {
+    title: string;
+    url: string;
+    source: string;
+    publishedAt: string;
+    description: string;
+    imageUrl: string | null;
+  };
+
+  try {
+    const rows = await prisma.$queryRaw<Row[]>`
+      SELECT "title","url","source","publishedAt","description","imageUrl"
+      FROM "MediaNewsSource"
+      WHERE "reportDate" = ${reportDate} AND "period" = ${period}
+      ORDER BY "publishedAt" DESC
+    `;
+    return rows.map((r) => ({
+      title: r.title,
+      url: r.url,
+      source: r.source,
+      publishedAt: r.publishedAt,
+      description: r.description,
+      image: r.imageUrl ?? undefined,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// Delete source articles (and reports) older than retentionDays (default 90 days).
+export async function deleteOldMediaNewsData(
+  retentionDays = 90,
+): Promise<{ sourcesDeleted: number; reportsDeleted: number }> {
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - retentionDays);
+  const cutoffStr = toIsoDate(cutoff); // "YYYY-MM-DD" for MediaNewsSource
+
+  const [sourcesResult, reportsResult] = await Promise.all([
+    prisma.$executeRaw`
+      DELETE FROM "MediaNewsSource" WHERE "reportDate" < ${cutoffStr}
+    `,
+    prisma.$executeRaw`
+      DELETE FROM "MediaIndustryReport" WHERE "reportDate" < ${cutoff}
+    `,
+  ]);
+
+  return {
+    sourcesDeleted: Number(sourcesResult),
+    reportsDeleted: Number(reportsResult),
+  };
+}
+
 export async function generateAndStoreMediaIndustryReport(
   period: ReportPeriod,
   now: Date = new Date(),
 ): Promise<DailyMediaNewsReport | null> {
-  const report = await generateMediaIndustryReport(period, now);
-  if (!report) return null;
-  return saveMediaIndustryReport(report);
+  // Inline the generation steps so we keep a handle on `sources` for persistence.
+  const { reportDate, rangeStart, rangeEnd } = getPeriodRange(period, now);
+  const sources = await fetchMediaArticles(period, rangeStart, rangeEnd);
+  if (sources.length === 0) return null;
+
+  const aiSummary = await generateAiSummary(sources, period, toIsoDate(reportDate));
+  const fallback = fallbackSummary(sources, period);
+  const summary = aiSummary ?? fallback;
+  const coverImageUrl = sources.find((item) => item.image)?.image;
+
+  const report: DailyMediaNewsReport = {
+    period,
+    date: toIsoDate(reportDate),
+    rangeStart: rangeStart.toISOString(),
+    rangeEnd: rangeEnd.toISOString(),
+    titleEn: summary.titleEn,
+    titleZh: summary.titleZh,
+    summaryEn: summary.summaryEn,
+    summaryZh: summary.summaryZh,
+    highlightsEn: summary.highlightsEn,
+    highlightsZh: summary.highlightsZh,
+    coverImageUrl,
+    sourceCount: sources.length,
+    generatedAt: new Date().toISOString(),
+    usedAi: Boolean(aiSummary),
+  };
+
+  const saved = await saveMediaIndustryReport(report);
+
+  // Persist source articles best-effort (don't fail the whole run if this errors).
+  saveSourceArticles(sources, toIsoDate(reportDate), period).catch((err) =>
+    console.error("Failed to save source articles:", err),
+  );
+
+  return saved;
 }
 
 export async function getLatestStoredMediaIndustryReport(

@@ -14,5 +14,5 @@ export default async function USMainstreamMediaCaseStudyPage({
 }) {
   const { locale } = await params;
   const prefix = locale === "zh" ? "/zh" : "";
-  redirect(`${prefix}/media-news/us-mainstream-media-2026`);
+  redirect(`${prefix}/news/us-mainstream-media-2026`);
 }
