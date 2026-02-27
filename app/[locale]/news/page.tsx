@@ -110,11 +110,28 @@ export default async function MediaNewsPage({
                   : "Media Tech · Social Marketing · Content Distribution — bilingual, daily"}
               </p>
             </div>
-            {latest?.date && (
-              <p className="shrink-0 text-sm font-medium text-blue-600 dark:text-blue-400">
-                {formatDate(latest.date, isZh)}
-              </p>
-            )}
+            <div className="flex items-center gap-3 shrink-0">
+              {latest?.date && (
+                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                  {formatDate(latest.date, isZh)}
+                </p>
+              )}
+              {/* Language toggle */}
+              <div className="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 p-1 text-xs font-medium">
+                <Link
+                  href="/news"
+                  className={`px-2.5 py-1 rounded-md transition-colors ${!isZh ? "bg-blue-600 text-white" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"}`}
+                >
+                  EN
+                </Link>
+                <Link
+                  href="/zh/news"
+                  className={`px-2.5 py-1 rounded-md transition-colors ${isZh ? "bg-blue-600 text-white" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"}`}
+                >
+                  中文
+                </Link>
+              </div>
+            </div>
           </div>
 
           {/* Quick links */}
@@ -122,14 +139,14 @@ export default async function MediaNewsPage({
             <a href="#today" className="px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60">
               {isZh ? "今日日报" : "Today"}
             </a>
-            <a href="#weekly" className="px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/60">
-              {isZh ? "本周周报" : "Weekly"}
-            </a>
             <a href="#product" className="px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900/60">
               {isZh ? "产品方向信号" : "Product Signals"}
             </a>
             <a href="#archive" className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600">
               {isZh ? "往期存档" : "Archive"}
+            </a>
+            <a href="#weekly" className="px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-200 dark:hover:bg-indigo-900/60">
+              {isZh ? "本周周报" : "Weekly"}
             </a>
             <a href="#research" className="px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600">
               {isZh ? "深度研究" : "Research"}
@@ -252,49 +269,20 @@ export default async function MediaNewsPage({
                     : "No stored report yet. The page updates automatically after the daily cron job runs."}
                 </p>
               )}
+
+              {latest?.date && (
+                <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+                  <Link
+                    href={`${prefix}/news/${latest.date}`}
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {isZh ? "查看完整报告与信源文章 →" : "View full report & source articles →"}
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </section>
-
-        {/* ── Weekly Report ────────────────────────────────────────── */}
-        {latestWeekly && (
-          <section id="weekly">
-            <div className="flex items-center gap-2 mb-3">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
-                {isZh ? "本周周报" : "This Week's Report"}
-              </h2>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
-                {isZh ? `周起始 ${latestWeekly.date}` : `Week of ${latestWeekly.date}`}
-              </span>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-5 sm:p-6 space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {isZh ? latestWeekly.titleZh : latestWeekly.titleEn}
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                {isZh ? latestWeekly.summaryZh : latestWeekly.summaryEn}
-              </p>
-              {weeklyHighlights.length > 0 && (
-                <ol className="space-y-2">
-                  {weeklyHighlights.map((item, i) => (
-                    <li key={i} className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
-                      <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center justify-center">
-                        {i + 1}
-                      </span>
-                      {item}
-                    </li>
-                  ))}
-                </ol>
-              )}
-              <p className="text-xs text-gray-400">
-                {isZh
-                  ? `${latestWeekly.sourceCount} 家信源 · ${latestWeekly.usedAi ? "AI 汇总" : "规则汇总"}`
-                  : `${latestWeekly.sourceCount} sources · ${latestWeekly.usedAi ? "AI synthesis" : "Rule-based"}`}
-              </p>
-            </div>
-          </section>
-        )}
 
         {/* ── Product Direction Signals ────────────────────────────── */}
         <section id="product">
@@ -400,6 +388,46 @@ export default async function MediaNewsPage({
             )}
           </div>
         </section>
+
+        {/* ── Weekly Report ────────────────────────────────────────── */}
+        {latestWeekly && (
+          <section id="weekly">
+            <div className="flex items-center gap-2 mb-3">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+                {isZh ? "本周周报" : "This Week's Report"}
+              </h2>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {isZh ? `周起始 ${latestWeekly.date}` : `Week of ${latestWeekly.date}`}
+              </span>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow p-5 sm:p-6 space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {isZh ? latestWeekly.titleZh : latestWeekly.titleEn}
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                {isZh ? latestWeekly.summaryZh : latestWeekly.summaryEn}
+              </p>
+              {weeklyHighlights.length > 0 && (
+                <ol className="space-y-2">
+                  {weeklyHighlights.map((item, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-300">
+                      <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-xs font-bold flex items-center justify-center">
+                        {i + 1}
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+                </ol>
+              )}
+              <p className="text-xs text-gray-400">
+                {isZh
+                  ? `${latestWeekly.sourceCount} 家信源 · ${latestWeekly.usedAi ? "AI 汇总" : "规则汇总"}`
+                  : `${latestWeekly.sourceCount} sources · ${latestWeekly.usedAi ? "AI synthesis" : "Rule-based"}`}
+              </p>
+            </div>
+          </section>
+        )}
 
         {/* ── Deep Research ────────────────────────────────────────── */}
         <section id="research">

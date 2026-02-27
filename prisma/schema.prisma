@@ -372,6 +372,7 @@ model MediaNewsSource {
   source      String   // outlet name e.g. "The Guardian", "Digiday"
   publishedAt String   // YYYY-MM-DD
   description String
+  fullContent String?  // Full article body — populated for sources that provide it (e.g. The Guardian)
   imageUrl    String?
   createdAt   DateTime @default(now())
 

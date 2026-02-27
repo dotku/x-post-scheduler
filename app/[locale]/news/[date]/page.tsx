@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getReportByDate, getSourceArticles, listStoredMediaIndustryReports } from "@/lib/media-news";
+import { getReportByDate, getSourceArticles, listStoredMediaIndustryReports, translateSourceArticlesForZh } from "@/lib/media-news";
 
 export const revalidate = 1800;
 
@@ -59,6 +59,11 @@ export default async function MediaNewsReportPage({ params }: Props) {
   ]);
   if (!report) notFound();
 
+  // Batch-translate source article titles + descriptions for Chinese mode
+  const sourceTranslations = isZh && sourceArticles.length > 0
+    ? await translateSourceArticlesForZh(sourceArticles)
+    : null;
+
   const highlights = isZh ? report.highlightsZh : report.highlightsEn;
   const title = isZh ? report.titleZh : report.titleEn;
   const summary = isZh ? report.summaryZh : report.summaryEn;
@@ -84,18 +89,34 @@ export default async function MediaNewsReportPage({ params }: Props) {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-        {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-6">
-          <Link href={prefix || "/"} className="hover:text-gray-700 dark:hover:text-gray-200">
-            {isZh ? "首页" : "Home"}
-          </Link>
-          <span>/</span>
-          <Link href={`${prefix}/news`} className="hover:text-gray-700 dark:hover:text-gray-200">
-            {isZh ? "传媒行业日报" : "Media Industry Daily"}
-          </Link>
-          <span>/</span>
-          <span className="text-gray-700 dark:text-gray-300 font-mono">{date}</span>
-        </nav>
+        {/* Breadcrumb + language toggle */}
+        <div className="flex items-center justify-between mb-6">
+          <nav className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <Link href={prefix || "/"} className="hover:text-gray-700 dark:hover:text-gray-200">
+              {isZh ? "首页" : "Home"}
+            </Link>
+            <span>/</span>
+            <Link href={`${prefix}/news`} className="hover:text-gray-700 dark:hover:text-gray-200">
+              {isZh ? "传媒行业日报" : "Media Industry Daily"}
+            </Link>
+            <span>/</span>
+            <span className="text-gray-700 dark:text-gray-300 font-mono">{date}</span>
+          </nav>
+          <div className="flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 p-1 text-xs font-medium">
+            <Link
+              href={`/news/${date}`}
+              className={`px-2.5 py-1 rounded-md transition-colors ${!isZh ? "bg-blue-600 text-white" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"}`}
+            >
+              EN
+            </Link>
+            <Link
+              href={`/zh/news/${date}`}
+              className={`px-2.5 py-1 rounded-md transition-colors ${isZh ? "bg-blue-600 text-white" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"}`}
+            >
+              中文
+            </Link>
+          </div>
+        </div>
 
         <article className="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
           {/* Cover */}
@@ -107,7 +128,7 @@ export default async function MediaNewsReportPage({ params }: Props) {
               className="h-48 sm:h-64 w-full object-cover"
             />
           ) : (
-            <div className="h-48 sm:h-64 w-full bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 flex items-center justify-center">
+            <div className="h-48 sm:h-64 w-full bg-linear-to-br from-blue-500 via-indigo-500 to-purple-600 flex items-center justify-center">
               <span className="text-white/80 text-4xl font-bold tracking-tight select-none">
                 {isZh ? "传媒日报" : "Media Daily"}
               </span>
@@ -230,32 +251,46 @@ export default async function MediaNewsReportPage({ params }: Props) {
               <span className="text-xs text-gray-400">▾</span>
             </summary>
             <ol className="divide-y divide-gray-100 dark:divide-gray-700">
-              {sourceArticles.map((article, i) => (
-                <li key={i} className="px-6 py-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                      {article.source.replace(/\s*\[(INDUSTRY|CONTEXT)\]/, "")}
-                    </span>
-                    <span className="text-[10px] text-gray-300 dark:text-gray-600">·</span>
-                    <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">
-                      {article.publishedAt}
-                    </span>
-                  </div>
-                  <a
-                    href={article.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-medium text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 leading-snug"
-                  >
-                    {article.title}
-                  </a>
-                  {article.description && (
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
-                      {article.description}
-                    </p>
-                  )}
-                </li>
-              ))}
+              {sourceArticles.map((article, i) => {
+                const t = sourceTranslations?.[i];
+                const displayTitle = t?.titleZh ?? article.title;
+                const displayDesc = t?.descriptionZh ?? article.description;
+                return (
+                  <li key={i} className="px-6 py-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                        {article.source.replace(/\s*\[(INDUSTRY|CONTEXT)\]/, "")}
+                      </span>
+                      <span className="text-[10px] text-gray-300 dark:text-gray-600">·</span>
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">
+                        {article.publishedAt}
+                      </span>
+                    </div>
+                    {article.hasFullContent ? (
+                      <Link
+                        href={`${prefix}/news/articles/${article.id}`}
+                        className="text-sm font-medium text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 leading-snug"
+                      >
+                        {displayTitle}
+                      </Link>
+                    ) : (
+                      <a
+                        href={article.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-gray-800 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 leading-snug"
+                      >
+                        {displayTitle}
+                      </a>
+                    )}
+                    {displayDesc && (
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-2">
+                        {displayDesc}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
             </ol>
           </details>
         )}

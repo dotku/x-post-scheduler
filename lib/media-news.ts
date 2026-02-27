@@ -10,6 +10,7 @@ export interface MediaNewsArticle {
   source: string;
   publishedAt: string;
   description: string;
+  fullContent?: string; // Full article body (Guardian API provides this)
   image?: string;
 }
 
@@ -749,22 +750,25 @@ async function fetchGuardianArticles(
       const data = (await res.json()) as {
         response?: { results?: GuardianArticle[] };
       };
-      return (data.response?.results ?? []).map((a): MediaNewsArticle => ({
-        title: normalizeText(a.webTitle, "Untitled"),
-        url: normalizeText(a.webUrl, ""),
-        // Embed category tag in source so AI can distinguish trade vs context news.
-        source: `The Guardian [${tag}]`,
-        publishedAt: a.webPublicationDate
-          ? a.webPublicationDate.slice(0, 10)
-          : todayIsoDate(),
-        description: normalizeText(
-          (a.fields?.bodyText ?? a.fields?.trailText)
-            ?.replace(/<[^>]+>/g, "")
-            .slice(0, 800),
-          "Media industry coverage from The Guardian.",
-        ),
-        image: a.fields?.thumbnail?.trim(),
-      }));
+      return (data.response?.results ?? []).map((a): MediaNewsArticle => {
+        const bodyText = a.fields?.bodyText?.replace(/<[^>]+>/g, "").trim();
+        const trailText = a.fields?.trailText?.replace(/<[^>]+>/g, "").trim();
+        return {
+          title: normalizeText(a.webTitle, "Untitled"),
+          url: normalizeText(a.webUrl, ""),
+          // Embed category tag in source so AI can distinguish trade vs context news.
+          source: `The Guardian [${tag}]`,
+          publishedAt: a.webPublicationDate
+            ? a.webPublicationDate.slice(0, 10)
+            : todayIsoDate(),
+          description: normalizeText(
+            (bodyText ?? trailText)?.slice(0, 800),
+            "Media industry coverage from The Guardian.",
+          ),
+          fullContent: bodyText || undefined, // store full body untruncated
+          image: a.fields?.thumbnail?.trim(),
+        };
+      });
     }),
   );
 
@@ -939,44 +943,212 @@ export async function saveSourceArticles(
     const id = randomUUID();
     await prisma.$executeRaw`
       INSERT INTO "MediaNewsSource"
-        ("id","reportDate","period","title","url","source","publishedAt","description","imageUrl","createdAt")
+        ("id","reportDate","period","title","url","source","publishedAt","description","fullContent","imageUrl","createdAt")
       VALUES
-        (${id},${reportDate},${period},${article.title},${article.url},${article.source},${article.publishedAt},${article.description},${article.image ?? null},NOW())
+        (${id},${reportDate},${period},${article.title},${article.url},${article.source},${article.publishedAt},${article.description},${article.fullContent ?? null},${article.image ?? null},NOW())
       ON CONFLICT ("reportDate","period","url") DO NOTHING
     `;
   }
 }
 
+export interface StoredSourceArticle extends MediaNewsArticle {
+  id: string;
+  hasFullContent: boolean;
+}
+
 export async function getSourceArticles(
   reportDate: string,
   period: ReportPeriod,
-): Promise<MediaNewsArticle[]> {
+): Promise<StoredSourceArticle[]> {
   type Row = {
+    id: string;
     title: string;
     url: string;
     source: string;
     publishedAt: string;
     description: string;
+    fullContent: string | null;
     imageUrl: string | null;
   };
 
   try {
     const rows = await prisma.$queryRaw<Row[]>`
-      SELECT "title","url","source","publishedAt","description","imageUrl"
+      SELECT "id","title","url","source","publishedAt","description","fullContent","imageUrl"
       FROM "MediaNewsSource"
       WHERE "reportDate" = ${reportDate} AND "period" = ${period}
       ORDER BY "publishedAt" DESC
     `;
     return rows.map((r) => ({
+      id: r.id,
       title: r.title,
       url: r.url,
       source: r.source,
       publishedAt: r.publishedAt,
       description: r.description,
+      fullContent: r.fullContent ?? undefined,
+      hasFullContent: Boolean(r.fullContent),
       image: r.imageUrl ?? undefined,
     }));
   } catch {
     return [];
+  }
+}
+
+export interface ArticleTranslationZh {
+  titleZh: string;
+  descriptionZh: string;
+  paragraphsZh: string[];
+}
+
+export interface SourceArticleTranslationZh {
+  titleZh: string;
+  descriptionZh: string;
+}
+
+/** Batch-translate source article titles + descriptions in a single Gemini call. */
+export async function translateSourceArticlesForZh(
+  articles: Array<{ title: string; description: string }>,
+): Promise<SourceArticleTranslationZh[]> {
+  if (!process.env.GEMINI_API_KEY || articles.length === 0) {
+    return articles.map((a) => ({ titleZh: a.title, descriptionZh: a.description }));
+  }
+
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        maxOutputTokens: 3000,
+        temperature: 0.2,
+      },
+    });
+
+    const input = articles.map((a, i) => ({
+      index: i,
+      title: a.title,
+      description: a.description.slice(0, 300),
+    }));
+
+    const prompt = `Translate the following media industry news article titles and descriptions into Simplified Chinese. Professional journalism tone. Return a JSON array matching this schema:
+[{"titleZh": string, "descriptionZh": string}, ...]
+
+The array must have exactly ${articles.length} items, in the same order as the input.
+
+Input:
+${JSON.stringify(input, null, 2)}`;
+
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text();
+    if (!raw) throw new Error("empty response");
+
+    const parsed = JSON.parse(raw) as SourceArticleTranslationZh[];
+    if (!Array.isArray(parsed) || parsed.length !== articles.length) throw new Error("length mismatch");
+
+    return parsed.map((item, i) => ({
+      titleZh: item?.titleZh || articles[i].title,
+      descriptionZh: item?.descriptionZh || articles[i].description,
+    }));
+  } catch {
+    // Fallback: return originals untranslated
+    return articles.map((a) => ({ titleZh: a.title, descriptionZh: a.description }));
+  }
+}
+
+export async function translateArticleForZh(
+  title: string,
+  description: string,
+  fullContent?: string,
+): Promise<ArticleTranslationZh | null> {
+  if (!process.env.GEMINI_API_KEY) return null;
+
+  try {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        maxOutputTokens: 2000,
+        temperature: 0.3,
+      },
+    });
+
+    // Truncate body to keep token usage reasonable
+    const bodySnippet = fullContent ? fullContent.slice(0, 4000) : "";
+
+    const prompt = `You are a professional media industry translator. Translate the following English news article content into Simplified Chinese. Maintain professional journalism tone. Return JSON matching this exact schema:
+{
+  "titleZh": string,
+  "descriptionZh": string,
+  "paragraphsZh": string[]
+}
+
+- titleZh: Chinese translation of the title
+- descriptionZh: Chinese translation of the description/lead
+- paragraphsZh: Chinese translation of the body text, split into paragraphs (same paragraph breaks as input). If body is empty, return [].
+
+Title: ${title}
+
+Description: ${description}
+
+Body:
+${bodySnippet}`;
+
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text();
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<ArticleTranslationZh>;
+    if (!parsed.titleZh) return null;
+
+    return {
+      titleZh: parsed.titleZh,
+      descriptionZh: parsed.descriptionZh ?? description,
+      paragraphsZh: Array.isArray(parsed.paragraphsZh) ? parsed.paragraphsZh : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function getSourceArticleById(
+  id: string,
+): Promise<StoredSourceArticle | null> {
+  type Row = {
+    id: string;
+    title: string;
+    url: string;
+    source: string;
+    publishedAt: string;
+    description: string;
+    fullContent: string | null;
+    imageUrl: string | null;
+    reportDate: string;
+    period: string;
+  };
+
+  try {
+    const rows = await prisma.$queryRaw<Row[]>`
+      SELECT "id","title","url","source","publishedAt","description","fullContent","imageUrl","reportDate","period"
+      FROM "MediaNewsSource"
+      WHERE "id" = ${id}
+      LIMIT 1
+    `;
+    if (!rows[0]) return null;
+    const r = rows[0];
+    return {
+      id: r.id,
+      title: r.title,
+      url: r.url,
+      source: r.source,
+      publishedAt: r.publishedAt,
+      description: r.description,
+      fullContent: r.fullContent ?? undefined,
+      hasFullContent: Boolean(r.fullContent),
+      image: r.imageUrl ?? undefined,
+    };
+  } catch {
+    return null;
   }
 }
 
