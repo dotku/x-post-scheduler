@@ -59,6 +59,10 @@ export default async function MediaNewsReportPage({ params }: Props) {
   ]);
   if (!report) notFound();
 
+  const uniqueSources = Array.from(
+    new Set(sourceArticles.map((a) => a.source.replace(/\s*\[(INDUSTRY|CONTEXT)\]/, "")))
+  );
+
   const highlights = isZh ? report.highlightsZh : report.highlightsEn;
   const title = isZh ? report.titleZh : report.titleEn;
   const summary = isZh ? report.summaryZh : report.summaryEn;
@@ -142,9 +146,11 @@ export default async function MediaNewsReportPage({ params }: Props) {
               <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
                 {formattedDate}
                 <span className="mx-2">·</span>
-                {isZh
-                  ? `${report.sourceCount} 家信源 · ${report.usedAi ? "AI 汇总" : "规则汇总"}`
-                  : `${report.sourceCount} sources · ${report.usedAi ? "AI synthesis" : "Rule-based"}`}
+                {uniqueSources.length > 0
+                  ? uniqueSources.join(" · ")
+                  : isZh
+                    ? `${report.sourceCount} 家信源`
+                    : `${report.sourceCount} sources`}
               </p>
             </div>
 
