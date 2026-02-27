@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSourceArticleById, translateArticleForZh } from "@/lib/media-news";
+import { getSourceArticleById } from "@/lib/media-news";
 
 export const revalidate = 86400; // 24h — article content & translation cached
 
@@ -16,14 +16,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!article) return {};
   const sourceName = article.source.replace(/\s*\[(INDUSTRY|CONTEXT)\]/, "");
 
-  if (isZh) {
-    const zh = await translateArticleForZh(article.title, article.description);
-    if (zh) {
-      return {
-        title: `${zh.titleZh} | ${sourceName} | xPilot`,
-        description: zh.descriptionZh.slice(0, 160),
-      };
-    }
+  if (isZh && article.titleZh) {
+    return {
+      title: `${article.titleZh} | ${sourceName} | xPilot`,
+      description: (article.descriptionZh ?? article.description).slice(0, 160),
+    };
   }
 
   return {
@@ -73,14 +70,12 @@ export default async function ArticlePage({ params }: Props) {
   const sourceName = article.source.replace(/\s*\[(INDUSTRY|CONTEXT)\]/, "");
   const paragraphsEn = article.fullContent ? splitParagraphs(article.fullContent) : [];
 
-  // Fetch Chinese translation when in zh mode (cached by ISR)
-  const zh = isZh && article.fullContent
-    ? await translateArticleForZh(article.title, article.description, article.fullContent)
-    : null;
-
-  const displayTitle = zh?.titleZh ?? article.title;
-  const displayDescription = zh?.descriptionZh ?? article.description;
-  const displayParagraphs = zh?.paragraphsZh?.length ? zh.paragraphsZh : paragraphsEn;
+  // Use stored Chinese translations (populated at cron time). Fall back to English.
+  const hasZhTranslation = isZh && Boolean(article.titleZh);
+  const displayTitle = (isZh ? article.titleZh : undefined) ?? article.title;
+  const displayDescription = (isZh ? article.descriptionZh : undefined) ?? article.description;
+  const paragraphsZh = article.fullContentZh ? splitParagraphs(article.fullContentZh) : [];
+  const displayParagraphs = isZh && paragraphsZh.length ? paragraphsZh : paragraphsEn;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -121,7 +116,7 @@ export default async function ArticlePage({ params }: Props) {
                 <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
                   {article.publishedAt}
                 </span>
-                {zh && (
+                {hasZhTranslation && (
                   <>
                     <span className="text-gray-300 dark:text-gray-600">·</span>
                     <span className="text-[10px] text-indigo-500 dark:text-indigo-400">AI 译</span>
@@ -132,7 +127,7 @@ export default async function ArticlePage({ params }: Props) {
                 {displayTitle}
               </h1>
               {/* Show English title as subtitle when translated */}
-              {zh && (
+              {hasZhTranslation && (
                 <p className="mt-1.5 text-sm text-gray-400 dark:text-gray-500 leading-snug">
                   {article.title}
                 </p>
@@ -162,7 +157,7 @@ export default async function ArticlePage({ params }: Props) {
             )}
 
             {/* If translated, show collapsible English original */}
-            {zh && paragraphsEn.length > 0 && (
+            {hasZhTranslation && paragraphsEn.length > 0 && (
               <details className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
                 <summary className="px-5 py-3.5 bg-gray-50 dark:bg-gray-700/50 text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-700 list-none flex items-center justify-between">
                   <span>English Original</span>

@@ -958,7 +958,7 @@ export async function translateAndStoreSourceArticlesZh(
 ): Promise<void> {
   if (!process.env.GEMINI_API_KEY) return;
 
-  // Fetch articles that don't yet have a Chinese title
+  // Pass 1: batch-translate titles + descriptions for articles missing titleZh
   type Row = { id: string; title: string; description: string };
   const rows = await prisma.$queryRaw<Row[]>`
     SELECT "id","title","description"
@@ -967,20 +967,39 @@ export async function translateAndStoreSourceArticlesZh(
       AND "titleZh" IS NULL
     ORDER BY "publishedAt" DESC
   `;
-  if (rows.length === 0) return;
+  if (rows.length > 0) {
+    const translations = await translateSourceArticlesForZh(rows);
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const t = translations[i];
+      if (!t || t.titleZh === row.title) continue; // skip if untranslated (fallback)
+      await prisma.$executeRaw`
+        UPDATE "MediaNewsSource"
+        SET "titleZh" = ${t.titleZh}, "descriptionZh" = ${t.descriptionZh}
+        WHERE "id" = ${row.id}
+      `;
+    }
+  }
 
-  const translations = await translateSourceArticlesForZh(rows);
-
-  // Write translations back
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const t = translations[i];
-    if (!t || t.titleZh === row.title) continue; // skip if untranslated (fallback)
-    await prisma.$executeRaw`
-      UPDATE "MediaNewsSource"
-      SET "titleZh" = ${t.titleZh}, "descriptionZh" = ${t.descriptionZh}
-      WHERE "id" = ${row.id}
-    `;
+  // Pass 2: translate full body for Guardian articles missing fullContentZh
+  type FullRow = { id: string; title: string; description: string; fullContent: string };
+  const fullRows = await prisma.$queryRaw<FullRow[]>`
+    SELECT "id","title","description","fullContent"
+    FROM "MediaNewsSource"
+    WHERE "reportDate" = ${reportDate} AND "period" = ${period}
+      AND "fullContent" IS NOT NULL AND "fullContentZh" IS NULL
+    ORDER BY "publishedAt" DESC
+  `;
+  for (const row of fullRows) {
+    const zh = await translateArticleForZh(row.title, row.description, row.fullContent);
+    if (zh?.paragraphsZh?.length) {
+      const fullContentZh = zh.paragraphsZh.join("\n\n");
+      await prisma.$executeRaw`
+        UPDATE "MediaNewsSource"
+        SET "fullContentZh" = ${fullContentZh}
+        WHERE "id" = ${row.id}
+      `;
+    }
   }
 }
 
@@ -989,6 +1008,7 @@ export interface StoredSourceArticle extends MediaNewsArticle {
   hasFullContent: boolean;
   titleZh?: string;
   descriptionZh?: string;
+  fullContentZh?: string;
 }
 
 export async function getSourceArticles(
@@ -1161,14 +1181,15 @@ export async function getSourceArticleById(
     publishedAt: string;
     description: string;
     fullContent: string | null;
+    fullContentZh: string | null;
+    titleZh: string | null;
+    descriptionZh: string | null;
     imageUrl: string | null;
-    reportDate: string;
-    period: string;
   };
 
   try {
     const rows = await prisma.$queryRaw<Row[]>`
-      SELECT "id","title","url","source","publishedAt","description","fullContent","imageUrl","reportDate","period"
+      SELECT "id","title","url","source","publishedAt","description","fullContent","fullContentZh","titleZh","descriptionZh","imageUrl"
       FROM "MediaNewsSource"
       WHERE "id" = ${id}
       LIMIT 1
@@ -1183,7 +1204,10 @@ export async function getSourceArticleById(
       publishedAt: r.publishedAt,
       description: r.description,
       fullContent: r.fullContent ?? undefined,
+      fullContentZh: r.fullContentZh ?? undefined,
       hasFullContent: Boolean(r.fullContent),
+      titleZh: r.titleZh ?? undefined,
+      descriptionZh: r.descriptionZh ?? undefined,
       image: r.imageUrl ?? undefined,
     };
   } catch {

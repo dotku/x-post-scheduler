@@ -373,6 +373,7 @@ model MediaNewsSource {
   publishedAt String   // YYYY-MM-DD
   description String
   fullContent   String?  // Full article body — populated for sources that provide it (e.g. The Guardian)
+  fullContentZh String?  // Chinese translation of fullContent — populated at cron time
   titleZh       String?  // Chinese translation — populated at cron time
   descriptionZh String?  // Chinese translation — populated at cron time
   imageUrl      String?
