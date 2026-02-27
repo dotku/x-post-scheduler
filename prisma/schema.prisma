@@ -372,9 +372,11 @@ model MediaNewsSource {
   source      String   // outlet name e.g. "The Guardian", "Digiday"
   publishedAt String   // YYYY-MM-DD
   description String
-  fullContent String?  // Full article body — populated for sources that provide it (e.g. The Guardian)
-  imageUrl    String?
-  createdAt   DateTime @default(now())
+  fullContent   String?  // Full article body — populated for sources that provide it (e.g. The Guardian)
+  titleZh       String?  // Chinese translation — populated at cron time
+  descriptionZh String?  // Chinese translation — populated at cron time
+  imageUrl      String?
+  createdAt     DateTime @default(now())
 
   @@unique([reportDate, period, url])
   @@index([reportDate, period])

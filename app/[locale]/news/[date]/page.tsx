@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getReportByDate, getSourceArticles, listStoredMediaIndustryReports, translateSourceArticlesForZh } from "@/lib/media-news";
+import { getReportByDate, getSourceArticles, listStoredMediaIndustryReports } from "@/lib/media-news";
 
 export const revalidate = 1800;
 
@@ -58,11 +58,6 @@ export default async function MediaNewsReportPage({ params }: Props) {
     getSourceArticles(date, "daily"),
   ]);
   if (!report) notFound();
-
-  // Batch-translate source article titles + descriptions for Chinese mode
-  const sourceTranslations = isZh && sourceArticles.length > 0
-    ? await translateSourceArticlesForZh(sourceArticles)
-    : null;
 
   const highlights = isZh ? report.highlightsZh : report.highlightsEn;
   const title = isZh ? report.titleZh : report.titleEn;
@@ -252,9 +247,8 @@ export default async function MediaNewsReportPage({ params }: Props) {
             </summary>
             <ol className="divide-y divide-gray-100 dark:divide-gray-700">
               {sourceArticles.map((article, i) => {
-                const t = sourceTranslations?.[i];
-                const displayTitle = t?.titleZh ?? article.title;
-                const displayDesc = t?.descriptionZh ?? article.description;
+                const displayTitle = isZh ? (article.titleZh ?? article.title) : article.title;
+                const displayDesc = isZh ? (article.descriptionZh ?? article.description) : article.description;
                 return (
                   <li key={i} className="px-6 py-4">
                     <div className="flex items-center gap-2 mb-1">

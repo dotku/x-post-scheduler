@@ -951,9 +951,44 @@ export async function saveSourceArticles(
   }
 }
 
+/** Translate source article titles + descriptions and persist them to the DB. */
+export async function translateAndStoreSourceArticlesZh(
+  reportDate: string,
+  period: ReportPeriod,
+): Promise<void> {
+  if (!process.env.GEMINI_API_KEY) return;
+
+  // Fetch articles that don't yet have a Chinese title
+  type Row = { id: string; title: string; description: string };
+  const rows = await prisma.$queryRaw<Row[]>`
+    SELECT "id","title","description"
+    FROM "MediaNewsSource"
+    WHERE "reportDate" = ${reportDate} AND "period" = ${period}
+      AND "titleZh" IS NULL
+    ORDER BY "publishedAt" DESC
+  `;
+  if (rows.length === 0) return;
+
+  const translations = await translateSourceArticlesForZh(rows);
+
+  // Write translations back
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const t = translations[i];
+    if (!t || t.titleZh === row.title) continue; // skip if untranslated (fallback)
+    await prisma.$executeRaw`
+      UPDATE "MediaNewsSource"
+      SET "titleZh" = ${t.titleZh}, "descriptionZh" = ${t.descriptionZh}
+      WHERE "id" = ${row.id}
+    `;
+  }
+}
+
 export interface StoredSourceArticle extends MediaNewsArticle {
   id: string;
   hasFullContent: boolean;
+  titleZh?: string;
+  descriptionZh?: string;
 }
 
 export async function getSourceArticles(
@@ -968,12 +1003,14 @@ export async function getSourceArticles(
     publishedAt: string;
     description: string;
     fullContent: string | null;
+    titleZh: string | null;
+    descriptionZh: string | null;
     imageUrl: string | null;
   };
 
   try {
     const rows = await prisma.$queryRaw<Row[]>`
-      SELECT "id","title","url","source","publishedAt","description","fullContent","imageUrl"
+      SELECT "id","title","url","source","publishedAt","description","fullContent","titleZh","descriptionZh","imageUrl"
       FROM "MediaNewsSource"
       WHERE "reportDate" = ${reportDate} AND "period" = ${period}
       ORDER BY "publishedAt" DESC
@@ -987,6 +1024,8 @@ export async function getSourceArticles(
       description: r.description,
       fullContent: r.fullContent ?? undefined,
       hasFullContent: Boolean(r.fullContent),
+      titleZh: r.titleZh ?? undefined,
+      descriptionZh: r.descriptionZh ?? undefined,
       image: r.imageUrl ?? undefined,
     }));
   } catch {
@@ -1208,10 +1247,11 @@ export async function generateAndStoreMediaIndustryReport(
 
   const saved = await saveMediaIndustryReport(report);
 
-  // Persist source articles best-effort (don't fail the whole run if this errors).
-  saveSourceArticles(sources, toIsoDate(reportDate), period).catch((err) =>
-    console.error("Failed to save source articles:", err),
-  );
+  // Persist source articles, then translate to Chinese — both best-effort.
+  const reportDateStr = toIsoDate(reportDate);
+  saveSourceArticles(sources, reportDateStr, period)
+    .then(() => translateAndStoreSourceArticlesZh(reportDateStr, period))
+    .catch((err) => console.error("Failed to save/translate source articles:", err));
 
   return saved;
 }

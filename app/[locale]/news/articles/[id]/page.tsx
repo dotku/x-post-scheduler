@@ -163,17 +163,23 @@ export default async function ArticlePage({ params }: Props) {
 
             {/* If translated, show collapsible English original */}
             {zh && paragraphsEn.length > 0 && (
-              <details className="border border-gray-100 dark:border-gray-700 rounded-lg">
-                <summary className="px-4 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 cursor-pointer select-none hover:text-gray-600 dark:hover:text-gray-300 list-none flex items-center justify-between">
+              <details className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <summary className="px-5 py-3.5 bg-gray-50 dark:bg-gray-700/50 text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-700 list-none flex items-center justify-between">
                   <span>English Original</span>
-                  <span className="text-gray-300 dark:text-gray-600">▾</span>
+                  <span className="text-gray-300 dark:text-gray-500 text-base font-normal">▾</span>
                 </summary>
-                <div className="px-4 pb-5 pt-2 space-y-4 border-t border-gray-100 dark:border-gray-700">
-                  {paragraphsEn.map((para, i) => (
-                    <p key={i} className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                      {para}
-                    </p>
-                  ))}
+                <div className="px-6 py-5 space-y-4 bg-white dark:bg-gray-800">
+                  {/* English lead */}
+                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed border-l-4 border-gray-200 dark:border-gray-600 pl-4 italic">
+                    {article.description}
+                  </p>
+                  <div className="space-y-4 pt-1">
+                    {paragraphsEn.map((para, i) => (
+                      <p key={i} className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                        {para}
+                      </p>
+                    ))}
+                  </div>
                 </div>
               </details>
             )}
