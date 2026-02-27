@@ -73,6 +73,42 @@ const worker = {
       );
       return;
     }
+
+    if (event.cron === "15 1 * * *") {
+      ctx.waitUntil(
+        (async () => {
+          const res = await triggerEndpoint(
+            env,
+            "/api/cron/media-news?period=daily",
+          );
+          if (!res.ok) {
+            const body = await res.text();
+            throw new Error(
+              `Media-news daily trigger failed (${res.status}): ${body}`,
+            );
+          }
+        })(),
+      );
+      return;
+    }
+
+    if (event.cron === "20 1 * * 1") {
+      ctx.waitUntil(
+        (async () => {
+          const res = await triggerEndpoint(
+            env,
+            "/api/cron/media-news?period=weekly",
+          );
+          if (!res.ok) {
+            const body = await res.text();
+            throw new Error(
+              `Media-news weekly trigger failed (${res.status}): ${body}`,
+            );
+          }
+        })(),
+      );
+      return;
+    }
   },
 };
 

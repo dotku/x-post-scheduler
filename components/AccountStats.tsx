@@ -151,17 +151,17 @@ export default function AccountStats() {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-4 flex-wrap">
+      <div className="px-4 sm:px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
           {t("statsTitle")}
         </h2>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex gap-1">
+        <div className="w-full sm:w-auto flex items-center gap-2 overflow-x-auto pb-1">
+          <div className="flex gap-1 min-w-max">
             {PERIODS.map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
-                className={`px-3 py-1 text-sm rounded transition-colors ${
+                className={`px-3 py-1.5 text-sm rounded transition-colors ${
                   period === p
                     ? "bg-blue-600 text-white"
                     : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -176,7 +176,7 @@ export default function AccountStats() {
             onClick={handleSyncFollowers}
             disabled={syncingFollowers}
             title={t("syncFollowersTooltip")}
-            className="px-3 py-1 text-sm rounded border border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 disabled:opacity-50 transition-colors"
+            className="shrink-0 px-3 py-1.5 text-sm rounded border border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 disabled:opacity-50 transition-colors"
           >
             {syncingFollowers
               ? "⟳ " + t("syncing")
@@ -186,7 +186,7 @@ export default function AccountStats() {
             onClick={handleSync}
             disabled={syncing}
             title={t("syncTooltip")}
-            className="px-3 py-1 text-sm rounded border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50 transition-colors"
+            className="shrink-0 px-3 py-1.5 text-sm rounded border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50 transition-colors"
           >
             {syncing ? "⟳ " + t("syncing") : "↻ " + t("syncViews")}
           </button>
@@ -214,7 +214,7 @@ export default function AccountStats() {
           {t("statsUnavailable")}
         </div>
       ) : (
-        <div className="p-6 space-y-4">
+        <div className="p-4 sm:p-6 space-y-4">
           {/* Totals row */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
@@ -337,9 +337,9 @@ export default function AccountStats() {
                 {data.accounts.map((acc) => (
                   <div
                     key={acc.accountId}
-                    className="flex items-center gap-3 text-sm"
+                    className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 text-sm"
                   >
-                    <div className="w-32 min-w-0">
+                    <div className="w-full sm:w-32 min-w-0">
                       <p className="font-medium text-gray-900 dark:text-white truncate">
                         {acc.label || acc.username || t("unknownAccount")}
                       </p>
@@ -355,7 +355,7 @@ export default function AccountStats() {
                         </p>
                       )}
                     </div>
-                    <div className="flex-1 flex items-center gap-2 min-w-0">
+                    <div className="w-full sm:flex-1 flex items-center gap-2 min-w-0">
                       {data.totals.total > 0 ? (
                         <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                           <div
@@ -369,7 +369,7 @@ export default function AccountStats() {
                         <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-2" />
                       )}
                     </div>
-                    <div className="flex items-center gap-3 shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-3 shrink-0 text-xs text-gray-500 dark:text-gray-400">
                       {acc.impressions > 0 && (
                         <span className="text-blue-600 dark:text-blue-400">
                           👁 {acc.impressions.toLocaleString()}

@@ -49,10 +49,10 @@ const MARKUP_MULTIPLIER = parsePositiveMultiplier(
 /** Flat fee in cents for agent service calls (no per-token data available). */
 export const AGENT_FLAT_FEE_CENTS = 5;
 
-// Wavespeed has different pricing — default is 2x (100% markup), not 60x
+// Wavespeed has different pricing — default is 5x (400% markup)
 const WAVESPEED_CHARGE_MULTIPLIER = parsePositiveMultiplier(
   process.env.WAVESPEED_CHARGE_MULTIPLIER,
-  2,
+  5,
 );
 const WAVESPEED_IMAGE_CHARGE_MULTIPLIER = parsePositiveMultiplier(
   process.env.WAVESPEED_IMAGE_CHARGE_MULTIPLIER,

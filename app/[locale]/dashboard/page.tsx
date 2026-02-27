@@ -7,8 +7,8 @@ import { buildSignedBlobProxyUrl } from "@/lib/blob-proxy";
 import { format } from "date-fns";
 import PostList from "@/components/PostList";
 import UserMenu from "@/components/UserMenu";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 import AccountStats from "@/components/AccountStats";
+import MediaDailyWidget from "@/components/MediaDailyWidget";
 import { redirect } from "next/navigation";
 import { headers as nextHeaders } from "next/headers";
 import { getTranslations, getLocale, setRequestLocale } from "next-intl/server";
@@ -151,7 +151,7 @@ export default async function Dashboard({
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center justify-between gap-3">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               <Link
                 href={prefix || "/"}
@@ -160,48 +160,68 @@ export default async function Dashboard({
                 {tNav("appTitle")}
               </Link>
             </h1>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-              <Link
-                href={`${prefix}/gallery`}
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-              >
-                {tNav("gallery")}
-              </Link>
-              <Link
-                href={`${prefix}/toolbox`}
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-              >
-                {tNav("toolbox")}
-              </Link>
-              <Link
-                href={`${prefix}/recurring`}
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-              >
-                {tNav("autoPost")}
-              </Link>
-              <Link
-                href={`${prefix}/knowledge`}
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-              >
-                {tNav("knowledge")}
-              </Link>
+            <div className="flex items-center gap-4">
+              <nav className="hidden md:flex items-center gap-3 text-sm">
+                <Link
+                  href={`${prefix}/dashboard`}
+                  className="px-2 py-1 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  {locale === "zh" ? "仪表盘" : "Dashboard"}
+                </Link>
+                <Link
+                  href={`${prefix}/gallery`}
+                  className="px-2 py-1 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  {tNav("gallery")}
+                </Link>
+                <Link
+                  href={`${prefix}/toolbox`}
+                  className="px-2 py-1 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  {tNav("toolbox")}
+                </Link>
+                <Link
+                  href={`${prefix}/schedule`}
+                  className="px-2 py-1 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  {tNav("compose")}
+                </Link>
+                <Link
+                  href={`${prefix}/recurring`}
+                  className="px-2 py-1 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  {tNav("autoPost")}
+                </Link>
+                <Link
+                  href={`${prefix}/knowledge`}
+                  className="px-2 py-1 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  {tNav("knowledge")}
+                </Link>
+                <Link
+                  href={`${prefix}/analytics`}
+                  className="px-2 py-1 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  {tNav("analytics")}
+                </Link>
+                <Link
+                  href={`${prefix}/media-news`}
+                  className="px-2 py-1 rounded-md text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                >
+                  {tNav("mediaNews")}
+                </Link>
+              </nav>
 
-              <Link
-                href={`${prefix}/analytics`}
-                className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4"
-              >
-                {tNav("analytics")}
-              </Link>
-
-              <div className="border-l border-gray-300 dark:border-gray-600 h-5 mx-1 hidden sm:block" />
-              <LanguageSwitcher />
-              <UserMenu />
+              <UserMenu hideNavigationLinksOnDesktop />
             </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Media Daily Widget */}
+        <MediaDailyWidget locale={locale} />
+
         {/* Post Activity Stats */}
         <AccountStats />
 

@@ -9,7 +9,7 @@ enabled = true
 # Deploy: npx wrangler deploy
 # Secrets: npx wrangler secret put APP_BASE_URL / CRON_SECRET
 [triggers]
-crons = ["* * * * *", "0 0 * * *"]
+crons = ["* * * * *", "0 0 * * *", "15 1 * * *", "20 1 * * 1"]
 
 # ── Dev environment ──
 # Deploy: npx wrangler deploy --env dev

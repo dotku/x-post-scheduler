@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useLocale } from "next-intl";
 
 interface StudioModel {
   id: string;
@@ -131,13 +132,13 @@ const IMAGE_MODELS_I2I: StudioModel[] = [
   {
     id: "wavespeed-ai/uno",
     label: "UNO",
-    description: "WaveSpeed 图像编辑（i2i / 图文）",
+    description: "图像编辑（i2i / 图文）",
     tier: "standard",
   },
   {
     id: "wavespeed-ai/real-esrgan",
     label: "Real-ESRGAN",
-    description: "WaveSpeed 图像增强/超分（i2i）",
+    description: "图像增强/超分（i2i）",
     tier: "fast",
   },
   {
@@ -340,6 +341,45 @@ function getToolboxVisitingPath(
 }
 
 export default function ToolboxPage() {
+  const locale = useLocale();
+  const isZh = locale === "zh";
+  const prefix = isZh ? "/zh" : "";
+  const uiText = isZh
+    ? {
+        title: "媒体工作室",
+        subtitle: "使用 AI 生成图片与视频",
+        galleryFeed: "作品社区",
+        videoJobs: "📊 视频任务",
+        dashboardHome: "← 仪表盘",
+        loadingBalance: "余额加载中...",
+        balance: "余额",
+        add: "+ 充值",
+        balanceUnavailable: "余额不可用",
+        image: "图片",
+        video: "视频",
+        imageGeneration: "图片生成",
+        videoGeneration: "视频生成",
+        textToVideo: "文字转视频",
+        imageToVideo: "图片转视频",
+      }
+    : {
+        title: "Media Studio",
+        subtitle: "Generate images and videos with AI",
+        galleryFeed: "Gallery Feed",
+        videoJobs: "📊 Video Jobs",
+        dashboardHome: "← Dashboard Home",
+        loadingBalance: "Loading balance...",
+        balance: "Balance",
+        add: "+ Add",
+        balanceUnavailable: "Balance unavailable",
+        image: "Image",
+        video: "Video",
+        imageGeneration: "Image Generation",
+        videoGeneration: "Video Generation",
+        textToVideo: "Text to Video",
+        imageToVideo: "Image to Video",
+      };
+
   const [tab, setTab] = useState<Tab>("image");
 
   // Credit balance
@@ -1885,52 +1925,56 @@ export default function ToolboxPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                Media Studio
+                {uiText.title}
               </h1>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                Generate images and videos with WaveSpeed
+                {uiText.subtitle}
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:items-end">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
                 <Link
-                  href="/gallery"
+                  href={`${prefix}/gallery`}
                   className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                 >
-                  Gallery Feed
+                  {uiText.galleryFeed}
                 </Link>
                 <Link
-                  href="/toolbox/video-jobs"
+                  href={`${prefix}/toolbox/video-jobs`}
                   className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                 >
-                  📊 Video Jobs
+                  {uiText.videoJobs}
                 </Link>
                 <Link
-                  href="/dashboard"
+                  href={`${prefix}/dashboard`}
                   className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                 >
-                  ← Dashboard Home
+                  {uiText.dashboardHome}
                 </Link>
               </div>
               {creditLoading ? (
-                <div className="text-xs text-gray-400">Loading balance...</div>
+                <div className="text-xs text-gray-400">
+                  {uiText.loadingBalance}
+                </div>
               ) : creditBalance !== null ? (
                 <div className="flex items-center gap-2">
                   <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                    Balance:{" "}
+                    {uiText.balance}:{" "}
                     <span className="text-green-600 dark:text-green-400">
                       ${(creditBalance / 100).toFixed(2)}
                     </span>
                   </div>
                   <Link
-                    href="/settings?tab=billing"
+                    href={`${prefix}/settings?tab=billing`}
                     className="text-xs px-2 py-1 rounded-md bg-green-600 hover:bg-green-700 text-white transition-colors"
                   >
-                    + Add
+                    {uiText.add}
                   </Link>
                 </div>
               ) : (
-                <div className="text-xs text-gray-400">Balance unavailable</div>
+                <div className="text-xs text-gray-400">
+                  {uiText.balanceUnavailable}
+                </div>
               )}
             </div>
           </div>
@@ -1950,7 +1994,7 @@ export default function ToolboxPage() {
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
               }`}
             >
-              {t === "image" ? "Image" : "Video"}
+              {t === "image" ? uiText.image : uiText.video}
             </button>
           ))}
         </div>
@@ -1959,7 +2003,9 @@ export default function ToolboxPage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {tab === "image" ? "Image Generation" : "Video Generation"}
+              {tab === "image"
+                ? uiText.imageGeneration
+                : uiText.videoGeneration}
             </h2>
           </div>
           <div className="p-6 space-y-5">
@@ -1978,7 +2024,7 @@ export default function ToolboxPage() {
                       : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
                   }`}
                 >
-                  Text to Video
+                  {uiText.textToVideo}
                 </button>
                 <button
                   onClick={() => setVideoMode("i2v")}
@@ -1989,7 +2035,7 @@ export default function ToolboxPage() {
                       : "border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
                   }`}
                 >
-                  Image to Video
+                  {uiText.imageToVideo}
                 </button>
               </div>
             )}
@@ -2475,8 +2521,8 @@ export default function ToolboxPage() {
                 </p>
               )}
               <p className="text-[11px] text-gray-500 dark:text-gray-500">
-                Note: WaveSpeed is task-priced. Token estimate is prompt-length
-                based and for reference only.
+                Note: The image/video service is task-priced. Token estimate is
+                prompt-length based and for reference only.
               </p>
             </div>
 
@@ -2551,7 +2597,7 @@ export default function ToolboxPage() {
                 )}
                 {saveStatus === "saved" && (
                   <a
-                    href="/gallery"
+                    href={`${prefix}/gallery`}
                     className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full hover:underline"
                   >
                     已保存到 Gallery ✓
@@ -2644,7 +2690,7 @@ export default function ToolboxPage() {
                       Download
                     </a>
                     <a
-                      href={`/schedule?mediaUrl=${encodeURIComponent(savedBlobUrl ?? outputUrl)}`}
+                      href={`${prefix}/schedule?mediaUrl=${encodeURIComponent(savedBlobUrl ?? outputUrl)}`}
                       className="flex-1 text-center py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors text-sm"
                     >
                       Use in Post
@@ -2725,7 +2771,7 @@ export default function ToolboxPage() {
                       </span>
                     </div>
                     {isStitching && stitchProgress ? (
-                      <div className="flex items-center gap-2 min-w-[140px]">
+                      <div className="flex items-center gap-2 min-w-35">
                         <div className="flex-1 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-blue-500 rounded-full transition-all duration-500"
@@ -2959,7 +3005,7 @@ export default function ToolboxPage() {
                                   </button>
                                 </div>
                               </div>
-                              <div className="flex-1 min-w-[120px]">
+                              <div className="flex-1 min-w-30">
                                 <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                                   旁白音量 {voiceoverVolume}%
                                 </label>

@@ -339,3 +339,25 @@ model VideoJob {
   @@index([createdAt])
 }
 
+model MediaIndustryReport {
+  id           String   @id @default(cuid())
+  period       String   // "daily" | "weekly"
+  reportDate   DateTime // Daily: UTC day start; Weekly: UTC week start (Monday)
+  rangeStart   DateTime
+  rangeEnd     DateTime
+  titleEn      String
+  titleZh      String
+  summaryEn    String
+  summaryZh    String
+  highlightsEn String   // JSON stringified string[]
+  highlightsZh String   // JSON stringified string[]
+  coverImageUrl String?
+  sourceCount  Int      @default(0)
+  usedAi       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([period, reportDate])
+  @@index([period, reportDate])
+}
+

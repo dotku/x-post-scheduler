@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         : SUBSCRIPTION_PRICE_IDS[normalizedTier];
     if (!priceId) {
       return NextResponse.json(
-        { error: "Subscription not configured for this tier" },
+        { error: "Subscription plan is not available for this tier." },
         { status: 503 },
       );
     }

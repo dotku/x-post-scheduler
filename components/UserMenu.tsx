@@ -6,17 +6,24 @@ import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { isVerifiedMember, getTierInfo } from "@/lib/subscription";
 import DailyCheckin from "@/components/DailyCheckin";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 interface SubInfo {
   tier: string | null;
   status: string | null;
 }
 
-export default function UserMenu() {
+export default function UserMenu({
+  hideNavigationLinksOnDesktop = false,
+}: {
+  hideNavigationLinksOnDesktop?: boolean;
+}) {
   const t = useTranslations("userMenu");
+  const tNav = useTranslations("nav");
   const locale = useLocale();
   const { user, isLoading } = useUser();
   const [isOpen, setIsOpen] = useState(false);
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const [sub, setSub] = useState<SubInfo | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -73,16 +80,21 @@ export default function UserMenu() {
         className="flex items-center gap-2 focus:outline-none"
       >
         <span className="relative inline-flex">
-          {user.picture ? (
+          {user.picture && failedAvatarUrl !== user.picture ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={user.picture}
               alt={user.name || "User"}
               className="w-8 h-8 rounded-full"
+              onError={() => setFailedAvatarUrl(user.picture ?? null)}
             />
           ) : (
             <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
-              {user.name?.charAt(0) || user.email?.charAt(0) || "U"}
+              {(
+                user.name?.charAt(0) ||
+                user.email?.charAt(0) ||
+                "U"
+              ).toUpperCase()}
             </div>
           )}
           {verified && tierBadgeText && (
@@ -115,7 +127,7 @@ export default function UserMenu() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-52 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-1 z-50">
+        <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-1 z-50">
           <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
             <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
               {user.name}
@@ -130,19 +142,82 @@ export default function UserMenu() {
               </p>
             )}
           </div>
+
+          <div
+            className={`px-2 py-2 border-b border-gray-200 dark:border-gray-700 ${hideNavigationLinksOnDesktop ? "md:hidden" : ""}`}
+          >
+            <div className="grid grid-cols-2 gap-1">
+              <Link
+                href={`${prefix}/dashboard`}
+                onClick={() => setIsOpen(false)}
+                className="rounded-md px-2.5 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {locale === "zh" ? "仪表盘" : "Dashboard"}
+              </Link>
+              <Link
+                href={`${prefix}/gallery`}
+                onClick={() => setIsOpen(false)}
+                className="rounded-md px-2.5 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {tNav("gallery")}
+              </Link>
+              <Link
+                href={`${prefix}/toolbox`}
+                onClick={() => setIsOpen(false)}
+                className="rounded-md px-2.5 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {tNav("toolbox")}
+              </Link>
+              <Link
+                href={`${prefix}/schedule`}
+                onClick={() => setIsOpen(false)}
+                className="rounded-md px-2.5 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {tNav("compose")}
+              </Link>
+              <Link
+                href={`${prefix}/recurring`}
+                onClick={() => setIsOpen(false)}
+                className="rounded-md px-2.5 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {tNav("autoPost")}
+              </Link>
+              <Link
+                href={`${prefix}/knowledge`}
+                onClick={() => setIsOpen(false)}
+                className="rounded-md px-2.5 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {tNav("knowledge")}
+              </Link>
+              <Link
+                href={`${prefix}/media-news`}
+                onClick={() => setIsOpen(false)}
+                className="rounded-md px-2.5 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {tNav("mediaNews")}
+              </Link>
+            </div>
+
+            <div className="mt-2 px-1">
+              <LanguageSwitcher className="w-full rounded-md px-2.5 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" />
+            </div>
+          </div>
+
           <DailyCheckin compact />
           <Link
             href={`${prefix}/settings`}
+            onClick={() => setIsOpen(false)}
             className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
           >
             {t("settings")}
           </Link>
-          <a
+          <Link
             href="/auth/logout"
+            onClick={() => setIsOpen(false)}
             className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
           >
             {t("signOut")}
-          </a>
+          </Link>
         </div>
       )}
     </div>

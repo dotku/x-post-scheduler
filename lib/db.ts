@@ -18,6 +18,7 @@ const hasExpectedDelegates = (client: PrismaClient | undefined) =>
   "cronRunEvent" in client &&
   "webVisit" in client &&
   "videoJob" in client &&
+  "mediaIndustryReport" in client &&
   "galleryLike" in client &&
   "galleryComment" in client &&
   "userFollow" in client;

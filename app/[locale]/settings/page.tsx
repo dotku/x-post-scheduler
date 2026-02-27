@@ -121,6 +121,7 @@ export default function SettingsPage() {
   const [billingInterval, setBillingInterval] = useState<"monthly" | "yearly">(
     "monthly",
   );
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
   const normalizedSubTier = normalizeTier(subTier);
 
   useEffect(() => {
@@ -784,12 +785,21 @@ export default function SettingsPage() {
               {tr("Profile", "个人信息")}
             </h2>
             <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-4">
-              {user.picture && (
+              {user.picture && failedAvatarUrl !== user.picture ? (
                 <img
                   src={user.picture}
                   alt={user.name || "User"}
                   className="w-14 h-14 rounded-full border border-gray-200 dark:border-gray-700"
+                  onError={() => setFailedAvatarUrl(user.picture ?? null)}
                 />
+              ) : (
+                <div className="w-14 h-14 rounded-full border border-gray-200 dark:border-gray-700 bg-blue-600 flex items-center justify-center text-white text-lg font-semibold">
+                  {(
+                    user.name?.charAt(0) ||
+                    user.email?.charAt(0) ||
+                    "U"
+                  ).toUpperCase()}
+                </div>
               )}
               <div className="min-w-0">
                 <p className="text-base font-semibold text-gray-900 dark:text-white truncate">
@@ -1150,7 +1160,11 @@ export default function SettingsPage() {
                 href="/api/auth/twitter/connect"
                 className="inline-flex items-center gap-2 px-5 py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-full font-semibold hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors"
               >
-                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-4 h-4 fill-current"
+                  aria-hidden="true"
+                >
                   <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.73-8.835L1.254 2.25H8.08l4.259 5.631L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
                 </svg>
                 {tr("Connect with X", "连接 X 账号")}
@@ -1166,8 +1180,21 @@ export default function SettingsPage() {
             {/* Advanced: manual API key entry */}
             <details className="group">
               <summary className="cursor-pointer text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 select-none list-none flex items-center gap-1">
-                <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
-                {tr("Advanced: enter API keys manually", "高级：手动填写 API 密钥")}
+                <svg
+                  className="w-3 h-3 transition-transform group-open:rotate-90"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                {tr(
+                  "Advanced: enter API keys manually",
+                  "高级：手动填写 API 密钥",
+                )}
               </summary>
               <div className="mt-3 pl-4 border-l-2 border-gray-200 dark:border-gray-700">
                 <div className="flex justify-end mb-3">
@@ -1178,92 +1205,92 @@ export default function SettingsPage() {
                     {tr("How to get API keys?", "如何获取 API 密钥？")}
                   </Link>
                 </div>
-            <form onSubmit={handleSave} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {tr("Account Label (optional)", "账号标签（可选）")}
-                  </label>
-                  <input
-                    type="text"
-                    value={label}
-                    onChange={(e) => setLabel(e.target.value)}
-                    placeholder={tr(
-                      "e.g. Brand Main, Personal",
-                      "例如：品牌主号、个人号",
-                    )}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {tr("API Key", "API Key")}
-                  </label>
-                  <input
-                    type="password"
-                    value={xApiKey}
-                    onChange={(e) => setXApiKey(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {tr("API Secret", "API Secret")}
-                  </label>
-                  <input
-                    type="password"
-                    value={xApiSecret}
-                    onChange={(e) => setXApiSecret(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {tr("Access Token", "Access Token")}
-                  </label>
-                  <input
-                    type="password"
-                    value={xAccessToken}
-                    onChange={(e) => setXAccessToken(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {tr("Access Token Secret", "Access Token Secret")}
-                  </label>
-                  <input
-                    type="password"
-                    value={xAccessTokenSecret}
-                    onChange={(e) => setXAccessTokenSecret(e.target.value)}
-                    required
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-4">
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={setAsDefault}
-                    onChange={(e) => setSetAsDefault(e.target.checked)}
-                  />
-                  {tr("Set as default account", "设为默认账号")}
-                </label>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                  {saving
-                    ? tr("Verifying & Saving...", "验证并保存中...")
-                    : tr("Add Account", "添加账号")}
-                </button>
-              </div>
-            </form>
+                <form onSubmit={handleSave} className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {tr("Account Label (optional)", "账号标签（可选）")}
+                      </label>
+                      <input
+                        type="text"
+                        value={label}
+                        onChange={(e) => setLabel(e.target.value)}
+                        placeholder={tr(
+                          "e.g. Brand Main, Personal",
+                          "例如：品牌主号、个人号",
+                        )}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {tr("API Key", "API Key")}
+                      </label>
+                      <input
+                        type="password"
+                        value={xApiKey}
+                        onChange={(e) => setXApiKey(e.target.value)}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {tr("API Secret", "API Secret")}
+                      </label>
+                      <input
+                        type="password"
+                        value={xApiSecret}
+                        onChange={(e) => setXApiSecret(e.target.value)}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {tr("Access Token", "Access Token")}
+                      </label>
+                      <input
+                        type="password"
+                        value={xAccessToken}
+                        onChange={(e) => setXAccessToken(e.target.value)}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {tr("Access Token Secret", "Access Token Secret")}
+                      </label>
+                      <input
+                        type="password"
+                        value={xAccessTokenSecret}
+                        onChange={(e) => setXAccessTokenSecret(e.target.value)}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={setAsDefault}
+                        onChange={(e) => setSetAsDefault(e.target.checked)}
+                      />
+                      {tr("Set as default account", "设为默认账号")}
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    >
+                      {saving
+                        ? tr("Verifying & Saving...", "验证并保存中...")
+                        : tr("Add Account", "添加账号")}
+                    </button>
+                  </div>
+                </form>
               </div>
             </details>
           </div>

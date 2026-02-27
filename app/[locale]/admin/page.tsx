@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/admin";
 import { getWavespeedFeeCents } from "@/lib/credits";
 import AdminCreditTopup from "@/components/AdminCreditTopup";
 import AdminMembershipManager from "@/components/AdminMembershipManager";
+import AdminMediaNewsTrigger from "@/components/AdminMediaNewsTrigger";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
@@ -944,6 +945,7 @@ export default async function AdminPage() {
           </div>
         </section>
 
+        <AdminMediaNewsTrigger />
         <AdminMembershipManager />
         <AdminCreditTopup />
       </main>

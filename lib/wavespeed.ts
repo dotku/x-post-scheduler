@@ -39,7 +39,7 @@ async function parseJsonSafe(res: Response): Promise<Record<string, unknown>> {
     return JSON.parse(text) as Record<string, unknown>;
   } catch {
     const preview = text.slice(0, 200).replace(/\s+/g, " ");
-    throw new Error(`WaveSpeed returned non-JSON (${res.status}): ${preview}`);
+    throw new Error(`Media API returned non-JSON (${res.status}): ${preview}`);
   }
 }
 
@@ -125,9 +125,9 @@ export async function submitVideoTask(
 
   const encodedModelId = encodeURIComponent(params.modelId);
   const url = `${WAVESPEED_BASE}/${encodedModelId}`;
-  console.log(`[WaveSpeed] Submitting video task to: ${url}`);
-  console.log(`[WaveSpeed] Model: ${params.modelId}`);
-  console.log(`[WaveSpeed] Request body:`, JSON.stringify(body, null, 2));
+  console.log(`[MediaAPI] Submitting video task to: ${url}`);
+  console.log(`[MediaAPI] Model: ${params.modelId}`);
+  console.log(`[MediaAPI] Request body:`, JSON.stringify(body, null, 2));
 
   const res = await fetch(url, {
     method: "POST",
@@ -138,12 +138,12 @@ export async function submitVideoTask(
     body: JSON.stringify(body),
   });
 
-  console.log(`[WaveSpeed] Response status: ${res.status}`);
+  console.log(`[MediaAPI] Response status: ${res.status}`);
 
   const json = await parseJsonSafe(res);
   if (!res.ok || json.code !== 200) {
-    console.error(`[WaveSpeed] Error response:`, json);
-    throw new Error(String(json.message ?? `WaveSpeed error ${res.status}`));
+    console.error(`[MediaAPI] Error response:`, json);
+    throw new Error(String(json.message ?? `Media API error ${res.status}`));
   }
   return json.data as VideoTask;
 }
@@ -173,7 +173,7 @@ export async function submitBgmTask(
   });
   const json = await parseJsonSafe(res);
   if (!res.ok || json.code !== 200) {
-    throw new Error(String(json.message ?? `WaveSpeed error ${res.status}`));
+    throw new Error(String(json.message ?? `Media API error ${res.status}`));
   }
   return json.data as VideoTask;
 }
@@ -189,27 +189,27 @@ export async function getVideoTask(taskIdOrUrl: string): Promise<VideoTask> {
     ? taskIdOrUrl
     : `${WAVESPEED_BASE}/predictions/${taskIdOrUrl}`;
 
-  console.log(`[WaveSpeed] Polling task status from: ${url}`);
+  console.log(`[MediaAPI] Polling task status from: ${url}`);
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${key}` },
   });
 
-  console.log(`[WaveSpeed] Poll response status: ${res.status}`);
+  console.log(`[MediaAPI] Poll response status: ${res.status}`);
 
   const json = await parseJsonSafe(res);
   if (!res.ok || json.code !== 200) {
     const msg = String(json.message ?? "");
-    console.error(`[WaveSpeed] Error polling task:`, {
+    console.error(`[MediaAPI] Error polling task:`, {
       status: res.status,
       message: msg,
       response: json,
     });
-    // WaveSpeed returns "not finished" when the task is still processing
+    // Provider returns "not finished" when the task is still processing
     if (msg.toLowerCase().includes("not finished")) {
       return { status: "processing", outputs: [] } as unknown as VideoTask;
     }
-    throw new Error(msg || `WaveSpeed error ${res.status}`);
+    throw new Error(msg || `Media API error ${res.status}`);
   }
   return json.data as VideoTask;
 }
@@ -381,7 +381,7 @@ export async function submitImageTask(
       return json.data as VideoTask;
     }
 
-    const msg = String(json.message ?? `WaveSpeed error ${res.status}`);
+    const msg = String(json.message ?? `Media API error ${res.status}`);
     lastError = msg;
     const lowerMsg = msg.toLowerCase();
     const requiresLargeSize = lowerMsg.includes(
@@ -406,7 +406,7 @@ export async function submitImageTask(
       if (res.ok && json.code === 200) {
         return json.data as VideoTask;
       }
-      lastError = String(json.message ?? `WaveSpeed error ${res.status}`);
+      lastError = String(json.message ?? `Media API error ${res.status}`);
     }
   }
 
@@ -453,14 +453,14 @@ export const IMAGE_MODELS: {
   {
     id: "wavespeed-ai/uno",
     label: "UNO",
-    description: "WaveSpeed 图像编辑（i2i / 图文）",
+    description: "图像编辑（i2i / 图文）",
     tier: "standard",
     mode: "i2i_text",
   },
   {
     id: "wavespeed-ai/real-esrgan",
     label: "Real-ESRGAN",
-    description: "WaveSpeed 图像增强/超分（i2i）",
+    description: "图像增强/超分（i2i）",
     tier: "fast",
     mode: "i2i",
   },

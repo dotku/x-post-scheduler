@@ -62,10 +62,10 @@ export async function POST() {
     // Create reverse mapping: price ID -> tier name
     const priceToTier: Record<string, string> = {};
     Object.entries(SUBSCRIPTION_PRICE_IDS).forEach(([tier, id]) => {
-      if (id) priceToTier[id] = tier;
+      if (id && tier !== "air") priceToTier[id] = tier;
     });
     Object.entries(SUBSCRIPTION_YEARLY_PRICE_IDS).forEach(([tier, id]) => {
-      if (id) priceToTier[id] = tier;
+      if (id && tier !== "air") priceToTier[id] = tier;
     });
 
     const tier = priceId ? (priceToTier[priceId] ?? null) : null;

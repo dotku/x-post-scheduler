@@ -69,7 +69,7 @@ function detectProvider(modelId: string): string {
     if (modelId.includes("flux")) return "Black Forest Labs";
     if (modelId.includes("uno")) return "ByteDance";
     if (modelId.includes("real-esrgan")) return "Xintao Wang";
-    return "WaveSpeed";
+    return "AI Platform";
   }
   return "Other";
 }
@@ -96,11 +96,16 @@ export default function LandingContent({
   const [trialTone, setTrialTone] = useState("");
   const [trialGoal, setTrialGoal] = useState("");
   const [trialOutput, setTrialOutput] = useState("");
-  const [trialTextModelId, setTrialTextModelId] = useState(DEFAULT_TEXT_MODEL.id);
+  const [trialTextModelId, setTrialTextModelId] = useState(
+    DEFAULT_TEXT_MODEL.id,
+  );
   const [trialGenerating, setTrialGenerating] = useState(false);
   const [trialError, setTrialError] = useState<string | null>(null);
-  const [trialRemainingCents, setTrialRemainingCents] = useState<number | null>(null);
+  const [trialRemainingCents, setTrialRemainingCents] = useState<number | null>(
+    null,
+  );
   const [xKeysOpen, setXKeysOpen] = useState(false);
+  const [navMenuOpen, setNavMenuOpen] = useState(false);
   const [xApiKey, setXApiKey] = useState("");
   const [xApiSecret, setXApiSecret] = useState("");
   const [xAccessToken, setXAccessToken] = useState("");
@@ -112,7 +117,18 @@ export default function LandingContent({
     error?: string;
   } | null>(null);
   // Editor mode tabs
-  const [editorMode, setEditorMode] = useState<"text" | "image" | "video">("text");
+  const [editorMode, setEditorMode] = useState<
+    "text" | "image" | "video" | "voice"
+  >("text");
+  // Voice (TTS) generation state
+  const [voiceText, setVoiceText] = useState("");
+  const [voiceVoice, setVoiceVoice] = useState<
+    "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer"
+  >("nova");
+  const [voiceSpeed, setVoiceSpeed] = useState(1.0);
+  const [voiceGenerating, setVoiceGenerating] = useState(false);
+  const [voiceOutput, setVoiceOutput] = useState<string | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   // Image generation state
   const t2iModels = useMemo(
     () => IMAGE_MODELS.filter((m) => !m.mode || m.mode === "t2i"),
@@ -126,7 +142,9 @@ export default function LandingContent({
   const [imgError, setImgError] = useState<string | null>(null);
   // Video generation state
   const t2vModels = useMemo(() => VIDEO_MODELS, []);
-  const [vidModelId, setVidModelId] = useState("wavespeed-ai/wan-2.2/t2v-480p-ultra-fast");
+  const [vidModelId, setVidModelId] = useState(
+    "wavespeed-ai/wan-2.2/t2v-480p-ultra-fast",
+  );
   const [vidPrompt, setVidPrompt] = useState("");
   const [vidAspect, setVidAspect] = useState("16:9");
   const [vidDuration, setVidDuration] = useState(5);
@@ -382,7 +400,13 @@ export default function LandingContent({
       const res = await fetch("/api/landing/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, tone, goal, language: trialLanguage, model: trialTextModelId }),
+        body: JSON.stringify({
+          topic,
+          tone,
+          goal,
+          language: trialLanguage,
+          model: trialTextModelId,
+        }),
       });
       const data = await res.json();
 
@@ -404,7 +428,11 @@ export default function LandingContent({
         setTrialRemainingCents(data.remainingCents);
       }
     } catch {
-      setTrialError(locale === "zh" ? "生成失败，请重试" : "Generation failed, please try again");
+      setTrialError(
+        locale === "zh"
+          ? "生成失败，请重试"
+          : "Generation failed, please try again",
+      );
     } finally {
       setTrialGenerating(false);
     }
@@ -428,14 +456,20 @@ export default function LandingContent({
       });
       const data = await res.json();
       if (!res.ok) {
-        setXPublishResult({ success: false, error: data.error || "Publish failed" });
+        setXPublishResult({
+          success: false,
+          error: data.error || "Publish failed",
+        });
       } else {
         setXPublishResult({ success: true, tweetUrl: data.tweetUrl });
       }
     } catch {
       setXPublishResult({
         success: false,
-        error: locale === "zh" ? "发布失败，请重试" : "Publish failed, please try again",
+        error:
+          locale === "zh"
+            ? "发布失败，请重试"
+            : "Publish failed, please try again",
       });
     } finally {
       setXPublishing(false);
@@ -447,9 +481,11 @@ export default function LandingContent({
       locale === "zh"
         ? "今日 $1 免费额度已用完。注册后赠送 $5 正式额度。"
         : "Your free trial ($1/day) is used up. Sign up to get $5 free credits.";
-    return data.error?.includes("INSUFFICIENT") || data.error?.includes("trial_exhausted")
+    return data.error?.includes("INSUFFICIENT") ||
+      data.error?.includes("trial_exhausted")
       ? exhaustedMsg
-      : data.error || (locale === "zh" ? "生成失败，请重试" : "Generation failed");
+      : data.error ||
+          (locale === "zh" ? "生成失败，请重试" : "Generation failed");
   }
 
   async function handleGenerateImage() {
@@ -502,7 +538,9 @@ export default function LandingContent({
           setVidOutput(task.outputs?.[0] ?? null);
           setVidGenerating(false);
         } else if (task?.status === "failed") {
-          setVidError(task.error || (locale === "zh" ? "生成失败" : "Generation failed"));
+          setVidError(
+            task.error || (locale === "zh" ? "生成失败" : "Generation failed"),
+          );
           setVidGenerating(false);
         } else {
           pollVideoStatus(taskId, pollUrl);
@@ -551,21 +589,58 @@ export default function LandingContent({
     }
   }
 
+  async function handleGenerateVoice() {
+    if (!voiceText.trim()) return;
+    setVoiceGenerating(true);
+    setVoiceOutput(null);
+    setVoiceError(null);
+    try {
+      const res = await fetch("/api/toolbox/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: voiceText,
+          voice: voiceVoice,
+          speed: voiceSpeed,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setVoiceError(
+          res.status === 401
+            ? locale === "zh"
+              ? "请先登录后使用语音功能"
+              : "Please sign in to use voice generation"
+            : handleInsufficientCredits(data),
+        );
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setVoiceOutput(url);
+    } catch {
+      setVoiceError(locale === "zh" ? "网络错误" : "Network error");
+    } finally {
+      setVoiceGenerating(false);
+    }
+  }
+
   const highlight = t("heroHighlight");
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-3">
           <h1
             className={`font-bold text-gray-900 dark:text-white ${
-              lang === "zh" ? "text-xl" : "text-2xl"
+              lang === "zh" ? "text-lg sm:text-xl" : "text-xl sm:text-2xl"
             }`}
           >
             {t("appName")}
           </h1>
-          <div className="flex items-center gap-4 text-sm">
+
+          <div className="hidden md:flex items-center gap-4 text-sm">
             <Link
               href={`${prefix}/gallery`}
               className="text-gray-600 dark:text-gray-400 hover:underline underline-offset-4"
@@ -577,6 +652,12 @@ export default function LandingContent({
               className="text-gray-600 dark:text-gray-400 hover:underline underline-offset-4"
             >
               {t("docs")}
+            </Link>
+            <Link
+              href={`${prefix}/media-news`}
+              className="text-blue-600 dark:text-blue-400 font-medium hover:underline underline-offset-4"
+            >
+              {locale === "zh" ? "传媒日报" : "Media Daily"}
             </Link>
             <Link
               href={`${prefix}/changelog`}
@@ -608,7 +689,96 @@ export default function LandingContent({
                 </Link>
               ))}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setNavMenuOpen((v) => !v)}
+            className="md:hidden inline-flex items-center justify-center rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm text-gray-700 dark:text-gray-300"
+            aria-expanded={navMenuOpen}
+            aria-label={locale === "zh" ? "切换菜单" : "Toggle menu"}
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d={
+                  navMenuOpen
+                    ? "M6 18L18 6M6 6l12 12"
+                    : "M4 6h16M4 12h16M4 18h16"
+                }
+              />
+            </svg>
+          </button>
         </div>
+
+        {navMenuOpen && (
+          <div className="md:hidden border-t border-gray-200 dark:border-gray-700 px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex flex-col gap-2 text-sm">
+              <Link
+                href={`${prefix}/gallery`}
+                onClick={() => setNavMenuOpen(false)}
+                className="rounded-md px-2 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {t("galleryFeed")}
+              </Link>
+              <Link
+                href={`${prefix}/docs`}
+                onClick={() => setNavMenuOpen(false)}
+                className="rounded-md px-2 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {t("docs")}
+              </Link>
+              <Link
+                href={`${prefix}/media-news`}
+                onClick={() => setNavMenuOpen(false)}
+                className="rounded-md px-2 py-2 text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-50 dark:hover:bg-blue-900/30"
+              >
+                {locale === "zh" ? "传媒日报" : "Media Daily"}
+              </Link>
+              <Link
+                href={`${prefix}/changelog`}
+                onClick={() => setNavMenuOpen(false)}
+                className="rounded-md px-2 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {t("changelog")}
+              </Link>
+              <Link
+                href={`${prefix}/invest`}
+                onClick={() => setNavMenuOpen(false)}
+                className="rounded-md px-2 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {t("investor")}
+              </Link>
+              <div className="pt-1">
+                <LanguageSwitcher />
+              </div>
+              {!browserEnv.isInAppBrowser &&
+                (isLoggedIn ? (
+                  <Link
+                    href={`${prefix}/dashboard`}
+                    onClick={() => setNavMenuOpen(false)}
+                    className="rounded-md px-2 py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                  >
+                    {t("dashboard")}
+                  </Link>
+                ) : (
+                  <Link
+                    href={`${prefix}/login`}
+                    onClick={() => setNavMenuOpen(false)}
+                    className="rounded-md px-2 py-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                  >
+                    {t("signIn")}
+                  </Link>
+                ))}
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Beta Notice */}
@@ -619,7 +789,7 @@ export default function LandingContent({
       </div>
 
       {/* Rebranding Announcement */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border-b border-blue-200 dark:border-blue-800">
+      <div className="bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30 border-b border-blue-200 dark:border-blue-800">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 text-center">
           <p className="text-sm sm:text-base text-gray-900 dark:text-white">
             <span className="font-semibold">
@@ -677,12 +847,20 @@ export default function LandingContent({
               </button>
             </div>
           ) : isLoggedIn ? (
-            <Link
-              href={`${prefix}/dashboard`}
-              className="inline-flex items-center px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors text-lg"
-            >
-              {t("goToDashboard")}
-            </Link>
+            <>
+              <Link
+                href={`${prefix}/dashboard`}
+                className="inline-flex items-center px-8 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors text-lg"
+              >
+                {t("goToDashboard")}
+              </Link>
+              <Link
+                href={`${prefix}/media-news`}
+                className="inline-flex items-center px-6 py-3 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 font-medium rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+              >
+                {locale === "zh" ? "今日传媒日报 →" : "Today's Media Brief →"}
+              </Link>
+            </>
           ) : (
             <>
               <Link
@@ -691,9 +869,12 @@ export default function LandingContent({
               >
                 {t("getStarted")}
               </Link>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {t("noCard")}
-              </p>
+              <Link
+                href={`${prefix}/media-news`}
+                className="inline-flex items-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                {locale === "zh" ? "传媒行业日报 →" : "Media Industry Daily →"}
+              </Link>
             </>
           )}
         </div>
@@ -712,296 +893,372 @@ export default function LandingContent({
           </div>
 
           {/* Mode tabs */}
-          <div className="flex gap-1 mb-6 p-1 bg-gray-100 dark:bg-gray-900 rounded-lg w-fit">
-            {(["text", "image", "video"] as const).map((mode) => (
+          <div className="flex gap-1 mb-6 p-1 bg-gray-100 dark:bg-gray-900 rounded-lg w-full overflow-x-auto">
+            {(["text", "image", "video", "voice"] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => setEditorMode(mode)}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`shrink-0 whitespace-nowrap px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   editorMode === mode
                     ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
                     : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 }`}
               >
                 {mode === "text"
-                  ? locale === "zh" ? "📝 文字" : "📝 Text"
+                  ? locale === "zh"
+                    ? "📝 文字"
+                    : "📝 Text"
                   : mode === "image"
-                  ? locale === "zh" ? "🖼️ 图片" : "🖼️ Image"
-                  : locale === "zh" ? "🎬 视频" : "🎬 Video"}
+                    ? locale === "zh"
+                      ? "🖼️ 图片"
+                      : "🖼️ Image"
+                    : mode === "video"
+                      ? locale === "zh"
+                        ? "🎬 视频"
+                        : "🎬 Video"
+                      : locale === "zh"
+                        ? "🎙️ 语音"
+                        : "🎙️ Voice"}
               </button>
             ))}
           </div>
 
-          {editorMode === "text" && (<>
-          {/* Sample presets */}
-          <div className="mb-4">
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              {locale === "zh" ? "快速填入示例 →" : "Try a sample →"}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {([
-                { topic: locale === "zh" ? "AI 生产力工具" : "AI productivity tools", tone: locale === "zh" ? "专业、权威" : "professional", goal: locale === "zh" ? "吸引注册" : "drive signups" },
-                { topic: locale === "zh" ? "视频内容创作技巧" : "video content creation tips", tone: locale === "zh" ? "轻松、充满活力" : "casual, energetic", goal: locale === "zh" ? "涨粉" : "grow following" },
-                { topic: locale === "zh" ? "创业融资经验" : "bootstrapping a startup", tone: locale === "zh" ? "真实、坦诚" : "authentic, raw", goal: locale === "zh" ? "建立社群" : "build community" },
-                { topic: locale === "zh" ? "早晨健身计划" : "morning workout routine", tone: locale === "zh" ? "激励人心" : "motivational", goal: locale === "zh" ? "激发行动" : "inspire action" },
-                { topic: locale === "zh" ? "加密货币市场趋势" : "crypto market trends", tone: locale === "zh" ? "理性、自信" : "analytical, confident", goal: locale === "zh" ? "建立思想领导力" : "establish thought leadership" },
-              ] as const).map((sample) => (
-                <button
-                  key={sample.topic}
-                  type="button"
-                  onClick={() => {
-                    setTrialTopic(sample.topic);
-                    setTrialTone(sample.tone);
-                    setTrialGoal(sample.goal);
-                  }}
-                  className="rounded-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 py-1 text-xs text-gray-700 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-colors"
-                >
-                  {sample.topic}
-                </button>
-              ))}
-            </div>
-          </div>
+          {editorMode === "text" && (
+            <>
+              {/* Sample presets */}
+              <div className="mb-4">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  {locale === "zh" ? "快速填入示例 →" : "Try a sample →"}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      {
+                        topic:
+                          locale === "zh"
+                            ? "AI 生产力工具"
+                            : "AI productivity tools",
+                        tone: locale === "zh" ? "专业、权威" : "professional",
+                        goal: locale === "zh" ? "吸引注册" : "drive signups",
+                      },
+                      {
+                        topic:
+                          locale === "zh"
+                            ? "视频内容创作技巧"
+                            : "video content creation tips",
+                        tone:
+                          locale === "zh"
+                            ? "轻松、充满活力"
+                            : "casual, energetic",
+                        goal: locale === "zh" ? "涨粉" : "grow following",
+                      },
+                      {
+                        topic:
+                          locale === "zh"
+                            ? "创业融资经验"
+                            : "bootstrapping a startup",
+                        tone: locale === "zh" ? "真实、坦诚" : "authentic, raw",
+                        goal: locale === "zh" ? "建立社群" : "build community",
+                      },
+                      {
+                        topic:
+                          locale === "zh"
+                            ? "早晨健身计划"
+                            : "morning workout routine",
+                        tone: locale === "zh" ? "激励人心" : "motivational",
+                        goal: locale === "zh" ? "激发行动" : "inspire action",
+                      },
+                      {
+                        topic:
+                          locale === "zh"
+                            ? "加密货币市场趋势"
+                            : "crypto market trends",
+                        tone:
+                          locale === "zh"
+                            ? "理性、自信"
+                            : "analytical, confident",
+                        goal:
+                          locale === "zh"
+                            ? "建立思想领导力"
+                            : "establish thought leadership",
+                      },
+                    ] as const
+                  ).map((sample) => (
+                    <button
+                      key={sample.topic}
+                      type="button"
+                      onClick={() => {
+                        setTrialTopic(sample.topic);
+                        setTrialTone(sample.tone);
+                        setTrialGoal(sample.goal);
+                      }}
+                      className="rounded-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 py-1 text-xs text-gray-700 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-colors"
+                    >
+                      {sample.topic}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                {t("editorTopicLabel")}
-              </span>
-              <input
-                value={trialTopic}
-                onChange={(e) => setTrialTopic(e.target.value)}
-                placeholder={t("editorTopicPlaceholder")}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
-              />
-            </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {t("editorTopicLabel")}
+                  </span>
+                  <input
+                    value={trialTopic}
+                    onChange={(e) => setTrialTopic(e.target.value)}
+                    placeholder={t("editorTopicPlaceholder")}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  />
+                </label>
 
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                {t("editorLanguageLabel")}
-              </span>
-              <select
-                value={trialLanguage}
-                onChange={(e) => setTrialLanguage(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
-              >
-                <option value="English">English</option>
-                <option value="中文">中文</option>
-              </select>
-            </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {t("editorLanguageLabel")}
+                  </span>
+                  <select
+                    value={trialLanguage}
+                    onChange={(e) => setTrialLanguage(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  >
+                    <option value="English">English</option>
+                    <option value="中文">中文</option>
+                  </select>
+                </label>
 
-            <label className="flex flex-col gap-1">
-              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                {t("editorToneLabel")}
-              </span>
-              <input
-                value={trialTone}
-                onChange={(e) => setTrialTone(e.target.value)}
-                placeholder={t("editorTonePlaceholder")}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
-              />
-            </label>
-          </div>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {t("editorToneLabel")}
+                  </span>
+                  <input
+                    value={trialTone}
+                    onChange={(e) => setTrialTone(e.target.value)}
+                    placeholder={t("editorTonePlaceholder")}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  />
+                </label>
+              </div>
 
-          <label className="flex flex-col gap-1 mt-4">
-            <span className="text-sm font-medium text-gray-900 dark:text-white">
-              {t("editorGoalLabel")}
-            </span>
-            <input
-              value={trialGoal}
-              onChange={(e) => setTrialGoal(e.target.value)}
-              placeholder={t("editorGoalPlaceholder")}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
-            />
-          </label>
-
-          <div className="mt-4">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                {locale === "zh" ? "AI 模型" : "AI Model"}
-              </span>
-              <select
-                value={trialTextModelId}
-                onChange={(e) => setTrialTextModelId(e.target.value)}
-                className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
-              >
-                {TEXT_MODELS.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label} · {m.provider}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={handleGenerateTrialPost}
-              disabled={
-                trialGenerating ||
-                !trialTopic.trim() ||
-                !trialTone.trim() ||
-                !trialGoal.trim()
-              }
-              className="inline-flex items-center px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
-            >
-              {trialGenerating
-                ? locale === "zh"
-                  ? "生成中..."
-                  : "Generating..."
-                : t("editorGenerateButton")}
-            </button>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {t("editorSessionHint")}
-            </span>
-            {trialRemainingCents !== null && (
-              <span className="text-xs text-green-600 dark:text-green-400">
-                {locale === "zh"
-                  ? `剩余试用额度: $${(trialRemainingCents / 100).toFixed(2)}`
-                  : `Trial balance: $${(trialRemainingCents / 100).toFixed(2)}`}
-              </span>
-            )}
-          </div>
-
-          {trialError && (
-            <div className="mt-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3">
-              <p className="text-sm text-red-700 dark:text-red-300">{trialError}</p>
-              {!isLoggedIn && (
-                <Link
-                  href={`${prefix}/login`}
-                  className="mt-2 inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  {locale === "zh" ? "立即注册，领取 $5 →" : "Sign up for $5 free credits →"}
-                </Link>
-              )}
-            </div>
-          )}
-
-          <div className="mt-5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
-              {t("editorPreviewLabel")}
-            </p>
-            <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap min-h-12">
-              {trialOutput || t("editorPreviewPlaceholder")}
-            </p>
-          </div>
-
-          {/* X Publishing Section — shown after content is generated */}
-          {trialOutput && (
-            <div className="mt-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-              <button
-                type="button"
-                onClick={() => setXKeysOpen((v) => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg"
-              >
-                <span>
-                  {locale === "zh"
-                    ? "发布到 X（需要你的 API Key）"
-                    : "Publish to X (requires your API keys)"}
+              <label className="flex flex-col gap-1 mt-4">
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {t("editorGoalLabel")}
                 </span>
-                <svg
-                  className={`w-4 h-4 transition-transform ${xKeysOpen ? "rotate-180" : ""}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
+                <input
+                  value={trialGoal}
+                  onChange={(e) => setTrialGoal(e.target.value)}
+                  placeholder={t("editorGoalPlaceholder")}
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                />
+              </label>
 
-              {xKeysOpen && (
-                <div className="px-4 pb-4 space-y-3">
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+              <div className="mt-4">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+                    {locale === "zh" ? "AI 模型" : "AI Model"}
+                  </span>
+                  <select
+                    value={trialTextModelId}
+                    onChange={(e) => setTrialTextModelId(e.target.value)}
+                    className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  >
+                    {TEXT_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.label} · {m.provider}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleGenerateTrialPost}
+                  disabled={
+                    trialGenerating ||
+                    !trialTopic.trim() ||
+                    !trialTone.trim() ||
+                    !trialGoal.trim()
+                  }
+                  className="inline-flex items-center px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {trialGenerating
+                    ? locale === "zh"
+                      ? "生成中..."
+                      : "Generating..."
+                    : t("editorGenerateButton")}
+                </button>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {t("editorSessionHint")}
+                </span>
+                {trialRemainingCents !== null && (
+                  <span className="text-xs text-green-600 dark:text-green-400">
                     {locale === "zh"
-                      ? "API Key 仅用于本次发布，不会被存储。"
-                      : "Your API keys are used only for this request and are never stored."}{" "}
-                    <Link href={`${prefix}/docs`} className="text-blue-500 hover:underline">
-                      {locale === "zh" ? "查看文档" : "View docs"}
-                    </Link>
+                      ? `剩余试用额度: $${(trialRemainingCents / 100).toFixed(2)}`
+                      : `Trial balance: $${(trialRemainingCents / 100).toFixed(2)}`}
+                  </span>
+                )}
+              </div>
+
+              {trialError && (
+                <div className="mt-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3">
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    {trialError}
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input
-                      type="password"
-                      placeholder="API Key"
-                      value={xApiKey}
-                      onChange={(e) => setXApiKey(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
-                    />
-                    <input
-                      type="password"
-                      placeholder="API Secret"
-                      value={xApiSecret}
-                      onChange={(e) => setXApiSecret(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
-                    />
-                    <input
-                      type="password"
-                      placeholder="Access Token"
-                      value={xAccessToken}
-                      onChange={(e) => setXAccessToken(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
-                    />
-                    <input
-                      type="password"
-                      placeholder="Access Token Secret"
-                      value={xAccessTokenSecret}
-                      onChange={(e) => setXAccessTokenSecret(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
-                    />
-                  </div>
+                  {!isLoggedIn && (
+                    <Link
+                      href={`${prefix}/login`}
+                      className="mt-2 inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {locale === "zh"
+                        ? "立即注册，领取 $5 →"
+                        : "Sign up for $5 free credits →"}
+                    </Link>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
+                  {t("editorPreviewLabel")}
+                </p>
+                <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap min-h-12">
+                  {trialOutput || t("editorPreviewPlaceholder")}
+                </p>
+              </div>
+
+              {/* X Publishing Section — shown after content is generated */}
+              {trialOutput && (
+                <div className="mt-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                   <button
                     type="button"
-                    onClick={handlePublishToX}
-                    disabled={
-                      xPublishing ||
-                      !xApiKey ||
-                      !xApiSecret ||
-                      !xAccessToken ||
-                      !xAccessTokenSecret
-                    }
-                    className="inline-flex items-center px-5 py-2.5 rounded-lg bg-black text-white text-sm font-semibold hover:bg-gray-800 disabled:opacity-50"
+                    onClick={() => setXKeysOpen((v) => !v)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg"
                   >
-                    {xPublishing
-                      ? locale === "zh"
-                        ? "发布中..."
-                        : "Publishing..."
-                      : locale === "zh"
-                        ? "发布到 X"
-                        : "Publish to X"}
-                  </button>
-                  {xPublishResult && (
-                    <div
-                      className={`rounded-lg px-4 py-3 text-sm ${
-                        xPublishResult.success
-                          ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
-                          : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
-                      }`}
+                    <span>
+                      {locale === "zh"
+                        ? "发布到 X（需要你的 API Key）"
+                        : "Publish to X (requires your API keys)"}
+                    </span>
+                    <svg
+                      className={`w-4 h-4 transition-transform ${xKeysOpen ? "rotate-180" : ""}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
                     >
-                      {xPublishResult.success ? (
-                        <>
-                          {locale === "zh" ? "发布成功！" : "Published successfully!"}{" "}
-                          {xPublishResult.tweetUrl && (
-                            <a
-                              href={xPublishResult.tweetUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="underline font-semibold"
-                            >
-                              {locale === "zh" ? "查看推文 →" : "View tweet →"}
-                            </a>
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+
+                  {xKeysOpen && (
+                    <div className="px-4 pb-4 space-y-3">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {locale === "zh"
+                          ? "API Key 仅用于本次发布，不会被存储。"
+                          : "Your API keys are used only for this request and are never stored."}{" "}
+                        <Link
+                          href={`${prefix}/docs`}
+                          className="text-blue-500 hover:underline"
+                        >
+                          {locale === "zh" ? "查看文档" : "View docs"}
+                        </Link>
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <input
+                          type="password"
+                          placeholder="API Key"
+                          value={xApiKey}
+                          onChange={(e) => setXApiKey(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                        />
+                        <input
+                          type="password"
+                          placeholder="API Secret"
+                          value={xApiSecret}
+                          onChange={(e) => setXApiSecret(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                        />
+                        <input
+                          type="password"
+                          placeholder="Access Token"
+                          value={xAccessToken}
+                          onChange={(e) => setXAccessToken(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                        />
+                        <input
+                          type="password"
+                          placeholder="Access Token Secret"
+                          value={xAccessTokenSecret}
+                          onChange={(e) =>
+                            setXAccessTokenSecret(e.target.value)
+                          }
+                          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handlePublishToX}
+                        disabled={
+                          xPublishing ||
+                          !xApiKey ||
+                          !xApiSecret ||
+                          !xAccessToken ||
+                          !xAccessTokenSecret
+                        }
+                        className="inline-flex items-center px-5 py-2.5 rounded-lg bg-black text-white text-sm font-semibold hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        {xPublishing
+                          ? locale === "zh"
+                            ? "发布中..."
+                            : "Publishing..."
+                          : locale === "zh"
+                            ? "发布到 X"
+                            : "Publish to X"}
+                      </button>
+                      {xPublishResult && (
+                        <div
+                          className={`rounded-lg px-4 py-3 text-sm ${
+                            xPublishResult.success
+                              ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300"
+                              : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+                          }`}
+                        >
+                          {xPublishResult.success ? (
+                            <>
+                              {locale === "zh"
+                                ? "发布成功！"
+                                : "Published successfully!"}{" "}
+                              {xPublishResult.tweetUrl && (
+                                <a
+                                  href={xPublishResult.tweetUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="underline font-semibold"
+                                >
+                                  {locale === "zh"
+                                    ? "查看推文 →"
+                                    : "View tweet →"}
+                                </a>
+                              )}
+                            </>
+                          ) : (
+                            xPublishResult.error
                           )}
-                        </>
-                      ) : (
-                        xPublishResult.error
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
               )}
-            </div>
+            </>
           )}
-          </>)}
 
           {/* Image generation mode */}
           {editorMode === "image" && (
@@ -1033,7 +1290,9 @@ export default function LandingContent({
                     className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
                   >
                     {["1:1", "16:9", "9:16", "4:3", "3:4"].map((r) => (
-                      <option key={r} value={r}>{r}</option>
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -1046,7 +1305,11 @@ export default function LandingContent({
                   rows={3}
                   value={imgPrompt}
                   onChange={(e) => setImgPrompt(e.target.value)}
-                  placeholder={locale === "zh" ? "描述你想生成的图片..." : "Describe the image you want to generate..."}
+                  placeholder={
+                    locale === "zh"
+                      ? "描述你想生成的图片..."
+                      : "Describe the image you want to generate..."
+                  }
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white resize-none"
                 />
               </label>
@@ -1058,8 +1321,12 @@ export default function LandingContent({
                   className="inline-flex items-center px-5 py-2.5 rounded-lg bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 disabled:opacity-50"
                 >
                   {imgGenerating
-                    ? locale === "zh" ? "生成中..." : "Generating..."
-                    : locale === "zh" ? "🖼️ 生成图片" : "🖼️ Generate Image"}
+                    ? locale === "zh"
+                      ? "生成中..."
+                      : "Generating..."
+                    : locale === "zh"
+                      ? "🖼️ 生成图片"
+                      : "🖼️ Generate Image"}
                 </button>
                 {trialRemainingCents !== null && (
                   <span className="text-xs text-green-600 dark:text-green-400">
@@ -1071,10 +1338,17 @@ export default function LandingContent({
               </div>
               {imgError && (
                 <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3">
-                  <p className="text-sm text-red-700 dark:text-red-300">{imgError}</p>
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    {imgError}
+                  </p>
                   {!isLoggedIn && (
-                    <Link href={`${prefix}/login`} className="mt-2 inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline">
-                      {locale === "zh" ? "立即注册，领取 $5 →" : "Sign up for $5 free credits →"}
+                    <Link
+                      href={`${prefix}/login`}
+                      className="mt-2 inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {locale === "zh"
+                        ? "立即注册，领取 $5 →"
+                        : "Sign up for $5 free credits →"}
                     </Link>
                   )}
                 </div>
@@ -1122,7 +1396,9 @@ export default function LandingContent({
                     className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
                   >
                     {["16:9", "9:16", "1:1"].map((r) => (
-                      <option key={r} value={r}>{r}</option>
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -1148,7 +1424,11 @@ export default function LandingContent({
                   rows={3}
                   value={vidPrompt}
                   onChange={(e) => setVidPrompt(e.target.value)}
-                  placeholder={locale === "zh" ? "描述你想生成的视频内容..." : "Describe the video you want to generate..."}
+                  placeholder={
+                    locale === "zh"
+                      ? "描述你想生成的视频内容..."
+                      : "Describe the video you want to generate..."
+                  }
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white resize-none"
                 />
               </label>
@@ -1160,8 +1440,12 @@ export default function LandingContent({
                   className="inline-flex items-center px-5 py-2.5 rounded-lg bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700 disabled:opacity-50"
                 >
                   {vidGenerating
-                    ? locale === "zh" ? "生成中（请稍候）..." : "Generating (please wait)..."
-                    : locale === "zh" ? "🎬 生成视频" : "🎬 Generate Video"}
+                    ? locale === "zh"
+                      ? "生成中（请稍候）..."
+                      : "Generating (please wait)..."
+                    : locale === "zh"
+                      ? "🎬 生成视频"
+                      : "🎬 Generate Video"}
                 </button>
                 {trialRemainingCents !== null && (
                   <span className="text-xs text-green-600 dark:text-green-400">
@@ -1173,10 +1457,17 @@ export default function LandingContent({
               </div>
               {vidError && (
                 <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3">
-                  <p className="text-sm text-red-700 dark:text-red-300">{vidError}</p>
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    {vidError}
+                  </p>
                   {!isLoggedIn && (
-                    <Link href={`${prefix}/login`} className="mt-2 inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline">
-                      {locale === "zh" ? "立即注册，领取 $5 →" : "Sign up for $5 free credits →"}
+                    <Link
+                      href={`${prefix}/login`}
+                      className="mt-2 inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {locale === "zh"
+                        ? "立即注册，领取 $5 →"
+                        : "Sign up for $5 free credits →"}
                     </Link>
                   )}
                 </div>
@@ -1191,6 +1482,144 @@ export default function LandingContent({
                     muted
                     className="rounded-lg max-w-full max-h-96 border border-gray-200 dark:border-gray-700"
                   />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Voice generation mode */}
+          {editorMode === "voice" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {locale === "zh" ? "音色" : "Voice"}
+                  </span>
+                  <select
+                    value={voiceVoice}
+                    onChange={(e) =>
+                      setVoiceVoice(e.target.value as typeof voiceVoice)
+                    }
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white"
+                  >
+                    <option value="alloy">
+                      Alloy —{" "}
+                      {locale === "zh" ? "中性、多用途" : "Neutral, versatile"}
+                    </option>
+                    <option value="echo">
+                      Echo — {locale === "zh" ? "稍低沉" : "Slightly deeper"}
+                    </option>
+                    <option value="fable">
+                      Fable —{" "}
+                      {locale === "zh" ? "温暖、富有表情" : "Warm, expressive"}
+                    </option>
+                    <option value="onyx">
+                      Onyx —{" "}
+                      {locale === "zh"
+                        ? "低沉、有权威感"
+                        : "Deep, authoritative"}
+                    </option>
+                    <option value="nova">
+                      Nova — {locale === "zh" ? "温暖、女声" : "Warm, female"}
+                    </option>
+                    <option value="shimmer">
+                      Shimmer —{" "}
+                      {locale === "zh" ? "柔和、女声" : "Soft, female"}
+                    </option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {locale === "zh" ? "语速" : "Speed"} ({voiceSpeed}×)
+                  </span>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={2.0}
+                    step={0.25}
+                    value={voiceSpeed}
+                    onChange={(e) => setVoiceSpeed(Number(e.target.value))}
+                    className="w-full mt-2 accent-orange-500"
+                  />
+                  <div className="flex justify-between text-xs text-gray-400">
+                    <span>0.5×</span>
+                    <span>1×</span>
+                    <span>2×</span>
+                  </div>
+                </label>
+              </div>
+              <label className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {locale === "zh" ? "文字内容" : "Text to speak"}
+                  <span className="ml-2 text-xs text-gray-400">
+                    ({voiceText.length}/4096)
+                  </span>
+                </span>
+                <textarea
+                  rows={4}
+                  maxLength={4096}
+                  value={voiceText}
+                  onChange={(e) => setVoiceText(e.target.value)}
+                  placeholder={
+                    locale === "zh"
+                      ? "输入要转换为语音的文字内容..."
+                      : "Enter the text you want to convert to speech..."
+                  }
+                  className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white resize-none"
+                />
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleGenerateVoice}
+                  disabled={voiceGenerating || !voiceText.trim()}
+                  className="inline-flex items-center px-5 py-2.5 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 disabled:opacity-50"
+                >
+                  {voiceGenerating
+                    ? locale === "zh"
+                      ? "生成中..."
+                      : "Generating..."
+                    : locale === "zh"
+                      ? "🎙️ 生成语音"
+                      : "🎙️ Generate Voice"}
+                </button>
+                <span className="text-xs text-gray-400">
+                  {locale === "zh"
+                    ? "OpenAI TTS · 高品质语音"
+                    : "OpenAI TTS · High quality"}
+                </span>
+              </div>
+              {voiceError && (
+                <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3">
+                  <p className="text-sm text-red-700 dark:text-red-300">
+                    {voiceError}
+                  </p>
+                  {!isLoggedIn && (
+                    <Link
+                      href={`${prefix}/login`}
+                      className="mt-2 inline-flex items-center text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {locale === "zh"
+                        ? "立即注册，领取 $5 →"
+                        : "Sign up for $5 free credits →"}
+                    </Link>
+                  )}
+                </div>
+              )}
+              {voiceOutput && (
+                <div className="mt-2 space-y-2">
+                  <audio
+                    controls
+                    src={voiceOutput}
+                    className="w-full rounded-lg"
+                  />
+                  <a
+                    href={voiceOutput}
+                    download="voiceover.mp3"
+                    className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {locale === "zh" ? "⬇ 下载 MP3" : "⬇ Download MP3"}
+                  </a>
                 </div>
               )}
             </div>
@@ -1666,7 +2095,7 @@ export default function LandingContent({
               href="https://jytech.us"
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 px-6 py-2.5 text-sm font-semibold rounded-lg border-2 border-gray-400 dark:border-gray-500 text-gray-700 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-colors text-center"
+              className="w-full sm:w-auto px-6 py-2.5 text-sm font-semibold rounded-lg border-2 border-gray-400 dark:border-gray-500 text-gray-700 dark:text-gray-300 hover:border-blue-500 hover:text-blue-600 dark:hover:border-blue-400 dark:hover:text-blue-400 transition-colors text-center"
             >
               {lang === "zh" ? "联系我们" : "Contact Us"}
             </a>
@@ -1741,12 +2170,13 @@ export default function LandingContent({
           {/* Africa region support */}
           <div className="text-center space-y-2 sm:space-y-1">
             <p className="text-sm sm:text-base font-medium text-gray-700 dark:text-gray-300">
-              {lang === "zh" ? "非洲地区客服" : "Africa Region Support"} — Mohamadou Laminou:
+              {lang === "zh" ? "非洲地区客服" : "Africa Region Support"} —
+              Mohamadou Laminou:
             </p>
             <div className="flex flex-col sm:flex-row sm:gap-4 gap-2 text-sm sm:text-base">
               <a
                 href="mailto:mohamadou439@gmail.com"
-                className="px-3 py-2 sm:py-1.5 rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all"
+                className="px-3 py-2 sm:py-1.5 rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all break-all sm:break-normal"
               >
                 mohamadou439@gmail.com
               </a>
@@ -1754,7 +2184,7 @@ export default function LandingContent({
                 href="https://wa.me/8613162726136"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-3 py-2 sm:py-1.5 rounded-md bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-300 transition-all"
+                className="px-3 py-2 sm:py-1.5 rounded-md bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-300 transition-all break-all sm:break-normal"
               >
                 WhatsApp: +86 131 6272 6136
               </a>
