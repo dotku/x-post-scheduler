@@ -34,9 +34,17 @@ async function triggerEndpoint(env: Env, path: string): Promise<Response> {
   });
 }
 
+async function safeTrigger(env: Env, label: string, path: string): Promise<void> {
+  const res = await triggerEndpoint(env, path);
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`${label} failed (${res.status}): ${body}`);
+  }
+}
+
 const worker = {
   async scheduled(
-    event: ScheduledController,
+    _event: ScheduledController,
     env: Env,
     ctx: WorkerExecutionContext,
   ): Promise<void> {
@@ -44,71 +52,24 @@ const worker = {
       throw new Error("Missing APP_BASE_URL worker secret/var.");
     }
 
-    if (event.cron === "* * * * *") {
-      ctx.waitUntil(
-        (async () => {
-          const res = await triggerEndpoint(env, "/api/scheduler");
-          if (!res.ok) {
-            const body = await res.text();
-            throw new Error(
-              `Scheduler trigger failed (${res.status}): ${body}`,
-            );
-          }
-        })(),
-      );
-      return;
-    }
+    // Single daily trigger: run all daily jobs sequentially
+    ctx.waitUntil(
+      (async () => {
+        // 1. Process any scheduled posts that are due
+        await safeTrigger(env, "Scheduler", "/api/scheduler");
 
-    if (event.cron === "0 0 * * *") {
-      ctx.waitUntil(
-        (async () => {
-          const res = await triggerEndpoint(env, "/api/daily-generate");
-          if (!res.ok) {
-            const body = await res.text();
-            throw new Error(
-              `Daily-generate trigger failed (${res.status}): ${body}`,
-            );
-          }
-        })(),
-      );
-      return;
-    }
+        // 2. Generate daily content for users
+        await safeTrigger(env, "Daily-generate", "/api/daily-generate");
 
-    if (event.cron === "15 1 * * *") {
-      ctx.waitUntil(
-        (async () => {
-          const res = await triggerEndpoint(
-            env,
-            "/api/cron/media-news?period=daily",
-          );
-          if (!res.ok) {
-            const body = await res.text();
-            throw new Error(
-              `Media-news daily trigger failed (${res.status}): ${body}`,
-            );
-          }
-        })(),
-      );
-      return;
-    }
+        // 3. Daily media industry news
+        await safeTrigger(env, "Media-news-daily", "/api/cron/media-news?period=daily");
 
-    if (event.cron === "20 1 * * 1") {
-      ctx.waitUntil(
-        (async () => {
-          const res = await triggerEndpoint(
-            env,
-            "/api/cron/media-news?period=weekly",
-          );
-          if (!res.ok) {
-            const body = await res.text();
-            throw new Error(
-              `Media-news weekly trigger failed (${res.status}): ${body}`,
-            );
-          }
-        })(),
-      );
-      return;
-    }
+        // 4. Weekly media news on Mondays
+        if (new Date().getUTCDay() === 1) {
+          await safeTrigger(env, "Media-news-weekly", "/api/cron/media-news?period=weekly");
+        }
+      })(),
+    );
   },
 };
 
