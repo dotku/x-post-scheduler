@@ -8,8 +8,8 @@ export interface XCredentials {
 }
 
 function createXClient(credentials: XCredentials) {
-  const appKey = credentials.apiKey || process.env.TWITTER_API_KEY;
-  const appSecret = credentials.apiSecret || process.env.TWITTER_API_SECRET;
+  const appKey = credentials.apiKey || process.env.X_API_KEY || process.env.TWITTER_API_KEY;
+  const appSecret = credentials.apiSecret || process.env.X_API_SECRET || process.env.TWITTER_API_SECRET;
   if (!appKey || !appSecret) {
     throw new Error("Twitter app credentials are not configured");
   }

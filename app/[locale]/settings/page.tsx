@@ -1021,6 +1021,17 @@ export default function SettingsPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {message && (
+          <div
+            className={`rounded-lg p-4 mb-6 ${
+              message.type === "success"
+                ? "bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200"
+                : "bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -2442,18 +2453,6 @@ export default function SettingsPage() {
           )}
         </div>
         {/* end Credits+AI Usage grid */}
-
-        {message && (
-          <div
-            className={`rounded-lg p-4 mb-6 ${
-              message.type === "success"
-                ? "bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200"
-                : "bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
-            }`}
-          >
-            {message.text}
-          </div>
-        )}
       </main>
     </div>
   );

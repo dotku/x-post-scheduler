@@ -34,8 +34,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${baseUrl}/settings?error=oauth_failed`);
   }
 
-  const appKey = process.env.TWITTER_API_KEY!;
-  const appSecret = process.env.TWITTER_API_SECRET!;
+  const appKey = (process.env.X_API_KEY || process.env.TWITTER_API_KEY)!;
+  const appSecret = (process.env.X_API_SECRET || process.env.TWITTER_API_SECRET)!;
 
   try {
     const tempClient = new TwitterApi({
