@@ -33,16 +33,37 @@ export async function POST(request: NextRequest) {
       const session = event.data.object as Stripe.Checkout.Session;
 
       if (session.mode === "payment") {
-        // One-time topup
-        const userId = session.metadata?.userId;
-        const amountCents = parseInt(session.metadata?.amountCents ?? "0", 10);
-        if (userId && amountCents > 0) {
-          await addCredits({
-            userId,
-            amountCents,
-            stripeSessionId: session.id,
-          });
-          console.log(`Credits added: ${amountCents}¢ for user ${userId}`);
+        const metadataType = session.metadata?.type;
+
+        if (metadataType === "campaign_payment") {
+          // Campaign client payment
+          const campaignPaymentId = session.metadata?.campaignPaymentId;
+          if (campaignPaymentId) {
+            await prisma.campaignPayment.update({
+              where: { id: campaignPaymentId },
+              data: {
+                paymentStatus: "paid",
+                stripePaymentIntentId:
+                  typeof session.payment_intent === "string"
+                    ? session.payment_intent
+                    : null,
+                paidAt: new Date(),
+              },
+            });
+            console.log(`Campaign payment completed: ${campaignPaymentId}`);
+          }
+        } else {
+          // One-time credit topup
+          const userId = session.metadata?.userId;
+          const amountCents = parseInt(session.metadata?.amountCents ?? "0", 10);
+          if (userId && amountCents > 0) {
+            await addCredits({
+              userId,
+              amountCents,
+              stripeSessionId: session.id,
+            });
+            console.log(`Credits added: ${amountCents}¢ for user ${userId}`);
+          }
         }
       } else if (session.mode === "subscription" && session.amount_total) {
         // Subscription - immediate credit on first purchase

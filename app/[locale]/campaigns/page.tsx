@@ -47,10 +47,12 @@ interface Campaign {
   _count?: { materials: number; attachments: number };
 }
 
-const STATUS_OPTIONS = ["all", "draft", "active", "completed", "archived"] as const;
+const STATUS_OPTIONS = ["all", "draft", "internal_review", "client_review", "active", "completed", "archived"] as const;
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300",
+  internal_review: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+  client_review: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
   active: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
   completed: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
   archived: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",

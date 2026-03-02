@@ -24,7 +24,8 @@ const hasExpectedDelegates = (client: PrismaClient | undefined) =>
   "userFollow" in client &&
   "campaign" in client &&
   "campaignMaterial" in client &&
-  "campaignAttachment" in client;
+  "campaignAttachment" in client &&
+  "campaignPayment" in client;
 
 const cachedClient = globalForPrisma.prisma;
 const prismaClient = hasExpectedDelegates(cachedClient)

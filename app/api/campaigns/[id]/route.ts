@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { prisma } from "@/lib/db";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 
@@ -41,7 +42,22 @@ export async function GET(
       return NextResponse.json({ error: "Campaign not found" }, { status: 404 });
     }
 
-    return NextResponse.json(campaign);
+    // Fetch payment info for owner
+    const payment = await prisma.campaignPayment.findUnique({
+      where: { campaignId: campaign.id },
+      select: {
+        clientName: true,
+        clientEmail: true,
+        paymentStatus: true,
+        budgetCents: true,
+        platformFeeCents: true,
+        totalChargeCents: true,
+        ownerPayoutCents: true,
+        paidAt: true,
+      },
+    });
+
+    return NextResponse.json({ ...campaign, payment: payment ?? null });
   } catch (error) {
     console.error("[campaigns] GET by id error:", error);
     return NextResponse.json(
@@ -85,6 +101,8 @@ export async function PATCH(
     if (body.startDate !== undefined) data.startDate = body.startDate ? new Date(body.startDate) : null;
     if (body.endDate !== undefined) data.endDate = body.endDate ? new Date(body.endDate) : null;
     if (body.notes !== undefined) data.notes = body.notes;
+    if (body.enableShare === true) data.shareToken = crypto.randomUUID();
+    if (body.enableShare === false) data.shareToken = null;
 
     const campaign = await prisma.campaign.update({
       where: { id },

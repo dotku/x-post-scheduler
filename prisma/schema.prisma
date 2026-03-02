@@ -412,6 +412,7 @@ model Campaign {
   aiAnalyzedAt DateTime?
   aiBudget    String?
   aiBudgetAt  DateTime?
+  shareToken  String?   @unique
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -419,6 +420,7 @@ model Campaign {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   materials   CampaignMaterial[]
   attachments CampaignAttachment[]
+  payment     CampaignPayment?
 
   @@unique([name, userId])
   @@index([userId, status])
@@ -460,5 +462,26 @@ model CampaignAttachment {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([campaignId])
+}
+
+model CampaignPayment {
+  id                    String    @id @default(cuid())
+  campaignId            String    @unique
+  campaign              Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  clientName            String
+  clientEmail           String
+  budgetCents           Int
+  platformFeeCents      Int
+  totalChargeCents      Int
+  ownerPayoutCents      Int
+  stripeSessionId       String?   @unique
+  stripePaymentIntentId String?
+  paymentStatus         String    @default("pending") // "pending" | "paid" | "failed"
+  paidAt                DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([campaignId])
+  @@index([paymentStatus])
 }
 
