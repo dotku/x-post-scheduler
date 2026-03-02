@@ -57,7 +57,7 @@ const worker = {
 
     ctx.waitUntil(
       (async () => {
-        // Every slot (3x/day at 01:00, 09:00, 17:00 UTC): process scheduled posts
+        // Every slot (2x/day at 01:00, 13:00 UTC): process scheduled posts
         await safeTrigger(env, "Scheduler", "/api/scheduler");
 
         // Slot 1 (UTC 01:00): Full daily pipeline

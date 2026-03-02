@@ -25,7 +25,62 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { prompt, language, count, postImmediately, xAccountId } = body;
+  const { prompt, language, count, postImmediately, xAccountId, tweets: providedTweets } = body;
+
+  // If tweets are provided, skip generation and post them directly
+  if (Array.isArray(providedTweets) && providedTweets.length > 0 && postImmediately) {
+    const resolved = await getUserXCredentials(user.id, xAccountId);
+    if (!resolved) {
+      return NextResponse.json(
+        { error: "X API credentials not configured." },
+        { status: 400 },
+      );
+    }
+
+    const threadId = `thread_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const postedPosts = [];
+    let previousTweetId: string | null = null;
+
+    for (let i = 0; i < providedTweets.length; i++) {
+      const tweetContent = String(providedTweets[i]).trim();
+      if (!tweetContent) continue;
+
+      let postResult;
+      if (i === 0) {
+        postResult = await postTweet(tweetContent, resolved.credentials);
+      } else {
+        postResult = await postReply(
+          tweetContent,
+          previousTweetId!,
+          resolved.credentials,
+        );
+      }
+
+      const post = await prisma.post.create({
+        data: {
+          content: tweetContent,
+          status: postResult.success ? "posted" : "failed",
+          postedAt: postResult.success ? new Date() : null,
+          tweetId: postResult.tweetId || null,
+          error: postResult.error || null,
+          threadId,
+          threadOrder: i,
+          xAccountId: resolved.accountId,
+          userId: user.id,
+        },
+      });
+
+      postedPosts.push(post);
+
+      if (postResult.success && postResult.tweetId) {
+        previousTweetId = postResult.tweetId;
+      } else {
+        break;
+      }
+    }
+
+    return NextResponse.json({ threadId, posts: postedPosts });
+  }
 
   // Load knowledge sources, content profile, and recent posts
   const [sources, recentPostsRows, profileData] = await Promise.all([
@@ -151,24 +206,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ threadId, posts: postedPosts });
   }
 
-  // Save as scheduled/draft posts
-  const savedPosts = await Promise.all(
-    result.tweets.map((tweet, i) =>
-      prisma.post.create({
-        data: {
-          content: tweet,
-          status: "draft",
-          threadId,
-          threadOrder: i,
-          userId: user.id,
-        },
-      }),
-    ),
-  );
-
+  // Return tweets for preview without saving drafts
   return NextResponse.json({
     threadId,
     tweets: result.tweets,
-    posts: savedPosts,
   });
 }

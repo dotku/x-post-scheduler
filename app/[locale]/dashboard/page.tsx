@@ -9,6 +9,7 @@ import PostList from "@/components/PostList";
 import UserMenu from "@/components/UserMenu";
 import AccountStats from "@/components/AccountStats";
 import MediaDailyWidget from "@/components/MediaDailyWidget";
+import EngageSuggestions from "@/components/EngageSuggestions";
 import { redirect } from "next/navigation";
 import { headers as nextHeaders } from "next/headers";
 import { getTranslations, getLocale, setRequestLocale } from "next-intl/server";
@@ -230,6 +231,9 @@ export default async function Dashboard({
 
         {/* Post Activity Stats */}
         <AccountStats />
+
+        {/* Engagement Opportunities */}
+        <EngageSuggestions />
 
         {/* Active Recurring Schedules */}
         {schedules.length > 0 && (
