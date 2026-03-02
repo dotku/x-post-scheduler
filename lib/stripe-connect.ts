@@ -154,19 +154,41 @@ export async function executePayout(params: {
   userId: string;
   amountCents: number;
   method: "standard" | "instant";
+  destination?: "connect" | "ach";
 }): Promise<{ payoutId: string; stripeTransferId: string }> {
-  const { userId, amountCents, method } = params;
+  const { userId, amountCents, method, destination = "connect" } = params;
+
+  // ACH only supports standard
+  if (destination === "ach" && method === "instant") {
+    throw new Error("ACH_INSTANT_NOT_SUPPORTED");
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { stripeConnectAccountId: true, stripeConnectStatus: true },
+    select: {
+      stripeConnectAccountId: true,
+      stripeConnectStatus: true,
+      achConnectAccountId: true,
+      achConnectStatus: true,
+    },
   });
 
-  if (!user?.stripeConnectAccountId || user.stripeConnectStatus !== "active") {
-    throw new Error("CONNECT_NOT_ACTIVE");
+  // Determine which Stripe account to use
+  let targetAccountId: string;
+  if (destination === "ach") {
+    if (!user?.achConnectAccountId || user.achConnectStatus !== "active") {
+      throw new Error("ACH_NOT_ACTIVE");
+    }
+    targetAccountId = user.achConnectAccountId;
+  } else {
+    if (!user?.stripeConnectAccountId || user.stripeConnectStatus !== "active") {
+      throw new Error("CONNECT_NOT_ACTIVE");
+    }
+    targetAccountId = user.stripeConnectAccountId;
   }
 
-  const feeCents = calculatePayoutFee(amountCents, method);
+  // ACH is always free; Express uses the existing fee logic
+  const feeCents = destination === "ach" ? 0 : calculatePayoutFee(amountCents, method);
   const netAmountCents = amountCents - feeCents;
 
   const payout = await prisma.payout.create({
@@ -175,7 +197,8 @@ export async function executePayout(params: {
       amountCents,
       feeCents,
       netAmountCents,
-      method,
+      method: destination === "ach" ? "standard" : method,
+      destination,
       status: "pending",
     },
   });
@@ -184,11 +207,12 @@ export async function executePayout(params: {
     const transfer = await stripe.transfers.create({
       amount: netAmountCents,
       currency: "usd",
-      destination: user.stripeConnectAccountId,
+      destination: targetAccountId,
       metadata: {
         payoutId: payout.id,
         userId,
         method,
+        destination,
       },
     });
 
@@ -196,18 +220,18 @@ export async function executePayout(params: {
       where: { id: payout.id },
       data: {
         stripeTransferId: transfer.id,
-        ...(method === "standard"
+        ...(method === "standard" || destination === "ach"
           ? { status: "completed", completedAt: new Date() }
           : {}),
       },
     });
 
-    // For instant: trigger instant payout from connected account
-    if (method === "instant") {
+    // For instant on Express Connect: trigger instant payout from connected account
+    if (method === "instant" && destination === "connect") {
       try {
         const instantPayout = await stripe.payouts.create(
           { amount: netAmountCents, currency: "usd", method: "instant" },
-          { stripeAccount: user.stripeConnectAccountId }
+          { stripeAccount: targetAccountId }
         );
 
         await prisma.payout.update({

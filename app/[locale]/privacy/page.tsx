@@ -36,8 +36,8 @@ export default function PrivacyPage({
           </h1>
           <p className="text-gray-600 dark:text-gray-400 text-sm">
             {isZh
-              ? "最后更新：February 24, 2026"
-              : "Last updated: February 24, 2026"}
+              ? "最后更新：March 2, 2026"
+              : "Last updated: March 2, 2026"}
           </p>
         </div>
 
@@ -75,7 +75,21 @@ export default function PrivacyPage({
                     <span className="text-blue-500 font-bold">•</span>
                     <div>
                       <strong>付款信息：</strong>{" "}
-                      交易记录和订阅状态，由支付服务商安全处理
+                      交易记录、订阅状态、API积分余额，由支付服务商（Stripe）安全处理
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="text-blue-500 font-bold">•</span>
+                    <div>
+                      <strong>提现和银行信息：</strong>{" "}
+                      银行账户末四位、银行名称、提现记录。完整银行账号和路由号码通过Stripe安全传输和存储，xPilot仅保留显示用的脱敏信息
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="text-blue-500 font-bold">•</span>
+                    <div>
+                      <strong>活动收入数据：</strong>{" "}
+                      活动付款记录、平台服务费记录、收入金额，用于计算可提现余额和财务报告
                     </div>
                   </li>
                   <li className="flex gap-3">
@@ -174,7 +188,7 @@ export default function PrivacyPage({
                       支付处理商
                     </strong>
                     <p className="ml-4 mt-1">
-                      Stripe（美国）和微信支付（中国），用于处理购买
+                      Stripe, Inc.（美国），用于处理订阅支付、活动客户付款、Stripe Connect提现和ACH银行转账。Stripe负责存储完整银行账户信息并执行资金转移。微信支付（中国），用于部分地区支付
                     </p>
                   </div>
                   <div>
@@ -298,8 +312,27 @@ export default function PrivacyPage({
                   <li className="flex gap-3">
                     <span className="text-blue-500 font-bold">•</span>
                     <div>
-                      <strong>Payment Information:</strong> Transaction records
-                      and subscription status
+                      <strong>Payment Information:</strong> Transaction records,
+                      subscription status, and API credit balance, processed
+                      securely by Stripe
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="text-blue-500 font-bold">•</span>
+                    <div>
+                      <strong>Withdrawal & Banking Information:</strong> Bank
+                      account last four digits, bank name, and withdrawal
+                      history. Full bank account and routing numbers are
+                      securely transmitted to and stored by Stripe; xPilot only
+                      retains masked display information
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="text-blue-500 font-bold">•</span>
+                    <div>
+                      <strong>Campaign Earnings Data:</strong> Campaign payment
+                      records, platform fee records, and earnings amounts used
+                      to calculate available balance and for financial reporting
                     </div>
                   </li>
                   <li className="flex gap-3">
@@ -399,7 +432,11 @@ export default function PrivacyPage({
                       Payment Processors
                     </strong>
                     <p className="ml-4 mt-1">
-                      Stripe (US) and WeChat Pay (China)
+                      Stripe, Inc. (US) — for subscription payments, campaign
+                      client payments, Stripe Connect withdrawals, and ACH bank
+                      transfers. Stripe securely stores full bank account
+                      information and executes fund transfers. WeChat Pay
+                      (China) for select regional payments
                     </p>
                   </div>
                   <div>

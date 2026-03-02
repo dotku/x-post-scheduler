@@ -152,10 +152,18 @@ export async function POST(request: NextRequest) {
       } else if (account.requirements?.currently_due?.length) {
         connectStatus = "restricted";
       }
-      await prisma.user.updateMany({
+      // Try Express Connect first
+      const expressUpdate = await prisma.user.updateMany({
         where: { stripeConnectAccountId: account.id },
         data: { stripeConnectStatus: connectStatus },
       });
+      // If no Express match, try ACH Custom Connect
+      if (expressUpdate.count === 0) {
+        await prisma.user.updateMany({
+          where: { achConnectAccountId: account.id },
+          data: { achConnectStatus: connectStatus },
+        });
+      }
       console.log(`Connect account updated: ${account.id} -> ${connectStatus}`);
       break;
     }

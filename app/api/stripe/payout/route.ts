@@ -27,6 +27,7 @@ export async function GET() {
         feeCents: true,
         netAmountCents: true,
         method: true,
+        destination: true,
         status: true,
         completedAt: true,
         failedReason: true,
@@ -57,6 +58,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const method: "standard" | "instant" =
       body.method === "instant" ? "instant" : "standard";
+    const destination: "connect" | "ach" =
+      body.destination === "ach" ? "ach" : "connect";
 
     const { availableCents } = await getAvailableBalance(user.id);
 
@@ -78,10 +81,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const feeCents = calculatePayoutFee(amountCents, method);
+    const feeCents = destination === "ach" ? 0 : calculatePayoutFee(amountCents, method);
     const netAmountCents = amountCents - feeCents;
 
-    const result = await executePayout({ userId: user.id, amountCents, method });
+    const result = await executePayout({
+      userId: user.id,
+      amountCents,
+      method,
+      destination,
+    });
 
     return NextResponse.json({
       success: true,
@@ -90,6 +98,7 @@ export async function POST(request: NextRequest) {
       feeCents,
       netAmountCents,
       method,
+      destination,
     });
   } catch (error) {
     console.error("[stripe/payout] POST error:", error);
@@ -98,6 +107,18 @@ export async function POST(request: NextRequest) {
     if (message === "CONNECT_NOT_ACTIVE") {
       return NextResponse.json(
         { error: "Stripe Connect account is not active" },
+        { status: 400 }
+      );
+    }
+    if (message === "ACH_NOT_ACTIVE") {
+      return NextResponse.json(
+        { error: "ACH bank account is not active" },
+        { status: 400 }
+      );
+    }
+    if (message === "ACH_INSTANT_NOT_SUPPORTED") {
+      return NextResponse.json(
+        { error: "ACH bank transfer only supports standard speed" },
         { status: 400 }
       );
     }

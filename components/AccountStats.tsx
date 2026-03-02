@@ -78,7 +78,7 @@ export default function AccountStats() {
       ),
     ])
       .then(([stats, daily]) => {
-        setData(stats);
+        setData(stats?.totals ? stats : null);
         setChartData(daily.data ?? []);
         setLoading(false);
       })

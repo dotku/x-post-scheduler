@@ -6,8 +6,9 @@ import {
   syncConnectStatus,
   getAvailableBalance,
 } from "@/lib/stripe-connect";
+import { getAchStatus } from "@/lib/ach-connect";
 
-// GET: Connect account status + available balance
+// GET: Connect account status + available balance + ACH status
 export async function GET() {
   let user;
   try {
@@ -17,12 +18,13 @@ export async function GET() {
   }
 
   try {
-    const [connectStatus, balance] = await Promise.all([
+    const [connectStatus, balance, achStatus] = await Promise.all([
       syncConnectStatus(user.id),
       getAvailableBalance(user.id),
+      getAchStatus(user.id),
     ]);
 
-    return NextResponse.json({ ...connectStatus, ...balance });
+    return NextResponse.json({ ...connectStatus, ...balance, ach: achStatus });
   } catch (error) {
     console.error("[stripe/connect] GET error:", error);
     return NextResponse.json(

@@ -35,9 +35,14 @@ model User {
   lastLoginRewardAt     DateTime?
   // Weixin Channel auth
   weixinCookie          String?
-  // Stripe Connect
+  // Stripe Connect (Express)
   stripeConnectAccountId  String?   @unique
   stripeConnectStatus     String?   // "pending" | "active" | "restricted"
+  // ACH Direct (Custom Connect)
+  achConnectAccountId     String?   @unique
+  achConnectStatus        String?   // "pending" | "active" | "restricted"
+  achBankLast4            String?   // last 4 digits for display
+  achBankName             String?   // bank name from Stripe
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -498,6 +503,7 @@ model Payout {
   feeCents         Int       @default(0)
   netAmountCents   Int
   method           String    @default("standard") // "standard" | "instant"
+  destination      String    @default("connect")  // "connect" | "ach"
   status           String    @default("pending")  // "pending" | "completed" | "failed"
   stripeTransferId String?   @unique
   stripePayoutId   String?   @unique

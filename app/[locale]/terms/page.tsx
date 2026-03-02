@@ -36,8 +36,8 @@ export default function TermsPage({
           </h1>
           <p className="text-gray-600 dark:text-gray-400 text-sm">
             {isZh
-              ? "最后更新：February 24, 2026"
-              : "Last updated: February 24, 2026"}
+              ? "最后更新：March 2, 2026"
+              : "Last updated: March 2, 2026"}
           </p>
         </div>
 
@@ -204,16 +204,17 @@ export default function TermsPage({
               {/* 7. 费用、支付和退款 */}
               <section className="border-l-4 border-blue-500 pl-6 py-2">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                  7. 费用、支付和退款政策
+                  7. 费用、支付、提现和退款政策
                 </h2>
-                <p className="text-gray-700 dark:text-gray-300 mb-4">
-                  xPilot提供多个订阅级别，费用结构如下：
-                </p>
+
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mt-4 mb-3">
+                  7.1 订阅和API积分
+                </h3>
                 <ul className="space-y-2 text-gray-700 dark:text-gray-300 ml-4">
                   <li>• 订阅费按月或年计费，具体金额见订阅页面</li>
                   <li>
                     •
-                    支持微信支付、支付宝、Stripe等多种支付方式，由正规支付服务商处理
+                    支持微信支付、支付宝、Stripe等多种支付方式，由正规支付服务商（Stripe, Inc.）处理
                   </li>
                   <li>
                     •
@@ -221,14 +222,88 @@ export default function TermsPage({
                   </li>
                   <li>• 免费试用期结束后自动转为付费订阅（会提前通知）</li>
                   <li>
-                    • <strong>退款政策：</strong>{" "}
-                    按照《消费者权益保护法》规定，自付款日起7日内可申请退款，超期不予退款（法律另有规定除外）
+                    • <strong>API积分：</strong>{" "}
+                    积分用于AI内容生成等平台功能，积分不可转让、不可兑换现金、不可提现。积分购买后不予退还（法律另有规定除外）
                   </li>
                   <li>
                     •
                     价格调整：xPilot可能随时调整费用，调整后的价格在30日后对新用户和续费用户生效
                   </li>
                   <li>• 发票：用户可申请开具增值税电子发票，由我们出具</li>
+                </ul>
+
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mt-6 mb-3">
+                  7.2 活动付款和平台服务费
+                </h3>
+                <ul className="space-y-2 text-gray-700 dark:text-gray-300 ml-4">
+                  <li>
+                    • <strong>活动付款：</strong>{" "}
+                    xPilot提供活动（Campaign）功能，允许用户创建推广活动并接受客户付款。客户通过Stripe支付的款项由xPilot代收
+                  </li>
+                  <li>
+                    • <strong>平台服务费：</strong>{" "}
+                    xPilot对每笔活动收入收取5%的平台服务费。该费用在提现时自动扣除
+                  </li>
+                  <li>
+                    • <strong>Stripe手续费：</strong>{" "}
+                    支付处理商Stripe收取的手续费（约2.9% + $0.30/笔）由收款方承担，xPilot不对此额外收费
+                  </li>
+                  <li>
+                    •
+                    活动收入与API积分是独立的系统，活动收入为现金收益，不可用于抵扣API积分
+                  </li>
+                </ul>
+
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mt-6 mb-3">
+                  7.3 提现和资金转出
+                </h3>
+                <ul className="space-y-2 text-gray-700 dark:text-gray-300 ml-4">
+                  <li>
+                    • <strong>提现方式：</strong>{" "}
+                    xPilot支持两种提现方式：(1) Stripe Connect快捷提现（需完成Stripe身份验证），(2) ACH银行直接转账（需提供美国银行账户信息）
+                  </li>
+                  <li>
+                    • <strong>Stripe Connect提现：</strong>{" "}
+                    标准提现免费，预计2-3个工作日到账；即时提现收取1.5%手续费
+                  </li>
+                  <li>
+                    • <strong>ACH银行转账：</strong>{" "}
+                    免手续费，预计2-3个工作日到账。仅支持标准速度
+                  </li>
+                  <li>
+                    • <strong>最低提现额：</strong>{" "}
+                    最低提现金额为$1.00（美元）
+                  </li>
+                  <li>
+                    • <strong>身份验证：</strong>{" "}
+                    为遵守反洗钱（AML）和了解客户（KYC）法规，用户在设置提现方式时需提供真实身份信息。xPilot通过Stripe处理身份验证，不直接存储完整银行账号
+                  </li>
+                  <li>
+                    • <strong>资金安全：</strong>{" "}
+                    用户活动收入由Stripe托管，xPilot不直接持有用户资金。资金转出通过Stripe的安全支付基础设施完成
+                  </li>
+                  <li>
+                    •
+                    提现申请一经提交不可撤销。因银行信息错误导致的转账失败，xPilot不承担责任
+                  </li>
+                </ul>
+
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mt-6 mb-3">
+                  7.4 退款政策
+                </h3>
+                <ul className="space-y-2 text-gray-700 dark:text-gray-300 ml-4">
+                  <li>
+                    • <strong>订阅退款：</strong>{" "}
+                    按照《消费者权益保护法》规定，自付款日起7日内可申请退款，超期不予退款（法律另有规定除外）
+                  </li>
+                  <li>
+                    • <strong>活动付款退款：</strong>{" "}
+                    客户对活动付款的退款请求需由活动创建者处理。xPilot不直接介入活动创建者和客户之间的退款纠纷
+                  </li>
+                  <li>
+                    • <strong>已提现资金：</strong>{" "}
+                    已成功提现到银行账户的资金不适用平台退款流程
+                  </li>
                 </ul>
               </section>
 
@@ -569,14 +644,15 @@ export default function TermsPage({
 
               <section className="border-l-4 border-blue-500 pl-6 py-2">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                  7. Subscription Fees & Billing
+                  7. Fees, Payments, Withdrawals & Refunds
                 </h2>
-                <p className="text-gray-700 dark:text-gray-300 mb-4">
-                  xPilot offers multiple subscription tiers. You agree:
-                </p>
+
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mt-4 mb-3">
+                  7.1 Subscriptions & API Credits
+                </h3>
                 <ul className="space-y-2 text-gray-700 dark:text-gray-300 ml-4">
                   <li>• Fees are billed monthly or annually as selected</li>
-                  <li>• Payment processed by Stripe, WeChat Pay, or Alipay</li>
+                  <li>• Payment processed securely by Stripe, Inc.</li>
                   <li>
                     • Auto-renewal unless canceled 72 hours before renewal
                   </li>
@@ -584,15 +660,110 @@ export default function TermsPage({
                     • Free trials convert to paid subscriptions automatically
                   </li>
                   <li>
-                    • <strong>Refund Policy:</strong> Refunds permitted within 7
-                    days of purchase under applicable law; otherwise
-                    non-refundable
+                    • <strong>API Credits:</strong> Credits are used for AI
+                    content generation and other platform features. Credits are
+                    non-transferable, non-exchangeable for cash, and
+                    non-withdrawable. Purchased credits are non-refundable
+                    except as required by applicable law
                   </li>
                   <li>
                     • Price changes effective 30 days after notice for
                     new/renewing customers
                   </li>
                   <li>• Invoices available upon request</li>
+                </ul>
+
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mt-6 mb-3">
+                  7.2 Campaign Payments & Platform Fees
+                </h3>
+                <ul className="space-y-2 text-gray-700 dark:text-gray-300 ml-4">
+                  <li>
+                    • <strong>Campaign Payments:</strong> xPilot enables users to
+                    create promotional campaigns and accept client payments.
+                    Client payments are processed and held by Stripe on behalf
+                    of xPilot
+                  </li>
+                  <li>
+                    • <strong>Platform Fee:</strong> xPilot charges a 5% platform
+                    service fee on each campaign earning, deducted automatically
+                    upon withdrawal
+                  </li>
+                  <li>
+                    • <strong>Stripe Processing Fee:</strong> Stripe's payment
+                    processing fee (approximately 2.9% + $0.30 per transaction)
+                    is borne by the payee; xPilot does not charge additional
+                    processing fees
+                  </li>
+                  <li>
+                    • Campaign earnings (cash) and API Credits are separate
+                    systems; campaign earnings cannot be used to offset API
+                    Credits
+                  </li>
+                </ul>
+
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mt-6 mb-3">
+                  7.3 Withdrawals & Fund Disbursement
+                </h3>
+                <ul className="space-y-2 text-gray-700 dark:text-gray-300 ml-4">
+                  <li>
+                    • <strong>Withdrawal Methods:</strong> xPilot supports two
+                    withdrawal methods: (1) Stripe Connect (requires Stripe
+                    identity verification), (2) ACH Direct Bank Transfer
+                    (requires US bank account details)
+                  </li>
+                  <li>
+                    • <strong>Stripe Connect:</strong> Standard withdrawal is
+                    free (2-3 business days); Instant withdrawal incurs a 1.5%
+                    fee
+                  </li>
+                  <li>
+                    • <strong>ACH Bank Transfer:</strong> Free of charge, 2-3
+                    business days. Standard speed only
+                  </li>
+                  <li>
+                    • <strong>Minimum Withdrawal:</strong> $1.00 USD
+                  </li>
+                  <li>
+                    • <strong>Identity Verification:</strong> To comply with
+                    Anti-Money Laundering (AML) and Know Your Customer (KYC)
+                    regulations, users must provide valid identity information
+                    when setting up withdrawal methods. xPilot processes
+                    identity verification through Stripe and does not directly
+                    store full bank account numbers
+                  </li>
+                  <li>
+                    • <strong>Fund Custody:</strong> Campaign earnings are held
+                    by Stripe; xPilot does not directly hold user funds. Fund
+                    transfers are executed through Stripe's secure payment
+                    infrastructure
+                  </li>
+                  <li>
+                    • Withdrawal requests are irrevocable once submitted. xPilot
+                    is not responsible for transfer failures caused by incorrect
+                    bank information
+                  </li>
+                </ul>
+
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mt-6 mb-3">
+                  7.4 Refund Policy
+                </h3>
+                <ul className="space-y-2 text-gray-700 dark:text-gray-300 ml-4">
+                  <li>
+                    • <strong>Subscription Refunds:</strong> Refunds permitted
+                    within 7 days of purchase under applicable law; otherwise
+                    non-refundable
+                  </li>
+                  <li>
+                    • <strong>Campaign Payment Refunds:</strong> Refund requests
+                    for campaign payments must be handled by the campaign
+                    creator. xPilot does not directly mediate refund disputes
+                    between campaign creators and clients
+                  </li>
+                  <li>
+                    • <strong>Withdrawn Funds:</strong> Funds successfully
+                    withdrawn to a bank account are not subject to platform
+                    refund processes
+                  </li>
                 </ul>
               </section>
 

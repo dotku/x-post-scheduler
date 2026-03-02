@@ -36,8 +36,8 @@ export default function DisclaimerPage({
           </h1>
           <p className="text-gray-600 dark:text-gray-400 text-sm">
             {isZh
-              ? "最后更新：February 24, 2026"
-              : "Last updated: February 24, 2026"}
+              ? "最后更新：March 2, 2026"
+              : "Last updated: March 2, 2026"}
           </p>
         </div>
 
@@ -245,7 +245,7 @@ export default function DisclaimerPage({
 
               <section className="border-l-4 border-red-500 pl-6 py-2">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                  9. 财务损失和赔偿免责
+                  9. 财务损失、支付和提现免责
                 </h2>
                 <p className="text-gray-700 dark:text-gray-300 mb-4">
                   xPilot对因使用本平台而导致的财务或其他损失不承担责任：
@@ -262,6 +262,30 @@ export default function DisclaimerPage({
                   <li>
                     •
                     用户对使用AI生成内容的所有后果（包括销售不利、曝光率下降等）自己负责
+                  </li>
+                  <li>
+                    • <strong>支付处理：</strong>{" "}
+                    所有支付由第三方支付处理商（Stripe, Inc.）处理。xPilot不直接持有用户资金。因Stripe服务中断、政策变更或技术故障导致的支付延迟或失败，xPilot不承担责任
+                  </li>
+                  <li>
+                    • <strong>提现延迟：</strong>{" "}
+                    提现到银行账户的处理时间取决于Stripe和收款银行。标准提现通常需要2-3个工作日，但可能因银行处理时间、节假日或其他因素而延迟。xPilot不对提现延迟承担责任
+                  </li>
+                  <li>
+                    • <strong>银行信息错误：</strong>{" "}
+                    因用户提供的银行账户信息（路由号码、账户号码）错误导致的转账失败或资金丢失，由用户自行承担。xPilot不负责找回因错误银行信息导致的资金损失
+                  </li>
+                  <li>
+                    • <strong>活动收入纠纷：</strong>{" "}
+                    活动创建者与其客户之间的付款纠纷由双方自行解决。xPilot作为技术平台提供方，不充当仲裁者或担保人
+                  </li>
+                  <li>
+                    • <strong>平台服务费：</strong>{" "}
+                    xPilot收取的5%平台服务费为不可退还的服务费用，一经扣除不予返还
+                  </li>
+                  <li>
+                    • <strong>API积分：</strong>{" "}
+                    API积分为预付费虚拟额度，仅用于平台AI功能消耗。积分不可转让、不可兑换现金、不可提现。用户账户中未使用的积分不产生利息
                   </li>
                   <li>
                     • <strong>责任上限：</strong>{" "}
@@ -580,7 +604,7 @@ export default function DisclaimerPage({
 
               <section className="border-l-4 border-red-500 pl-6 py-2">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-                  9. Financial Loss and Damages Disclaimer
+                  9. Financial Loss, Payments & Withdrawals Disclaimer
                 </h2>
                 <p className="text-gray-700 dark:text-gray-300 mb-4">
                   xPilot assumes no responsibility for financial or other losses
@@ -589,7 +613,7 @@ export default function DisclaimerPage({
                 <ul className="space-y-2 text-gray-700 dark:text-gray-300 ml-4">
                   <li>
                     • All economic losses from AI content errors, platform
-                    failures, security issues, or other causes are user's
+                    failures, security issues, or other causes are the user's
                     responsibility
                   </li>
                   <li>
@@ -599,6 +623,47 @@ export default function DisclaimerPage({
                   <li>
                     • Users assume full consequences of using AI-generated
                     content, including decreased sales or engagement
+                  </li>
+                  <li>
+                    • <strong>Payment Processing:</strong> All payments are
+                    processed by Stripe, Inc. xPilot does not directly hold user
+                    funds. xPilot is not responsible for payment delays or
+                    failures caused by Stripe service interruptions, policy
+                    changes, or technical issues
+                  </li>
+                  <li>
+                    • <strong>Withdrawal Delays:</strong> Processing time for
+                    withdrawals to bank accounts depends on Stripe and the
+                    receiving bank. Standard withdrawals typically take 2-3
+                    business days but may be delayed due to bank processing,
+                    holidays, or other factors. xPilot is not liable for
+                    withdrawal delays
+                  </li>
+                  <li>
+                    • <strong>Incorrect Bank Details:</strong> Transfer failures
+                    or fund losses resulting from incorrect bank account
+                    information (routing number, account number) provided by the
+                    user are the user's sole responsibility. xPilot is not
+                    responsible for recovering funds lost due to incorrect bank
+                    details
+                  </li>
+                  <li>
+                    • <strong>Campaign Earnings Disputes:</strong> Payment
+                    disputes between campaign creators and their clients are
+                    resolved between the parties. xPilot, as a technology
+                    platform provider, does not act as an arbitrator or
+                    guarantor
+                  </li>
+                  <li>
+                    • <strong>Platform Fee:</strong> The 5% platform service fee
+                    charged by xPilot is non-refundable once deducted
+                  </li>
+                  <li>
+                    • <strong>API Credits:</strong> API Credits are prepaid
+                    virtual credits used exclusively for AI features on the
+                    platform. Credits are non-transferable,
+                    non-exchangeable for cash, and non-withdrawable. Unused
+                    credits in user accounts do not accrue interest
                   </li>
                   <li>
                     • <strong>Liability Cap:</strong> Even if xPilot bears
