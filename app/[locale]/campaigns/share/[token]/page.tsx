@@ -329,16 +329,16 @@ export default function SharedCampaignPage() {
           </div>
         )}
 
-        {/* AI Analysis */}
+        {/* Marketing Plan (AI Analysis shown as client-facing label) */}
         {campaign.aiAnalysis && (
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {t("aiAnalysis")}
+              {t("marketingPlan")}
             </h2>
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
               {campaign.aiAnalyzedAt && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                  {t("analysisGenerated")}: {formatDate(campaign.aiAnalyzedAt)}
+                  {t("planDate")}: {formatDate(campaign.aiAnalyzedAt)}
                 </p>
               )}
               <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -348,11 +348,11 @@ export default function SharedCampaignPage() {
           </div>
         )}
 
-        {/* AI Budget */}
+        {/* Budget Breakdown (AI Budget shown as client-facing label) */}
         {budgetData && groupedBudget && (
           <div>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              {t("aiBudget")}
+              {t("budgetBreakdown")}
             </h2>
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
               {campaign.aiBudgetAt && (
