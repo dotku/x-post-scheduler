@@ -332,6 +332,19 @@ export default function LandingContent({
       .finally(() => setStatsLoading(false));
   }, []);
 
+  // Fetch trial/user credit balance on load
+  useEffect(() => {
+    fetch("/api/landing/balance")
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data = await res.json();
+        if (typeof data.remainingCents === "number") {
+          setTrialRemainingCents(data.remainingCents);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = window.sessionStorage.getItem("landing-editor-draft");
@@ -510,13 +523,15 @@ export default function LandingContent({
         return;
       }
 
+      // Update balance from response
+      if (typeof data.remainingCents === "number") {
+        setTrialRemainingCents(data.remainingCents);
+      }
+
       // Sync: outputs returned immediately
       let output = data.task?.outputs?.[0] ?? null;
       if (output) {
         setImgOutput(output);
-        if (typeof data.task?.remainingCents === "number") {
-          setTrialRemainingCents(data.task.remainingCents);
-        }
         return;
       }
 
@@ -603,6 +618,9 @@ export default function LandingContent({
         setVidError(handleInsufficientCredits(data));
         setVidGenerating(false);
         return;
+      }
+      if (typeof data.remainingCents === "number") {
+        setTrialRemainingCents(data.remainingCents);
       }
       const taskId = data.task?.id;
       const taskPollUrl = data.task?.urls?.get;
@@ -1757,9 +1775,16 @@ export default function LandingContent({
                 </button>
                 <span className="text-xs text-gray-400">
                   {locale === "zh"
-                    ? "OpenAI TTS · 高品质语音"
-                    : "OpenAI TTS · High quality"}
+                    ? "OpenAI TTS · 需登录"
+                    : "OpenAI TTS · Sign-in required"}
                 </span>
+                {trialRemainingCents !== null && (
+                  <span className="text-xs text-green-600 dark:text-green-400">
+                    {locale === "zh"
+                      ? `剩余额度: $${(trialRemainingCents / 100).toFixed(2)}`
+                      : `Balance: $${(trialRemainingCents / 100).toFixed(2)}`}
+                  </span>
+                )}
               </div>
               {voiceError && (
                 <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-4 py-3">

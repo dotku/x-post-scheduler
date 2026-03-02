@@ -381,6 +381,31 @@ export async function getTrialUserIdFromRequest(
   };
 }
 
+/** Platform-wide daily trial spending cap in cents ($10). */
+const PLATFORM_DAILY_TRIAL_CAP_CENTS = 1000;
+
+/**
+ * Check if the platform-wide daily trial spending cap has been reached.
+ * Sums all deduction transactions from trial users (userId starts with "trial-") today.
+ */
+export async function isDailyTrialCapReached(): Promise<boolean> {
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  const result = await prisma.creditTransaction.aggregate({
+    where: {
+      userId: { startsWith: "trial-" },
+      type: "deduction",
+      createdAt: { gte: today },
+    },
+    _sum: { amountCents: true },
+  });
+
+  // amountCents is negative for deductions, so total spending = abs(sum)
+  const totalSpent = Math.abs(result._sum.amountCents ?? 0);
+  return totalSpent >= PLATFORM_DAILY_TRIAL_CAP_CENTS;
+}
+
 /**
  * Get or create a trial user based on IP + device fingerprint.
  * Ensures each device/IP combo gets $1 per day.

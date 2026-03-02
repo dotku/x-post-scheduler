@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOrCreateTrialUser, deductCredits, getCreditBalance } from "@/lib/credits";
+import { getOrCreateTrialUser, deductCredits, getCreditBalance, isDailyTrialCapReached } from "@/lib/credits";
 import { trackTokenUsage } from "@/lib/usage-tracking";
 import { generateLandingTweetViaGateway } from "@/lib/ai-gateway";
 
@@ -9,6 +9,18 @@ export async function POST(request: NextRequest) {
     request.headers.get("x-real-ip") ??
     "unknown";
   const ua = request.headers.get("user-agent") ?? "unknown";
+
+  // Check platform-wide daily trial cap first
+  if (await isDailyTrialCapReached()) {
+    return NextResponse.json(
+      {
+        error: "trial_exhausted",
+        message:
+          "Today's free trial quota has been reached. Sign up to get $5 of free credits.",
+      },
+      { status: 402 },
+    );
+  }
 
   const trialUserId = await getOrCreateTrialUser(ip, ua);
 

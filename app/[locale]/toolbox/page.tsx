@@ -350,6 +350,7 @@ export default function ToolboxPage() {
         subtitle: "使用 AI 生成图片与视频",
         galleryFeed: "作品社区",
         videoJobs: "📊 视频任务",
+        modelDocs: "📖 模型文档",
         dashboardHome: "← 仪表盘",
         loadingBalance: "余额加载中...",
         balance: "余额",
@@ -367,6 +368,7 @@ export default function ToolboxPage() {
         subtitle: "Generate images and videos with AI",
         galleryFeed: "Gallery Feed",
         videoJobs: "📊 Video Jobs",
+        modelDocs: "📖 Model Docs",
         dashboardHome: "← Dashboard Home",
         loadingBalance: "Loading balance...",
         balance: "Balance",
@@ -1948,6 +1950,12 @@ export default function ToolboxPage() {
                   className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                 >
                   {uiText.videoJobs}
+                </Link>
+                <Link
+                  href={`${prefix}/docs/models`}
+                  className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                >
+                  {uiText.modelDocs}
                 </Link>
                 <Link
                   href={`${prefix}/dashboard`}

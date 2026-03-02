@@ -728,10 +728,10 @@ export default function ModelsDocsPage() {
         {/* CTA */}
         <section className="text-center py-4">
           <Link
-            href={`/${locale}`}
+            href={`/${locale}/toolbox`}
             className="inline-flex items-center px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
           >
-            {locale === "zh" ? "立即试用内容创作工具 →" : "Try Content Creation Tools →"}
+            {locale === "zh" ? "立即试用媒体工作室 →" : "Try Media Studio →"}
           </Link>
         </section>
       </main>
