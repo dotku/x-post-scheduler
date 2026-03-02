@@ -111,14 +111,16 @@ export async function POST(
   }
 
   // 8. Deduct credits & track usage
+  let costCents: number | null = null;
   if (result.usage && result.modelId) {
     try {
-      await deductCredits({
+      const creditResult = await deductCredits({
         userId: user.id,
         usage: result.usage,
         model: result.modelId,
         source: "sentiment_monitoring",
       });
+      costCents = creditResult.costCents;
     } catch (e) {
       console.error("[monitoring] Failed to deduct credits:", e);
     }
@@ -151,6 +153,7 @@ export async function POST(
       aiSummary: result.aiSummary ?? null,
       rawQuery: query,
       modelId: result.modelId,
+      costCents,
     },
   });
 
@@ -162,5 +165,7 @@ export async function POST(
     topTweets: result.topTweets,
     aiSummary: result.aiSummary,
     tweetCount: result.tweetCount,
+    costCents,
+    usage: result.usage,
   });
 }

@@ -32,7 +32,13 @@ export async function GET() {
       snapshots: {
         orderBy: { createdAt: "desc" },
         take: 1,
-        select: { createdAt: true },
+        select: {
+          createdAt: true,
+          tweetCount: true,
+          positiveCount: true,
+          negativeCount: true,
+          neutralCount: true,
+        },
       },
     },
     orderBy: { updatedAt: "desc" },

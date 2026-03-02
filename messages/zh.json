@@ -810,7 +810,13 @@
     "silverRequired": "舆情监控需要白银或更高等级会员",
     "upgrade": "升级套餐",
     "noTweetsFound": "未找到相关推文，请尝试不同关键词。",
-    "backToDashboard": "← 返回"
+    "backToDashboard": "← 返回",
+    "creditsUsed": "消耗点数",
+    "share": "分享报告",
+    "sharing": "生成中...",
+    "copyLink": "复制链接",
+    "linkCopied": "链接已复制！",
+    "viewReport": "查看报告"
   },
   "intelligence": {
     "title": "情报中心",

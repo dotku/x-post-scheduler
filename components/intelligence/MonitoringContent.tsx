@@ -32,7 +32,13 @@ interface TopicSummary {
   createdAt: string;
   updatedAt: string;
   _count: { snapshots: number };
-  snapshots: Array<{ createdAt: string }>;
+  snapshots: Array<{
+    createdAt: string;
+    tweetCount: number;
+    positiveCount: number;
+    negativeCount: number;
+    neutralCount: number;
+  }>;
 }
 
 interface Snapshot {
@@ -47,6 +53,8 @@ interface Snapshot {
   aiSummary: string | null;
   rawQuery: string | null;
   modelId: string | null;
+  costCents: number | null;
+  publicId: string | null;
   createdAt: string;
 }
 
@@ -455,58 +463,86 @@ export default function MonitoringContent({ locale }: { locale: string }) {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {topics.map((topic) => {
                 const keywords: string[] = JSON.parse(topic.keywords);
-                const lastAnalyzed = topic.snapshots[0]?.createdAt;
+                const latest = topic.snapshots[0];
                 return (
                   <div
                     key={topic.id}
-                    className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-md transition-shadow cursor-pointer"
+                    className="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-md transition-shadow cursor-pointer flex flex-col"
                     onClick={() => fetchTopicDetail(topic.id)}
                   >
-                    <div className="flex items-start justify-between">
-                      <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
-                        {isZh && topic.nameZh ? topic.nameZh : topic.name}
-                      </h3>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteTopic(topic.id);
-                        }}
-                        className="text-gray-400 hover:text-red-500 text-xs"
-                      >
-                        {t("delete")}
-                      </button>
-                    </div>
-                    {topic.description && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
-                        {topic.description}
-                      </p>
-                    )}
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {keywords.slice(0, 4).map((kw) => (
-                        <span
-                          key={kw}
-                          className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs rounded"
+                    {/* Card body */}
+                    <div className="p-4 flex-1">
+                      <div className="flex items-start justify-between">
+                        <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
+                          {isZh && topic.nameZh ? topic.nameZh : topic.name}
+                        </h3>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteTopic(topic.id);
+                          }}
+                          className="text-gray-400 hover:text-red-500 text-xs"
                         >
-                          {kw}
-                        </span>
-                      ))}
-                      {keywords.length > 4 && (
-                        <span className="px-2 py-0.5 text-gray-400 text-xs">
-                          +{keywords.length - 4}
-                        </span>
+                          {t("delete")}
+                        </button>
+                      </div>
+                      {topic.description && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                          {topic.description}
+                        </p>
                       )}
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {keywords.slice(0, 4).map((kw) => (
+                          <span
+                            key={kw}
+                            className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 text-xs rounded"
+                          >
+                            {kw}
+                          </span>
+                        ))}
+                        {keywords.length > 4 && (
+                          <span className="px-2 py-0.5 text-gray-400 text-xs">
+                            +{keywords.length - 4}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="mt-3 text-xs text-gray-400 flex items-center justify-between">
-                      <span>
-                        {t("snapshotCount", {
-                          count: topic._count.snapshots,
-                        })}
-                      </span>
-                      <span>
-                        {lastAnalyzed
-                          ? `${t("lastAnalyzed")}: ${new Date(lastAnalyzed).toLocaleDateString()}`
-                          : t("never")}
-                      </span>
+
+                    {/* Card footer */}
+                    <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-700">
+                      {latest ? (
+                        <>
+                          <SentimentBar
+                            p={latest.positiveCount}
+                            ne={latest.negativeCount}
+                            nu={latest.neutralCount}
+                          />
+                          <div className="flex items-center justify-between mt-1.5 text-[11px] text-gray-400">
+                            <div className="flex gap-2">
+                              <span className="text-green-600 dark:text-green-400">
+                                {latest.positiveCount}%
+                              </span>
+                              <span>
+                                {latest.neutralCount}%
+                              </span>
+                              <span className="text-red-600 dark:text-red-400">
+                                {latest.negativeCount}%
+                              </span>
+                            </div>
+                            <span>{latest.tweetCount} tweets</span>
+                          </div>
+                          <div className="text-[10px] text-gray-400 mt-1">
+                            {t("snapshotCount", {
+                              count: topic._count.snapshots,
+                            })}{" "}
+                            · {new Date(latest.createdAt).toLocaleDateString()}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-xs text-gray-400">
+                          {t("never")}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -810,6 +846,14 @@ function ResultView({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   t: any;
 }) {
+  const [sharing, setSharing] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(() =>
+    snapshot.publicId
+      ? `${typeof window !== "undefined" ? window.location.origin : ""}${isZh ? "/zh" : ""}/report/${snapshot.publicId}`
+      : null,
+  );
+  const [copied, setCopied] = useState(false);
+
   const themes: string[] = snapshot.themes ? JSON.parse(snapshot.themes) : [];
   const topTweets: Array<{
     id: string;
@@ -837,6 +881,33 @@ function ResultView({
     neutral:
       "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400",
   };
+
+  async function handleShare() {
+    setSharing(true);
+    try {
+      const res = await fetch(`/api/monitoring/snapshot/${snapshot.id}/share`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Share failed");
+      const data = await res.json();
+      const url = `${window.location.origin}${isZh ? "/zh" : ""}/report/${data.publicId}`;
+      setShareUrl(url);
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    } catch {
+      /* ignore */
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  async function copyLink() {
+    if (!shareUrl) return;
+    await navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+  }
 
   return (
     <div className="space-y-6">
@@ -964,10 +1035,47 @@ function ResultView({
         </div>
       )}
 
-      {/* Meta */}
-      <div className="text-xs text-gray-400 text-center">
-        {new Date(snapshot.createdAt).toLocaleString()}
-        {snapshot.modelId && ` · ${snapshot.modelId}`}
+      {/* Footer: Meta + Credits + Share */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="text-xs text-gray-400 space-x-2">
+            <span>{new Date(snapshot.createdAt).toLocaleString()}</span>
+            {snapshot.modelId && <span>· {snapshot.modelId}</span>}
+            {snapshot.costCents != null && snapshot.costCents > 0 && (
+              <span>
+                · {t("creditsUsed")}: {(snapshot.costCents / 100).toFixed(2)}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {shareUrl ? (
+              <>
+                <button
+                  onClick={copyLink}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  {copied ? t("linkCopied") : t("copyLink")}
+                </button>
+                <a
+                  href={shareUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                >
+                  {t("viewReport")}
+                </a>
+              </>
+            ) : (
+              <button
+                onClick={handleShare}
+                disabled={sharing}
+                className="px-4 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {sharing ? t("sharing") : t("share")}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

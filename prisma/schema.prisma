@@ -638,6 +638,8 @@ model TopicSnapshot {
   aiSummary     String?  // Markdown AI analysis
   rawQuery      String?  // X API search query used
   modelId       String?  // AI model used for analysis
+  costCents     Int?     // Credits consumed for this analysis
+  publicId      String?  @unique // Random ID for public sharing
   createdAt     DateTime @default(now())
 
   topicId String

@@ -812,7 +812,13 @@
     "silverRequired": "Silver subscription or higher required for Sentiment Monitor",
     "upgrade": "Upgrade Plan",
     "noTweetsFound": "No tweets found for these keywords. Try different keywords.",
-    "backToDashboard": "← Dashboard"
+    "backToDashboard": "← Dashboard",
+    "creditsUsed": "Credits used",
+    "share": "Share Report",
+    "sharing": "Generating...",
+    "copyLink": "Copy Link",
+    "linkCopied": "Link copied!",
+    "viewReport": "View Report"
   },
   "intelligence": {
     "title": "Intelligence",
