@@ -1744,16 +1744,54 @@ export default function SettingsPage() {
         {/* Payouts / Stripe Connect */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            {tr("Payouts", "提现")}
+            {tr("Cash & Payouts", "现金与提现")}
           </h2>
+
+          {/* Balance summary — always visible */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {tr("Cash Available", "可提现现金")}
+              </p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">
+                ${(availableBalanceCents / 100).toFixed(2)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {tr("Cash Earned", "现金收入")}
+              </p>
+              <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                ${(totalEarnedCents / 100).toFixed(2)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {tr("Cash Withdrawn", "已提现金额")}
+              </p>
+              <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
+                ${(totalPaidOutCents / 100).toFixed(2)}
+              </p>
+            </div>
+            {pendingPayoutCents > 0 && (
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {tr("Pending", "处理中")}
+                </p>
+                <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
+                  ${(pendingPayoutCents / 100).toFixed(2)}
+                </p>
+              </div>
+            )}
+          </div>
 
           {connectStatus === "not_connected" ||
           connectStatus === "pending" ? (
-            <div className="space-y-3">
+            <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 {tr(
-                  "Connect your Stripe account to receive campaign payouts.",
-                  "连接你的 Stripe 账户以接收案子收入。",
+                  "Connect your Stripe account to withdraw your cash earnings from campaigns.",
+                  "连接你的 Stripe 账户以提取营销活动的现金收入。",
                 )}
               </p>
               <button
@@ -1797,49 +1835,11 @@ export default function SettingsPage() {
             </div>
           ) : (
             <div className="space-y-5">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2">
                 <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
                 <span className="text-sm font-medium text-green-700 dark:text-green-400">
                   {tr("Stripe Account Active", "Stripe 账户已激活")}
                 </span>
-              </div>
-
-              {/* Balance summary */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {tr("Available", "可提现")}
-                  </p>
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">
-                    ${(availableBalanceCents / 100).toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {tr("Total Earned", "总收入")}
-                  </p>
-                  <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
-                    ${(totalEarnedCents / 100).toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {tr("Paid Out", "已提现")}
-                  </p>
-                  <p className="text-lg font-semibold text-gray-700 dark:text-gray-300">
-                    ${(totalPaidOutCents / 100).toFixed(2)}
-                  </p>
-                </div>
-                {pendingPayoutCents > 0 && (
-                  <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {tr("Pending", "处理中")}
-                    </p>
-                    <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
-                      ${(pendingPayoutCents / 100).toFixed(2)}
-                    </p>
-                  </div>
-                )}
               </div>
 
               {/* Payout action */}
@@ -1900,7 +1900,7 @@ export default function SettingsPage() {
               {payoutHistory.length > 0 && (
                 <div className="pt-3">
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    {tr("Payout History", "提现记录")}
+                    {tr("Withdrawal History", "提现记录")}
                   </p>
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
                     {payoutHistory.map((p) => (
@@ -1958,12 +1958,18 @@ export default function SettingsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 items-start">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {tr("Credits & Billing", "积分与账单")}
+              {tr("API Credits", "API 积分")}
             </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {tr(
+                "Credits are used for AI generation features. Not withdrawable as cash.",
+                "积分用于 AI 生成功能，不可提现为现金。",
+              )}
+            </p>
             <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
               <div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {tr("Current Balance", "当前余额")}
+                  {tr("Credit Balance", "积分余额")}
                 </p>
                 <p className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                   ${(credits.balanceCents / 100).toFixed(2)}
@@ -1988,8 +1994,8 @@ export default function SettingsPage() {
                     {topupLoading === amount
                       ? tr("Loading...", "加载中...")
                       : tr(
-                          `Add $${(amount / 100).toFixed(2)}`,
-                          `充值 $${(amount / 100).toFixed(2)}`,
+                          `Add Credits $${(amount / 100).toFixed(2)}`,
+                          `充值积分 $${(amount / 100).toFixed(2)}`,
                         )}
                   </button>
                 ))}
@@ -1998,7 +2004,7 @@ export default function SettingsPage() {
             {credits.transactions.length > 0 && (
               <div className="mt-4">
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  {tr("Recent Transactions", "最近交易")}
+                  {tr("Credit Transactions", "积分交易记录")}
                 </p>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
                   {credits.transactions.map((tx) => (
