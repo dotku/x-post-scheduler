@@ -10,6 +10,7 @@
     "mediaNews": "传媒日报",
     "campaigns": "案子",
     "monitoring": "舆情监控",
+    "intelligence": "情报中心",
     "appTitle": "X 推创"
   },
   "userMenu": {
@@ -809,6 +810,13 @@
     "silverRequired": "舆情监控需要白银或更高等级会员",
     "upgrade": "升级套餐",
     "noTweetsFound": "未找到相关推文，请尝试不同关键词。",
+    "backToDashboard": "← 返回"
+  },
+  "intelligence": {
+    "title": "情报中心",
+    "subtitle": "传媒洞察与社交舆情追踪",
+    "tabNews": "传媒日报",
+    "tabMonitoring": "舆情监控",
     "backToDashboard": "← 返回"
   }
 }

@@ -10,6 +10,7 @@
     "mediaNews": "Media Daily",
     "campaigns": "Campaigns",
     "monitoring": "Sentiment Monitor",
+    "intelligence": "Intelligence",
     "appTitle": "xPilot"
   },
   "userMenu": {
@@ -811,6 +812,13 @@
     "silverRequired": "Silver subscription or higher required for Sentiment Monitor",
     "upgrade": "Upgrade Plan",
     "noTweetsFound": "No tweets found for these keywords. Try different keywords.",
+    "backToDashboard": "← Dashboard"
+  },
+  "intelligence": {
+    "title": "Intelligence",
+    "subtitle": "Media insights & social sentiment tracking",
+    "tabNews": "Media Daily",
+    "tabMonitoring": "Sentiment Monitor",
     "backToDashboard": "← Dashboard"
   }
 }

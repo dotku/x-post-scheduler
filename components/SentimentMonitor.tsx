@@ -115,9 +115,11 @@ export default function SentimentMonitor({
       if (res.ok) {
         const data = await res.json();
         setKeywords(data.keywords || []);
+      } else {
+        console.error("[SentimentMonitor] fetchKeywords:", res.status, res.statusText);
       }
-    } catch {
-      /* ignore */
+    } catch (err) {
+      console.error("[SentimentMonitor] fetchKeywords error:", err);
     }
   }, [campaignId]);
 
@@ -188,10 +190,11 @@ export default function SentimentMonitor({
         fetchKeywords();
       } else {
         const data = await res.json().catch(() => ({}));
-        showFeedback(data.error || "Failed to add keyword");
+        showFeedback(data.error || `Failed to add keyword (${res.status})`);
       }
-    } catch {
-      showFeedback("Failed to add keyword");
+    } catch (err) {
+      console.error("[SentimentMonitor] addKeyword error:", err);
+      showFeedback(`Failed to add keyword: ${err instanceof Error ? err.message : "network error"}`);
     } finally {
       setAddingKeyword(false);
     }

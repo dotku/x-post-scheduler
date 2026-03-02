@@ -215,7 +215,7 @@ export default async function Dashboard({
                   href={`${prefix}/news`}
                   className="px-2 py-1 rounded-md text-blue-600 dark:text-blue-400 font-medium hover:bg-blue-50 dark:hover:bg-blue-900/30"
                 >
-                  {tNav("mediaNews")}
+                  {tNav("intelligence")}
                 </Link>
               </nav>
 

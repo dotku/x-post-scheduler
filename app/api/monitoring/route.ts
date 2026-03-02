@@ -99,6 +99,10 @@ export async function POST(request: NextRequest) {
         { status: 409 },
       );
     }
-    throw err;
+    console.error("[monitoring] Failed to create topic:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to create topic" },
+      { status: 500 },
+    );
   }
 }

@@ -92,6 +92,41 @@ export async function searchRecentTweets(
   return { tweets, query };
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Escape control characters only inside JSON string values (not structural whitespace). */
+function sanitizeJsonControlChars(raw: string): string {
+  let result = "";
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escaped) {
+      result += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\" && inString) {
+      escaped = true;
+      result += ch;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      result += ch;
+      continue;
+    }
+    if (inString && ch.charCodeAt(0) <= 0x1f) {
+      if (ch === "\n") { result += "\\n"; continue; }
+      if (ch === "\r") { result += "\\r"; continue; }
+      if (ch === "\t") { result += "\\t"; continue; }
+      continue; // strip other control chars
+    }
+    result += ch;
+  }
+  return result;
+}
+
 // ── AI Sentiment Analysis ────────────────────────────────────────────────────
 
 export async function analyzeSentiment(
@@ -154,8 +189,10 @@ Guidelines:
       return { success: false, error: "No analysis generated", modelId: model.id };
     }
 
-    const jsonStr = text.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "");
-    const parsed = JSON.parse(jsonStr);
+    const jsonStr = text
+      .replace(/^```(?:json)?\s*/, "")
+      .replace(/\s*```$/, "");
+    const parsed = JSON.parse(sanitizeJsonControlChars(jsonStr));
 
     const topTweetsFull = (
       parsed.topTweets ?? []
