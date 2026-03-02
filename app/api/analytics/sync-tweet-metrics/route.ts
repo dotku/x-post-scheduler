@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { decrypt } from "@/lib/encryption";
 import { batchTweetMetrics, XCredentials } from "@/lib/x-client";
+import { isProfileStale, generateContentProfile } from "@/lib/content-profile";
+import { trackTokenUsage } from "@/lib/usage-tracking";
+import { hasCredits, deductCredits } from "@/lib/credits";
 
 export async function POST(request: NextRequest) {
   let user;
@@ -93,7 +96,7 @@ export async function POST(request: NextRequest) {
   // Fetch metrics from X API and update DB
   let synced = 0;
   let totalImpressions = 0;
-  const updates: { id: string; impressions: number }[] = [];
+  const updates: { id: string; impressions: number; likes: number; retweets: number; replies: number }[] = [];
 
   for (const [accountId, accountPosts] of groupedByAccount) {
     const creds = accountCredentials.get(accountId);
@@ -105,24 +108,63 @@ export async function POST(request: NextRequest) {
     for (const post of accountPosts) {
       const metrics = metricsMap.get(post.tweetId!);
       if (metrics) {
-        updates.push({ id: post.id, impressions: metrics.impressions });
+        updates.push({
+          id: post.id,
+          impressions: metrics.impressions,
+          likes: metrics.likes,
+          retweets: metrics.retweets,
+          replies: metrics.replies,
+        });
         totalImpressions += metrics.impressions;
         synced++;
       }
     }
   }
 
-  // Batch update impressions in DB
+  // Batch update all metrics in DB
   if (updates.length > 0) {
     await Promise.all(
       updates.map((u) =>
         prisma.post.update({
           where: { id: u.id },
-          data: { impressions: u.impressions },
+          data: {
+            impressions: u.impressions,
+            likes: u.likes,
+            retweets: u.retweets,
+            replies: u.replies,
+          },
         })
       )
     );
   }
 
-  return NextResponse.json({ synced, totalImpressions });
+  // Auto-refresh content profile if stale (>7 days)
+  let profileRefreshed = false;
+  if (synced > 0) {
+    try {
+      const stale = await isProfileStale(user.id);
+      if (stale && (await hasCredits(user.id))) {
+        const profileResult = await generateContentProfile(user.id);
+        if (profileResult.success && profileResult.usage) {
+          await trackTokenUsage({
+            userId: user.id,
+            source: "content_profile_auto_refresh",
+            usage: profileResult.usage,
+            model: profileResult.model,
+          });
+          await deductCredits({
+            userId: user.id,
+            usage: profileResult.usage,
+            model: profileResult.model,
+            source: "content_profile_auto_refresh",
+          });
+          profileRefreshed = true;
+        }
+      }
+    } catch (error) {
+      console.error("Failed to auto-refresh content profile:", error);
+    }
+  }
+
+  return NextResponse.json({ synced, totalImpressions, profileRefreshed });
 }

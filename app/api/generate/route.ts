@@ -11,6 +11,7 @@ import {
   generateTweetViaGateway,
   generateSuggestionsViaGateway,
 } from "@/lib/ai-gateway";
+import { getContentProfile } from "@/lib/content-profile";
 
 export async function POST(request: NextRequest) {
   let user;
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
   }
 
   // AI Gateway generation (supports multiple providers)
-  const [sources, recentPostsRows] = await Promise.all([
+  const [sources, recentPostsRows, profileData] = await Promise.all([
     prisma.knowledgeSource.findMany({
       where: { isActive: true, userId: user.id },
     }),
@@ -80,8 +81,10 @@ export async function POST(request: NextRequest) {
       take: 5,
       select: { content: true },
     }),
+    getContentProfile(user.id),
   ]);
   const recentPosts = recentPostsRows.map((p) => p.content);
+  const contentProfile = profileData.profile ?? undefined;
   type KnowledgeSource = (typeof sources)[number];
 
   if (sources.length === 0) {
@@ -112,6 +115,7 @@ export async function POST(request: NextRequest) {
       language,
       recentPosts,
       modelId,
+      contentProfile,
     });
 
     if (result.usage) {
@@ -141,6 +145,7 @@ export async function POST(request: NextRequest) {
       language,
       recentPosts,
       modelId,
+      contentProfile,
     });
 
     if (result.usage) {

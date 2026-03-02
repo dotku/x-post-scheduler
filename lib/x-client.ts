@@ -117,6 +117,33 @@ export async function getRecentTweets(
   return results;
 }
 
+export async function postReply(
+  content: string,
+  inReplyToTweetId: string,
+  credentials: XCredentials,
+): Promise<PostResult> {
+  try {
+    const client = createXClient(credentials);
+    const rwClient = client.readWrite;
+
+    const result = await rwClient.v2.tweet({
+      text: content,
+      reply: { in_reply_to_tweet_id: inReplyToTweetId },
+    });
+
+    return {
+      success: true,
+      tweetId: result.data.id,
+    };
+  } catch (error) {
+    console.error("Error posting reply:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error occurred",
+    };
+  }
+}
+
 export async function postTweetWithMedia(
   content: string,
   imageBuffer: Buffer,

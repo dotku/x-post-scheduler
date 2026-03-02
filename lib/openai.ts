@@ -37,7 +37,8 @@ export async function generateTweet(
   knowledgeContext: string,
   prompt?: string,
   language?: string,
-  recentPosts?: string[]
+  recentPosts?: string[],
+  contentProfile?: string,
 ): Promise<GenerateResult> {
   try {
     const client = getOpenAIClient();
@@ -50,12 +51,16 @@ export async function generateTweet(
       ? `\n## Recent posts (DO NOT repeat these topics, angles, or opening styles):\n${recentPosts.map((p, i) => `${i + 1}. ${p}`).join("\n")}\n`
       : "";
 
+    const contentProfileSection = contentProfile
+      ? `\n## Your Content Profile (based on past performance data — apply these insights):\n${contentProfile}\n`
+      : "";
+
     const systemPrompt = `You are a social media expert who creates engaging tweets for X (formerly Twitter).
 
 ${languageInstruction}
 
 ${INFLUENCER_STRATEGY}
-
+${contentProfileSection}
 Rules:
 - Keep tweets under 280 characters (STRICT LIMIT)
 - Be engaging, informative, and authentic
@@ -127,7 +132,8 @@ export async function generateTweetSuggestions(
   prompt?: string,
   count: number = 3,
   language?: string,
-  recentPosts?: string[]
+  recentPosts?: string[],
+  contentProfile?: string,
 ): Promise<{
   success: boolean;
   suggestions?: string[];
@@ -146,12 +152,16 @@ export async function generateTweetSuggestions(
       ? `\n## Recent posts (DO NOT repeat these topics, angles, or opening styles):\n${recentPosts.map((p, i) => `${i + 1}. ${p}`).join("\n")}\n`
       : "";
 
+    const contentProfileSection2 = contentProfile
+      ? `\n## Your Content Profile (based on past performance data — apply these insights):\n${contentProfile}\n`
+      : "";
+
     const systemPrompt = `You are a social media expert who creates engaging tweets for X (formerly Twitter).
 
 ${languageInstruction}
 
 ${INFLUENCER_STRATEGY}
-
+${contentProfileSection2}
 Rules:
 - Keep each tweet under 280 characters (STRICT LIMIT)
 - Be engaging, informative, and authentic

@@ -8,8 +8,10 @@ enabled = true
 # ── Production (default) ──
 # Deploy: npx wrangler deploy
 # Secrets: npx wrangler secret put APP_BASE_URL / CRON_SECRET
+# 3 triggers covering full 24h cycle (every ~8 hours)
+# Cloudflare free plan: max 5 triggers but account-level shared limit
 [triggers]
-crons = ["0 1 * * *"]
+crons = ["0 1 * * *", "0 9 * * *", "0 17 * * *"]
 
 # ── Dev environment ──
 # Deploy: npx wrangler deploy --env dev

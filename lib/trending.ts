@@ -235,7 +235,7 @@ export async function fetchMultiRegionalTrends(
   }
 }
 
-const trendRegionWoeid: Record<string, number> = {
+export const trendRegionWoeid: Record<string, number> = {
   global: 1,
   usa: 23424977,
   china: 23424856,

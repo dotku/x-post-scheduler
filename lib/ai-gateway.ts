@@ -46,6 +46,7 @@ function buildSystemPrompt(
   language?: string,
   recentPosts?: string[],
   count?: number,
+  contentProfile?: string,
 ): string {
   const languageInstruction = language
     ? `IMPORTANT: Generate the tweet${count && count > 1 ? "s" : ""} in ${language}.`
@@ -56,13 +57,17 @@ function buildSystemPrompt(
       ? `\n## Recent posts (DO NOT repeat these topics, angles, or opening styles):\n${recentPosts.map((p, i) => `${i + 1}. ${p}`).join("\n")}\n`
       : "";
 
+  const contentProfileSection = contentProfile
+    ? `\n## Your Content Profile (based on past performance data — apply these insights):\n${contentProfile}\n`
+    : "";
+
   if (count && count > 1) {
     return `You are a social media expert who creates engaging tweets for X (formerly Twitter).
 
 ${languageInstruction}
 
 ${INFLUENCER_STRATEGY}
-
+${contentProfileSection}
 Rules:
 - Keep each tweet under 280 characters (STRICT LIMIT)
 - Be engaging, informative, and authentic
@@ -83,7 +88,7 @@ Generate ${count} different tweet options, each on a new line. Just the tweet te
 ${languageInstruction}
 
 ${INFLUENCER_STRATEGY}
-
+${contentProfileSection}
 Rules:
 - Keep tweets under 280 characters (STRICT LIMIT)
 - Be engaging, informative, and authentic
@@ -110,6 +115,7 @@ export async function generateTweetViaGateway(params: {
   language?: string;
   recentPosts?: string[];
   modelId?: string;
+  contentProfile?: string;
 }): Promise<GatewayGenerateResult> {
   const model = resolveTextModel(params.modelId);
   try {
@@ -119,6 +125,8 @@ export async function generateTweetViaGateway(params: {
         params.knowledgeContext,
         params.language,
         params.recentPosts,
+        undefined,
+        params.contentProfile,
       ),
       prompt: params.prompt
         ? `Generate a tweet about: ${params.prompt}`
@@ -165,6 +173,7 @@ export async function generateSuggestionsViaGateway(params: {
   language?: string;
   recentPosts?: string[];
   modelId?: string;
+  contentProfile?: string;
 }): Promise<GatewaySuggestionsResult> {
   const model = resolveTextModel(params.modelId);
   const count = params.count ?? 3;
@@ -176,6 +185,7 @@ export async function generateSuggestionsViaGateway(params: {
         params.language,
         params.recentPosts,
         count,
+        params.contentProfile,
       ),
       prompt: params.prompt
         ? `Generate ${count} different tweets about: ${params.prompt}`

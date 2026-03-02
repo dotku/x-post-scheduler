@@ -43,10 +43,14 @@ model User {
   achConnectStatus        String?   // "pending" | "active" | "restricted"
   achBankLast4            String?   // last 4 digits for display
   achBankName             String?   // bank name from Stripe
+  // Content performance profile (AI-generated from top posts analysis)
+  contentProfile          String?
+  contentProfileUpdatedAt DateTime?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   posts              Post[]
+  followerSnapshots  FollowerSnapshot[]
   recurringSchedules RecurringSchedule[]
   knowledgeSources   KnowledgeSource[]
   mediaAssets        MediaAsset[]
@@ -213,6 +217,7 @@ model XAccount {
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   posts              Post[]
   recurringSchedules RecurringSchedule[]
+  followerSnapshots  FollowerSnapshot[]
 
   @@index([userId, isDefault])
 }
@@ -521,5 +526,21 @@ model Payout {
 
   @@index([userId, status])
   @@index([userId, createdAt])
+}
+
+model FollowerSnapshot {
+  id             String    @id @default(cuid())
+  userId         String
+  xAccountId     String?
+  followersCount Int
+  followingCount Int
+  tweetCount     Int?
+  recordedAt     DateTime  @default(now())
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  xAccount       XAccount? @relation(fields: [xAccountId], references: [id], onDelete: Cascade)
+
+  @@index([userId, recordedAt])
+  @@index([xAccountId, recordedAt])
 }
 

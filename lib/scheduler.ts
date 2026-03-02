@@ -14,7 +14,9 @@ import { addDays, addWeeks, addMonths, addHours } from "date-fns";
 import { HOURLY_FREQUENCIES, isVerifiedMember } from "./subscription";
 import { decodeRecurringAiPrompt } from "./recurring-ai";
 import { submitImageTask, getVideoTask } from "./wavespeed";
-import { buildTrendPrompt } from "./trending";
+import { buildTrendPrompt, fetchTrendingTopics, trendRegionWoeid } from "./trending";
+import { getContentProfile } from "./content-profile";
+import { optimizeHashtags } from "./hashtag-optimizer";
 
 async function fetchBinary(
   url: string,
@@ -174,7 +176,7 @@ export async function processRecurringSchedules() {
       if (!userHasCredits) {
         generationError = "Insufficient credits for AI generation";
       } else {
-        const [sources, recentPostsRows] = await Promise.all([
+        const [sources, recentPostsRows, profileData] = await Promise.all([
           prisma.knowledgeSource.findMany({
             where: { isActive: true, userId: schedule.userId },
           }),
@@ -184,8 +186,10 @@ export async function processRecurringSchedules() {
             take: 5,
             select: { content: true },
           }),
+          getContentProfile(schedule.userId!),
         ]);
         const recentPosts = recentPostsRows.map((p) => p.content);
+        const contentProfile = profileData.profile ?? undefined;
 
         if (sources.length === 0) {
           generationError =
@@ -223,6 +227,7 @@ export async function processRecurringSchedules() {
             effectivePrompt,
             schedule.aiLanguage || undefined,
             recentPosts,
+            contentProfile,
           );
 
           if (generated.usage) {
@@ -253,6 +258,31 @@ export async function processRecurringSchedules() {
               generated.error || "Failed to generate AI content";
           } else {
             contentToPost = generated.content;
+
+            // Hashtag optimization: append relevant trending hashtags
+            if (schedule.trendRegion) {
+              try {
+                const woeid = trendRegionWoeid[schedule.trendRegion!] ?? 1;
+                const trendResult = await fetchTrendingTopics(
+                  schedule.userId!,
+                  woeid,
+                );
+                if (trendResult.success && trendResult.trends?.length) {
+                  const trendNames = trendResult.trends
+                    .slice(0, 10)
+                    .map((t) => t.name);
+                  const hashtagResult = await optimizeHashtags(
+                    contentToPost,
+                    trendNames,
+                  );
+                  if (hashtagResult.success) {
+                    contentToPost = hashtagResult.content;
+                  }
+                }
+              } catch (hashtagErr) {
+                console.warn("Hashtag optimization failed:", hashtagErr);
+              }
+            }
           }
         }
       }
