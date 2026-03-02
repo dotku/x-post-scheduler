@@ -93,6 +93,13 @@ model Post {
   postedAt    DateTime?
   tweetId     String?   // ID returned from X API after posting
   impressions Int?      // Fetched from X API public_metrics
+  likes       Int?      // Fetched from X API public_metrics
+  retweets    Int?      // Fetched from X API public_metrics
+  replies     Int?      // Fetched from X API public_metrics
+  abGroup     String?   // A/B group identifier linking variant posts
+  abScore     Float?    // AI-predicted engagement score (0-100)
+  threadId    String?   // Groups posts in a thread
+  threadOrder Int?      // Order within thread (0 = first)
   error       String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
