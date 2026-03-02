@@ -2198,6 +2198,12 @@ export default function LandingContent({
           </Link>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 text-xs text-gray-500 dark:text-gray-500 pt-3">
             <Link
+              href={`${prefix}/about`}
+              className="hover:text-gray-700 dark:hover:text-gray-400 hover:underline underline-offset-2"
+            >
+              {lang === "zh" ? "关于我们" : "About"}
+            </Link>
+            <Link
               href={`${prefix}/privacy`}
               className="hover:text-gray-700 dark:hover:text-gray-400 hover:underline underline-offset-2"
             >
