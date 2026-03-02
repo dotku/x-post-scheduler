@@ -16,9 +16,27 @@ function getExtensionFromMime(mimeType: string | null): string {
       return "svg";
     case "image/avif":
       return "avif";
+    case "video/mp4":
+      return "mp4";
+    case "video/webm":
+      return "webm";
+    case "video/quicktime":
+      return "mov";
+    case "audio/mpeg":
+      return "mp3";
+    case "audio/mp4":
+      return "m4a";
     default:
       return "bin";
   }
+}
+
+function isAllowedMimeType(mimeType: string): boolean {
+  return (
+    mimeType.startsWith("image/") ||
+    mimeType.startsWith("video/") ||
+    mimeType.startsWith("audio/")
+  );
 }
 
 function safeSegment(value: string): string {
@@ -43,9 +61,9 @@ async function uploadOneImageToBlob(params: {
       return { ok: false, error: `Failed to fetch image (${response.status})` };
     }
 
-    const mimeType = response.headers.get("content-type");
-    if (!mimeType?.startsWith("image/")) {
-      return { ok: false, error: "URL is not an image" };
+    const mimeType = response.headers.get("content-type")?.split(";")[0]?.trim() || "";
+    if (!isAllowedMimeType(mimeType)) {
+      return { ok: false, error: `Unsupported media type: ${mimeType}` };
     }
 
     const buffer = Buffer.from(await response.arrayBuffer());
@@ -91,6 +109,98 @@ async function uploadOneImageToBlob(params: {
   }
 }
 
+export async function uploadBase64ToBlob(params: {
+  userId: string;
+  knowledgeSourceId: string;
+  sourceUrl: string;
+  base64Data: string; // data:image/jpeg;base64,...
+  altText?: string;
+  mediaType: string; // "thumbnail" | "video"
+  duration?: number;
+}): Promise<{ ok: boolean; blobUrl?: string; error?: string }> {
+  try {
+    const match = params.base64Data.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return { ok: false, error: "Invalid base64 data URI" };
+
+    const [, mimeType, base64] = match;
+    const buffer = Buffer.from(base64, "base64");
+    const ext = getExtensionFromMime(mimeType);
+    const blobPath = `knowledge/${safeSegment(params.userId)}/${safeSegment(
+      params.knowledgeSourceId
+    )}/${Date.now()}-${params.mediaType}.${ext}`;
+
+    const uploaded = await put(blobPath, buffer, {
+      access: "public",
+      addRandomSuffix: true,
+      contentType: mimeType,
+    });
+
+    await prisma.knowledgeImage.upsert({
+      where: {
+        knowledgeSourceId_sourceUrl: {
+          knowledgeSourceId: params.knowledgeSourceId,
+          sourceUrl: params.sourceUrl,
+        },
+      },
+      update: {
+        blobUrl: uploaded.url,
+        mimeType,
+        altText: params.altText ?? null,
+        mediaType: params.mediaType,
+        duration: params.duration ?? null,
+      },
+      create: {
+        userId: params.userId,
+        knowledgeSourceId: params.knowledgeSourceId,
+        sourceUrl: params.sourceUrl,
+        blobUrl: uploaded.url,
+        mimeType,
+        altText: params.altText ?? null,
+        mediaType: params.mediaType,
+        duration: params.duration ?? null,
+      },
+    });
+
+    return { ok: true, blobUrl: uploaded.url };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unknown upload error",
+    };
+  }
+}
+
+export async function syncKnowledgeSourceThumbnails(params: {
+  userId: string;
+  knowledgeSourceId: string;
+  thumbnails: Array<{ url: string; base64Data: string; altText?: string }>;
+}) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return { uploaded: 0, failed: params.thumbnails.length, skipped: true };
+  }
+
+  let uploaded = 0;
+  const errors: string[] = [];
+
+  for (const thumb of params.thumbnails) {
+    const result = await uploadBase64ToBlob({
+      userId: params.userId,
+      knowledgeSourceId: params.knowledgeSourceId,
+      sourceUrl: thumb.url,
+      base64Data: thumb.base64Data,
+      altText: thumb.altText,
+      mediaType: "thumbnail",
+    });
+    if (result.ok) {
+      uploaded += 1;
+    } else if (result.error) {
+      errors.push(`${thumb.url} - ${result.error}`);
+    }
+  }
+
+  return { uploaded, failed: params.thumbnails.length - uploaded, errors, skipped: false };
+}
+
 export async function syncKnowledgeSourceImages(params: {
   userId: string;
   knowledgeSourceId: string;
@@ -131,6 +241,7 @@ export async function syncKnowledgeSourceImages(params: {
   await prisma.knowledgeImage.deleteMany({
     where: {
       knowledgeSourceId: params.knowledgeSourceId,
+      mediaType: "image",
       sourceUrl: {
         notIn: uniqueImages.map((img) => img.url),
       },

@@ -33,6 +33,8 @@ model User {
   longestStreak         Int       @default(0)
   lastLoginDate         DateTime?
   lastLoginRewardAt     DateTime?
+  // Weixin Channel auth
+  weixinCookie          String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -51,6 +53,8 @@ model User {
   galleryComments    GalleryComment[]
   followers          UserFollow[] @relation("Following")
   following          UserFollow[] @relation("Follower")
+  campaigns              Campaign[]
+  campaignAttachments    CampaignAttachment[]
 }
 
 model CronRunEvent {
@@ -115,7 +119,9 @@ model KnowledgeSource {
   id           String    @id @default(cuid())
   url          String
   name         String
+  type         String    @default("website") // "website" | "weixin_channel"
   content      String    @default("") // Scraped text content
+  metadata     String?   // JSON: { videos: VideoMeta[] } for structured data
   pagesScraped Int       @default(1)  // Number of pages scraped
   lastScraped  DateTime?
   isActive     Boolean   @default(true)
@@ -125,6 +131,7 @@ model KnowledgeSource {
   userId       String?
   user         User?     @relation(fields: [userId], references: [id])
   images       KnowledgeImage[]
+  campaignMaterials CampaignMaterial[]
 
   @@unique([url, userId])
 }
@@ -135,6 +142,9 @@ model KnowledgeImage {
   blobUrl           String
   mimeType          String?
   altText           String?
+  mediaType         String          @default("image") // "image" | "video" | "thumbnail"
+  duration          Int?            // video duration in seconds
+  thumbnailBlobUrl  String?         // for video entries: link to thumbnail blob
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
@@ -143,8 +153,11 @@ model KnowledgeImage {
   knowledgeSourceId String
   knowledgeSource   KnowledgeSource @relation(fields: [knowledgeSourceId], references: [id], onDelete: Cascade)
 
+  campaignMaterials CampaignMaterial[]
+
   @@unique([knowledgeSourceId, sourceUrl])
   @@index([userId, knowledgeSourceId])
+  @@index([knowledgeSourceId, mediaType])
 }
 
 model MediaAsset {
@@ -382,5 +395,70 @@ model MediaNewsSource {
   @@unique([reportDate, period, url])
   @@index([reportDate, period])
   @@index([createdAt])
+}
+
+model Campaign {
+  id          String    @id @default(cuid())
+  name        String
+  client      String?
+  description String?
+  status      String    @default("draft") // "draft" | "active" | "completed" | "archived"
+  budgetCents Int?
+  budgetNote  String?
+  startDate   DateTime?
+  endDate     DateTime?
+  notes       String?
+  aiAnalysis  String?
+  aiAnalyzedAt DateTime?
+  aiBudget    String?
+  aiBudgetAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  materials   CampaignMaterial[]
+  attachments CampaignAttachment[]
+
+  @@unique([name, userId])
+  @@index([userId, status])
+  @@index([userId, createdAt])
+}
+
+model CampaignMaterial {
+  id                String           @id @default(cuid())
+  note              String?
+  createdAt         DateTime         @default(now())
+
+  campaignId        String
+  campaign          Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  knowledgeSourceId String?
+  knowledgeSource   KnowledgeSource? @relation(fields: [knowledgeSourceId], references: [id], onDelete: SetNull)
+
+  knowledgeImageId  String?
+  knowledgeImage    KnowledgeImage?  @relation(fields: [knowledgeImageId], references: [id], onDelete: SetNull)
+
+  @@unique([campaignId, knowledgeSourceId])
+  @@unique([campaignId, knowledgeImageId])
+  @@index([campaignId])
+}
+
+model CampaignAttachment {
+  id        String   @id @default(cuid())
+  fileName  String
+  fileType  String
+  fileSize  Int
+  blobUrl   String
+  note      String?
+  createdAt DateTime @default(now())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
 }
 

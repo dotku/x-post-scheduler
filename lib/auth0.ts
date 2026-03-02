@@ -8,6 +8,7 @@ export interface AuthenticatedUser {
   name: string | null;
   picture: string | null;
   language: string;
+  weixinCookie: string | null;
 }
 
 export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
@@ -30,6 +31,7 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
       name: true,
       picture: true,
       language: true,
+      weixinCookie: true,
     },
   });
 
@@ -40,6 +42,7 @@ export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> 
     name: user.name,
     picture: user.picture,
     language: user.language,
+    weixinCookie: user.weixinCookie,
   };
 }
 

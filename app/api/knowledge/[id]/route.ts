@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { scrapeUrl } from "@/lib/scraper";
-import { syncKnowledgeSourceImages } from "@/lib/knowledge-images";
+import { scrapeUrl, ScrapeResult } from "@/lib/scraper";
+import { scrapeWeixinChannel, scrapeWeixinChannelWithWorker } from "@/lib/weixin-channel";
+import { syncKnowledgeSourceImages, syncKnowledgeSourceThumbnails } from "@/lib/knowledge-images";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
+
+// Worker-based scraping can take 2-3 minutes (slow TLS + page rendering)
+export const maxDuration = 300;
 
 export async function GET(
   request: NextRequest,
@@ -21,9 +25,9 @@ export async function GET(
     where: { id, userId: user.id },
     include: {
       images: {
-        select: { id: true, blobUrl: true, altText: true },
+        select: { id: true, blobUrl: true, altText: true, mimeType: true, mediaType: true, duration: true, thumbnailBlobUrl: true },
         orderBy: { createdAt: "desc" },
-        take: 8,
+        take: 12,
       },
       _count: { select: { images: true } },
     },
@@ -84,7 +88,15 @@ export async function PATCH(
   }
 
   if (body.rescrape) {
-    const scrapeResult = await scrapeUrl(source.url);
+    let scrapeResult: ScrapeResult;
+    if (source.type === "weixin_channel") {
+      const channelId = source.url.replace("weixin-channel://", "");
+      scrapeResult = user.weixinCookie
+        ? await scrapeWeixinChannelWithWorker(channelId, user.weixinCookie, user.id)
+        : await scrapeWeixinChannel(channelId, source.name);
+    } else {
+      scrapeResult = await scrapeUrl(source.url);
+    }
 
     if (!scrapeResult.success) {
       return NextResponse.json(
@@ -97,6 +109,7 @@ export async function PATCH(
       where: { id },
       data: {
         content: scrapeResult.content || "",
+        metadata: scrapeResult.videos ? JSON.stringify({ videos: scrapeResult.videos }) : null,
         pagesScraped: scrapeResult.pagesScraped || 1,
         lastScraped: new Date(),
       },
@@ -108,13 +121,21 @@ export async function PATCH(
       images: scrapeResult.images || [],
     });
 
+    if (scrapeResult.thumbnails && scrapeResult.thumbnails.length > 0) {
+      await syncKnowledgeSourceThumbnails({
+        userId: user.id,
+        knowledgeSourceId: id,
+        thumbnails: scrapeResult.thumbnails,
+      });
+    }
+
     const withImages = await prisma.knowledgeSource.findUnique({
       where: { id },
       include: {
         images: {
-          select: { id: true, blobUrl: true, altText: true },
+          select: { id: true, blobUrl: true, altText: true, mimeType: true, mediaType: true, duration: true, thumbnailBlobUrl: true },
           orderBy: { createdAt: "desc" },
-          take: 8,
+          take: 12,
         },
         _count: { select: { images: true } },
       },

@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
       name: "Trial User",
       picture: null,
       language: "en",
+      weixinCookie: null,
     };
   }
 

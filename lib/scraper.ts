@@ -6,6 +6,17 @@ export interface ScrapeResult {
   title?: string;
   pagesScraped?: number;
   images?: ScrapedImage[];
+  thumbnails?: Array<{ url: string; base64Data: string; altText?: string }>;
+  videos?: Array<{
+    title: string;
+    description?: string;
+    publishedAt?: string;
+    thumbnailUrl?: string;
+    videoUrl?: string;
+    objectId?: string;
+    exportId?: string;
+    duration?: number;
+  }>;
   error?: string;
 }
 

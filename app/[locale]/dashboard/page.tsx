@@ -199,6 +199,12 @@ export default async function Dashboard({
                   {tNav("knowledge")}
                 </Link>
                 <Link
+                  href={`${prefix}/campaigns`}
+                  className="px-2 py-1 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  {tNav("campaigns")}
+                </Link>
+                <Link
                   href={`${prefix}/analytics`}
                   className="px-2 py-1 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
