@@ -279,7 +279,7 @@ export default function LandingContent({
       .map(([vendor, requests]) => ({ vendor, requests }));
   }, [stats]);
 
-  // Cleanup video poll timer on unmount
+  // Cleanup poll timers on unmount
   useEffect(() => {
     return () => {
       if (vidPollRef.current) clearTimeout(vidPollRef.current);
@@ -509,15 +509,44 @@ export default function LandingContent({
         setImgError(handleInsufficientCredits(data));
         return;
       }
-      const url = data.task?.outputs?.[0] ?? null;
-      if (url) {
-        setImgOutput(url);
+
+      // Sync: outputs returned immediately
+      let output = data.task?.outputs?.[0] ?? null;
+      if (output) {
+        setImgOutput(output);
         if (typeof data.task?.remainingCents === "number") {
           setTrialRemainingCents(data.task.remainingCents);
         }
-      } else {
-        setImgError(locale === "zh" ? "生成失败，请重试" : "Generation failed");
+        return;
       }
+
+      // Async: poll until completed (max ~2 min)
+      const taskId = data.task?.id;
+      const pollUrl = data.task?.urls?.get;
+      if (!taskId) {
+        setImgError(locale === "zh" ? "生成失败，请重试" : "Generation failed");
+        return;
+      }
+      for (let i = 0; i < 60; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const endpoint = pollUrl
+          ? `/api/toolbox/video/${taskId}?pollUrl=${encodeURIComponent(pollUrl)}`
+          : `/api/toolbox/video/${taskId}`;
+        const pollRes = await fetch(endpoint);
+        const pollData = await pollRes.json();
+        const task = pollData.task;
+        if (task?.status === "completed") {
+          output = task.outputs?.[0] ?? null;
+          if (output) setImgOutput(output);
+          else setImgError(locale === "zh" ? "生成失败，请重试" : "Generation failed");
+          return;
+        }
+        if (task?.status === "failed") {
+          setImgError(task.error || (locale === "zh" ? "生成失败" : "Generation failed"));
+          return;
+        }
+      }
+      setImgError(locale === "zh" ? "生成超时，请重试" : "Generation timed out");
     } catch {
       setImgError(locale === "zh" ? "网络错误" : "Network error");
     } finally {
@@ -1297,6 +1326,50 @@ export default function LandingContent({
                   </select>
                 </label>
               </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  {locale === "zh" ? "快速填入示例 →" : "Try a sample →"}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      {
+                        label: locale === "zh" ? "赛博朋克柴犬" : "Cyberpunk Shiba",
+                        prompt: locale === "zh"
+                          ? "一只柴犬坐在咖啡馆里看报纸，赛博朋克风格，霓虹灯光，电影级画质"
+                          : "A Shiba Inu reading a newspaper in a neon-lit cyberpunk café, cinematic lighting, detailed",
+                      },
+                      {
+                        label: locale === "zh" ? "产品展示" : "Product Shot",
+                        prompt: locale === "zh"
+                          ? "一瓶精酿啤酒放在大理石桌面上，背景是柔和的暖光，专业产品摄影风格"
+                          : "A craft beer bottle on a marble countertop, soft warm backlight, professional product photography",
+                      },
+                      {
+                        label: locale === "zh" ? "扁平插画" : "Flat Illustration",
+                        prompt: locale === "zh"
+                          ? "一个女孩在书房里用笔记本电脑工作，扁平矢量插画风格，柔和配色"
+                          : "A girl working on a laptop in a cozy study room, flat vector illustration style, pastel colors",
+                      },
+                      {
+                        label: locale === "zh" ? "未来城市" : "Future City",
+                        prompt: locale === "zh"
+                          ? "未来城市天际线，飞行汽车穿梭在摩天大楼之间，日落时分，金色光芒"
+                          : "Futuristic city skyline with flying cars between skyscrapers, golden hour sunset, ultra detailed",
+                      },
+                    ] as const
+                  ).map((sample) => (
+                    <button
+                      key={sample.label}
+                      type="button"
+                      onClick={() => setImgPrompt(sample.prompt)}
+                      className="rounded-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 py-1 text-xs text-gray-700 dark:text-gray-300 hover:border-purple-500 hover:text-purple-600 dark:hover:border-purple-400 dark:hover:text-purple-400 transition-colors"
+                    >
+                      {sample.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <label className="flex flex-col gap-1">
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                   {locale === "zh" ? "提示词" : "Prompt"}
@@ -1307,8 +1380,8 @@ export default function LandingContent({
                   onChange={(e) => setImgPrompt(e.target.value)}
                   placeholder={
                     locale === "zh"
-                      ? "描述你想生成的图片..."
-                      : "Describe the image you want to generate..."
+                      ? "例如：一只柴犬坐在咖啡馆里看报纸，赛博朋克风格，霓虹灯光"
+                      : "e.g., A Shiba Inu reading a newspaper in a café, cyberpunk style, neon lighting"
                   }
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white resize-none"
                 />
@@ -1416,6 +1489,50 @@ export default function LandingContent({
                   </select>
                 </label>
               </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  {locale === "zh" ? "快速填入示例 →" : "Try a sample →"}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      {
+                        label: locale === "zh" ? "旧金山旅拍" : "SF Travel",
+                        prompt: locale === "zh"
+                          ? "航拍金门大桥，镜头从桥面缓缓上升，晨雾在桥塔间流动，旧金山湾区全景展现，电影级色彩"
+                          : "Aerial shot of the Golden Gate Bridge, camera slowly rising above the deck, morning fog flowing between towers, San Francisco Bay panorama, cinematic color grading",
+                      },
+                      {
+                        label: locale === "zh" ? "餐厅氛围" : "Restaurant",
+                        prompt: locale === "zh"
+                          ? "特写镜头：厨师在明火上翻炒菜肴，火焰升腾，食材在锅中翻滚，蒸汽弥漫，温暖的餐厅灯光"
+                          : "Close-up of a chef cooking over an open flame, flames rising, ingredients tossing in a wok, steam billowing, warm restaurant lighting",
+                      },
+                      {
+                        label: locale === "zh" ? "豪宅巡游" : "Property Tour",
+                        prompt: locale === "zh"
+                          ? "镜头从豪华别墅大门缓缓推入，穿过大理石门厅，落地窗外是无边泳池和海景，阳光洒满客厅"
+                          : "Camera glides through a luxury villa entrance, across a marble foyer, floor-to-ceiling windows reveal an infinity pool and ocean view, sunlight fills the living room",
+                      },
+                      {
+                        label: locale === "zh" ? "美容护理" : "Beauty Spa",
+                        prompt: locale === "zh"
+                          ? "特写：美容师轻柔地为客人做面部护理，花瓣散落在水疗床旁，柔和的灯光和舒缓的氛围"
+                          : "Close-up of an aesthetician gently performing a facial treatment, flower petals scattered beside the spa bed, soft lighting and calming ambiance",
+                      },
+                    ] as const
+                  ).map((sample) => (
+                    <button
+                      key={sample.label}
+                      type="button"
+                      onClick={() => setVidPrompt(sample.prompt)}
+                      className="rounded-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 py-1 text-xs text-gray-700 dark:text-gray-300 hover:border-rose-500 hover:text-rose-600 dark:hover:border-rose-400 dark:hover:text-rose-400 transition-colors"
+                    >
+                      {sample.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <label className="flex flex-col gap-1">
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                   {locale === "zh" ? "提示词" : "Prompt"}
@@ -1426,8 +1543,8 @@ export default function LandingContent({
                   onChange={(e) => setVidPrompt(e.target.value)}
                   placeholder={
                     locale === "zh"
-                      ? "描述你想生成的视频内容..."
-                      : "Describe the video you want to generate..."
+                      ? "例如：镜头缓慢推进，穿过晨雾中的竹林，阳光透过叶缝洒下光斑"
+                      : "e.g., Camera slowly pushes through a misty bamboo forest at dawn, sunlight filtering through the leaves"
                   }
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white resize-none"
                 />
@@ -1548,6 +1665,50 @@ export default function LandingContent({
                   </div>
                 </label>
               </div>
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  {locale === "zh" ? "快速填入示例 →" : "Try a sample →"}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      {
+                        label: locale === "zh" ? "频道欢迎语" : "Channel Intro",
+                        text: locale === "zh"
+                          ? "大家好，欢迎来到我们的频道！今天我们来聊聊社交媒体营销的五个关键策略，帮助你快速涨粉、提升互动率。"
+                          : "Hey everyone, welcome to our channel! Today we're breaking down five key strategies for social media marketing that will help you grow your audience fast.",
+                      },
+                      {
+                        label: locale === "zh" ? "产品介绍" : "Product Pitch",
+                        text: locale === "zh"
+                          ? "这款全新的 AI 写作助手，能在几秒钟内为你生成高质量的社交媒体文案。无论是推文、帖子还是广告文案，它都能轻松搞定。"
+                          : "Introducing our brand-new AI writing assistant. It generates high-quality social media copy in seconds — whether it's tweets, posts, or ad copy, it handles it all effortlessly.",
+                      },
+                      {
+                        label: locale === "zh" ? "新闻播报" : "News Brief",
+                        text: locale === "zh"
+                          ? "今日科技要闻：人工智能领域再迎突破，最新模型在多项基准测试中刷新纪录。业内专家表示，这将深刻改变内容创作行业的格局。"
+                          : "Today in tech: A major breakthrough in artificial intelligence as the latest model sets new records across multiple benchmarks. Industry experts say this will reshape the content creation landscape.",
+                      },
+                      {
+                        label: locale === "zh" ? "激励语录" : "Motivation",
+                        text: locale === "zh"
+                          ? "每一次尝试都是通往成功的一步。不要害怕失败，因为失败只是告诉你，还有更好的方法在等着你。坚持下去，你的努力终将得到回报。"
+                          : "Every attempt is a step toward success. Don't fear failure — it's simply showing you there's a better way. Keep going. Your effort will pay off.",
+                      },
+                    ] as const
+                  ).map((sample) => (
+                    <button
+                      key={sample.label}
+                      type="button"
+                      onClick={() => setVoiceText(sample.text)}
+                      className="rounded-full border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 py-1 text-xs text-gray-700 dark:text-gray-300 hover:border-orange-500 hover:text-orange-600 dark:hover:border-orange-400 dark:hover:text-orange-400 transition-colors"
+                    >
+                      {sample.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <label className="flex flex-col gap-1">
                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                   {locale === "zh" ? "文字内容" : "Text to speak"}
@@ -1562,8 +1723,8 @@ export default function LandingContent({
                   onChange={(e) => setVoiceText(e.target.value)}
                   placeholder={
                     locale === "zh"
-                      ? "输入要转换为语音的文字内容..."
-                      : "Enter the text you want to convert to speech..."
+                      ? "例如：大家好，欢迎来到我们的频道！今天我们来聊聊社交媒体营销的五个关键策略。"
+                      : "e.g., Hey everyone, welcome to our channel! Today we're going to talk about five key strategies for social media marketing."
                   }
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-900 dark:text-white resize-none"
                 />
