@@ -118,6 +118,149 @@ export default async function ChangelogPage({
             </div>
           </div>
 
+          {/* 2026-02 February Feature Updates */}
+          <div className="relative pl-8 pb-8 border-l-2 border-blue-500">
+            <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500"></div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                  {isZh ? "功能更新" : "Feature Updates"}
+                </span>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {isZh ? "2026年2月" : "February 2026"}
+                </span>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                {isZh
+                  ? "2 月功能更新总结"
+                  : "February Feature Update Roundup"}
+              </h2>
+              <div className="prose dark:prose-invert max-w-none">
+                {isZh ? (
+                  <>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-4 mb-3">
+                      发帖与调度
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 mb-4">
+                      <li>帖子创建、编辑与定时发布</li>
+                      <li>帖子支持多张图片</li>
+                      <li>多账号管理 — 支持连接和切换多个 X 账号</li>
+                    </ul>
+
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-3">
+                      AI 工具箱
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 mb-4">
+                      <li>AI 图片生成</li>
+                      <li>AI 视频生成，视频处理流程优化</li>
+                      <li>AI 背景音乐生成</li>
+                      <li>文字转语音（TTS）预览</li>
+                      <li>AI 内容优化与重试机制</li>
+                    </ul>
+
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-3">
+                      积分与会员
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 mb-4">
+                      <li>积分余额系统与用量追踪</li>
+                      <li>会员等级与权限体系</li>
+                      <li>积分定价与计费</li>
+                    </ul>
+
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-3">
+                      数据分析
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 mb-4">
+                      <li>社交媒体数据分析面板</li>
+                      <li>Dashboard 数据可视化图表</li>
+                      <li>站点访问分析</li>
+                    </ul>
+
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-3">
+                      新闻资讯
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 mb-4">
+                      <li>媒体新闻聚合模块</li>
+                      <li>RSS 文章自动翻译</li>
+                      <li>每日内容自动更新</li>
+                    </ul>
+
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-3">
+                      国际化与体验
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 mb-4">
+                      <li>中英文多语言支持</li>
+                      <li>首页改版</li>
+                      <li>管理后台</li>
+                      <li>使用文档中心</li>
+                      <li>法律文档（隐私政策、服务条款）</li>
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-4 mb-3">
+                      Posting & Scheduling
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 mb-4">
+                      <li>Create, edit, and schedule posts</li>
+                      <li>Multi-image support for posts</li>
+                      <li>Multi-account management — connect and switch between multiple X accounts</li>
+                    </ul>
+
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-3">
+                      AI Toolbox
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 mb-4">
+                      <li>AI image generation</li>
+                      <li>AI video generation with optimized processing pipeline</li>
+                      <li>AI background music generation</li>
+                      <li>Text-to-speech (TTS) preview</li>
+                      <li>AI content optimization with retry mechanism</li>
+                    </ul>
+
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-3">
+                      Credits & Membership
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 mb-4">
+                      <li>Credit balance system with usage tracking</li>
+                      <li>Membership tiers and permissions</li>
+                      <li>Credit pricing and billing</li>
+                    </ul>
+
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-3">
+                      Analytics
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 mb-4">
+                      <li>Social media analytics dashboard</li>
+                      <li>Dashboard data visualization charts</li>
+                      <li>Site traffic analytics</li>
+                    </ul>
+
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-3">
+                      News Feed
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 mb-4">
+                      <li>Media news aggregation module</li>
+                      <li>Automatic RSS article translation</li>
+                      <li>Daily content auto-refresh</li>
+                    </ul>
+
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-3">
+                      Internationalization & Experience
+                    </h3>
+                    <ul className="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 mb-4">
+                      <li>Chinese/English multilingual support</li>
+                      <li>Homepage redesign</li>
+                      <li>Admin dashboard</li>
+                      <li>Documentation center</li>
+                      <li>Legal documents (Privacy Policy, Terms of Service)</li>
+                    </ul>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* 2026-02 Rebranding */}
           <div className="relative pl-8 pb-8 border-l-2 border-blue-500">
             <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-blue-500"></div>
