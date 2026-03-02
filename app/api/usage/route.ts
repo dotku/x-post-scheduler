@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   // Get current credit balance
   const currentUser = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { creditBalanceCents: true },
+    select: { creditBalanceCents: true, subscriptionTier: true, subscriptionStatus: true },
   });
 
   const [windowAgg, allTimeAgg, bySource, byModel, recent] = await Promise.all([
@@ -98,8 +98,13 @@ export async function GET(request: NextRequest) {
     }),
   ]);
 
+  const isActiveSubscriber =
+    currentUser?.subscriptionStatus === "active" &&
+    !!currentUser?.subscriptionTier;
+
   return NextResponse.json({
     creditBalance: currentUser?.creditBalanceCents ?? 0,
+    subscriptionTier: isActiveSubscriber ? currentUser.subscriptionTier : null,
     rangeDays: days,
     window: {
       requests: windowAgg._count._all,

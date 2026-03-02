@@ -9,12 +9,20 @@ export default function DocsPage() {
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
               Documentation
             </h1>
-            <Link
-              href="/"
-              className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            >
-              Back to Home
-            </Link>
+            <div className="flex gap-3">
+              <Link
+                href="/docs/models"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                AI Models →
+              </Link>
+              <Link
+                href="/"
+                className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              >
+                Back to Home
+              </Link>
+            </div>
           </div>
         </div>
       </header>

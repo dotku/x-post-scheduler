@@ -916,9 +916,17 @@ export default function LandingContent({
             <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
               {t("editorTitle")}
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {t("editorSubtitle")}
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {t("editorSubtitle")}
+              </p>
+              <Link
+                href={`${prefix}/docs/models`}
+                className="shrink-0 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {locale === "zh" ? "查看模型文档 →" : "View model docs →"}
+              </Link>
+            </div>
           </div>
 
           {/* Mode tabs */}
@@ -966,51 +974,54 @@ export default function LandingContent({
                       {
                         topic:
                           locale === "zh"
-                            ? "AI 生产力工具"
-                            : "AI productivity tools",
-                        tone: locale === "zh" ? "专业、权威" : "professional",
-                        goal: locale === "zh" ? "吸引注册" : "drive signups",
+                            ? "新菜品上市推广"
+                            : "New menu launch promotion",
+                        tone: locale === "zh" ? "热情、诱人" : "warm, appetizing",
+                        goal: locale === "zh" ? "吸引到店" : "drive foot traffic",
                       },
                       {
                         topic:
                           locale === "zh"
-                            ? "视频内容创作技巧"
-                            : "video content creation tips",
+                            ? "医美抗衰新技术"
+                            : "Anti-aging skincare treatment",
                         tone:
                           locale === "zh"
-                            ? "轻松、充满活力"
-                            : "casual, energetic",
-                        goal: locale === "zh" ? "涨粉" : "grow following",
+                            ? "专业、值得信赖"
+                            : "professional, trustworthy",
+                        goal: locale === "zh" ? "预约咨询" : "book consultations",
                       },
                       {
                         topic:
                           locale === "zh"
-                            ? "创业融资经验"
-                            : "bootstrapping a startup",
-                        tone: locale === "zh" ? "真实、坦诚" : "authentic, raw",
-                        goal: locale === "zh" ? "建立社群" : "build community",
-                      },
-                      {
-                        topic:
-                          locale === "zh"
-                            ? "早晨健身计划"
-                            : "morning workout routine",
-                        tone: locale === "zh" ? "激励人心" : "motivational",
-                        goal: locale === "zh" ? "激发行动" : "inspire action",
-                      },
-                      {
-                        topic:
-                          locale === "zh"
-                            ? "加密货币市场趋势"
-                            : "crypto market trends",
-                        tone:
-                          locale === "zh"
-                            ? "理性、自信"
-                            : "analytical, confident",
+                            ? "2026 年投资理财策略"
+                            : "2026 investment strategies",
+                        tone: locale === "zh" ? "理性、自信" : "analytical, confident",
                         goal:
                           locale === "zh"
-                            ? "建立思想领导力"
+                            ? "建立专业形象"
                             : "establish thought leadership",
+                      },
+                      {
+                        topic:
+                          locale === "zh"
+                            ? "旧金山湾区新房源"
+                            : "New SF Bay Area listing",
+                        tone: locale === "zh" ? "简洁、有吸引力" : "concise, compelling",
+                        goal: locale === "zh" ? "吸引看房" : "generate showings",
+                      },
+                      {
+                        topic:
+                          locale === "zh"
+                            ? "法律知识科普：租房权益"
+                            : "Legal tips: Tenant rights",
+                        tone:
+                          locale === "zh"
+                            ? "权威、通俗易懂"
+                            : "authoritative, accessible",
+                        goal:
+                          locale === "zh"
+                            ? "涨粉、建立信任"
+                            : "grow following & build trust",
                       },
                     ] as const
                   ).map((sample) => (
@@ -1334,28 +1345,28 @@ export default function LandingContent({
                   {(
                     [
                       {
-                        label: locale === "zh" ? "赛博朋克柴犬" : "Cyberpunk Shiba",
+                        label: locale === "zh" ? "餐厅美食" : "Restaurant",
                         prompt: locale === "zh"
-                          ? "一只柴犬坐在咖啡馆里看报纸，赛博朋克风格，霓虹灯光，电影级画质"
-                          : "A Shiba Inu reading a newspaper in a neon-lit cyberpunk café, cinematic lighting, detailed",
+                          ? "精致日式料理摆盘特写，新鲜三文鱼刺身配金箔点缀，黑色石板盘，柔和自然光，专业美食摄影"
+                          : "Close-up of elegant Japanese cuisine plating, fresh salmon sashimi with gold leaf garnish on black slate plate, soft natural light, professional food photography",
                       },
                       {
-                        label: locale === "zh" ? "产品展示" : "Product Shot",
+                        label: locale === "zh" ? "美容护肤" : "Beauty & Skincare",
                         prompt: locale === "zh"
-                          ? "一瓶精酿啤酒放在大理石桌面上，背景是柔和的暖光，专业产品摄影风格"
-                          : "A craft beer bottle on a marble countertop, soft warm backlight, professional product photography",
+                          ? "高端护肤品系列产品展示，白色大理石背景，鲜花和绿植点缀，柔光打光，简约奢华风格"
+                          : "Luxury skincare product line display on white marble background with fresh flowers and greenery, soft lighting, minimalist luxury aesthetic",
                       },
                       {
-                        label: locale === "zh" ? "扁平插画" : "Flat Illustration",
+                        label: locale === "zh" ? "豪宅地产" : "Luxury Property",
                         prompt: locale === "zh"
-                          ? "一个女孩在书房里用笔记本电脑工作，扁平矢量插画风格，柔和配色"
-                          : "A girl working on a laptop in a cozy study room, flat vector illustration style, pastel colors",
+                          ? "现代豪华别墅外观，无边泳池倒映晚霞，棕榈树环绕，建筑摄影风格，黄金时段"
+                          : "Modern luxury villa exterior with infinity pool reflecting sunset, surrounded by palm trees, architectural photography, golden hour",
                       },
                       {
-                        label: locale === "zh" ? "未来城市" : "Future City",
+                        label: locale === "zh" ? "旧金山旅拍" : "SF Travel",
                         prompt: locale === "zh"
-                          ? "未来城市天际线，飞行汽车穿梭在摩天大楼之间，日落时分，金色光芒"
-                          : "Futuristic city skyline with flying cars between skyscrapers, golden hour sunset, ultra detailed",
+                          ? "旧金山金门大桥全景，晨雾缭绕，前景有野花草地，色彩鲜艳，风光摄影"
+                          : "Golden Gate Bridge panorama with morning fog, wildflower meadow in foreground, vibrant colors, landscape photography",
                       },
                     ] as const
                   ).map((sample) => (
@@ -1673,28 +1684,28 @@ export default function LandingContent({
                   {(
                     [
                       {
-                        label: locale === "zh" ? "频道欢迎语" : "Channel Intro",
+                        label: locale === "zh" ? "餐厅推荐" : "Restaurant",
                         text: locale === "zh"
-                          ? "大家好，欢迎来到我们的频道！今天我们来聊聊社交媒体营销的五个关键策略，帮助你快速涨粉、提升互动率。"
-                          : "Hey everyone, welcome to our channel! Today we're breaking down five key strategies for social media marketing that will help you grow your audience fast.",
+                          ? "欢迎来到我们的餐厅！今天为大家推荐主厨特制的招牌菜——慢炖和牛配黑松露酱，选用澳洲M9级和牛，经过8小时低温慢煮，搭配当季时令蔬菜。现在预订可享受双人套餐优惠。"
+                          : "Welcome to our restaurant! Today's chef special is the signature slow-braised wagyu with black truffle sauce, using premium Australian M9 wagyu slow-cooked for 8 hours, paired with seasonal vegetables. Book now for our couples dining special.",
                       },
                       {
-                        label: locale === "zh" ? "产品介绍" : "Product Pitch",
+                        label: locale === "zh" ? "医疗健康" : "Health Tips",
                         text: locale === "zh"
-                          ? "这款全新的 AI 写作助手，能在几秒钟内为你生成高质量的社交媒体文案。无论是推文、帖子还是广告文案，它都能轻松搞定。"
-                          : "Introducing our brand-new AI writing assistant. It generates high-quality social media copy in seconds — whether it's tweets, posts, or ad copy, it handles it all effortlessly.",
+                          ? "关注您的健康！研究表明，每天30分钟的适度运动可以显著降低心血管疾病风险。我们诊所本月推出全面体检套餐，包含血液检测、心电图和专家咨询，助您全面了解身体状况。"
+                          : "Your health matters! Studies show that just 30 minutes of moderate exercise daily can significantly reduce cardiovascular disease risk. Our clinic is offering comprehensive health screening packages this month, including blood work, ECG, and specialist consultation.",
                       },
                       {
-                        label: locale === "zh" ? "新闻播报" : "News Brief",
+                        label: locale === "zh" ? "金融理财" : "Finance",
                         text: locale === "zh"
-                          ? "今日科技要闻：人工智能领域再迎突破，最新模型在多项基准测试中刷新纪录。业内专家表示，这将深刻改变内容创作行业的格局。"
-                          : "Today in tech: A major breakthrough in artificial intelligence as the latest model sets new records across multiple benchmarks. Industry experts say this will reshape the content creation landscape.",
+                          ? "2026年投资策略分享：在当前利率环境下，分散投资组合比以往更加重要。我们的理财顾问团队为您量身定制资产配置方案，帮助您实现稳健增长。预约免费咨询，让专业人士为您的财富保驾护航。"
+                          : "2026 Investment outlook: In today's interest rate environment, portfolio diversification is more important than ever. Our advisory team creates personalized asset allocation plans for steady growth. Schedule a free consultation and let our experts safeguard your wealth.",
                       },
                       {
-                        label: locale === "zh" ? "激励语录" : "Motivation",
+                        label: locale === "zh" ? "地产介绍" : "Property Tour",
                         text: locale === "zh"
-                          ? "每一次尝试都是通往成功的一步。不要害怕失败，因为失败只是告诉你，还有更好的方法在等着你。坚持下去，你的努力终将得到回报。"
-                          : "Every attempt is a step toward success. Don't fear failure — it's simply showing you there's a better way. Keep going. Your effort will pay off.",
+                          ? "坐落于旧金山湾区黄金地段，这套全新装修的四居室豪宅拥有开阔的海湾景观和私人花园。步行可达优质学区，周边配套设施齐全。欢迎预约看房，感受品质生活。"
+                          : "Located in San Francisco's prime Bay Area, this newly renovated four-bedroom luxury home features sweeping bay views and a private garden. Walking distance to top-rated schools with excellent nearby amenities. Schedule a viewing today.",
                       },
                     ] as const
                   ).map((sample) => (

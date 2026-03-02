@@ -382,9 +382,10 @@ export default function ToolboxPage() {
 
   const [tab, setTab] = useState<Tab>("image");
 
-  // Credit balance
+  // Credit balance & subscription
   const [creditBalance, setCreditBalance] = useState<number | null>(null);
   const [creditLoading, setCreditLoading] = useState(true);
+  const [subscriptionTier, setSubscriptionTier] = useState<string | null>(null);
 
   // shared
   const [prompt, setPrompt] = useState("");
@@ -502,6 +503,9 @@ export default function ToolboxPage() {
         const data = await res.json();
         if (res.ok && data.creditBalance !== undefined) {
           setCreditBalance(data.creditBalance);
+          if (data.subscriptionTier) {
+            setSubscriptionTier(data.subscriptionTier);
+          }
         }
       } catch (err) {
         console.error("Failed to fetch credit balance:", err);
@@ -2455,39 +2459,62 @@ export default function ToolboxPage() {
               </label>
             )}
 
-            {/* Long video generation */}
+            {/* Long video generation — members only */}
             {tab === "video" && (
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={enableLongVideo}
-                    onChange={(e) => setEnableLongVideo(e.target.checked)}
-                    disabled={isRunning}
-                    className="h-4 w-4 text-blue-600 border-gray-300 rounded"
-                  />
-                  Generate long video (multi-segment)
-                </label>
-                {enableLongVideo && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-gray-500 dark:text-gray-400">
-                      Segments:
+                {subscriptionTier ? (
+                  <>
+                    <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={enableLongVideo}
+                        onChange={(e) => setEnableLongVideo(e.target.checked)}
+                        disabled={isRunning}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                      />
+                      {locale === "zh"
+                        ? "生成长视频（多段拼接）"
+                        : "Generate long video (multi-segment)"}
+                    </label>
+                    {enableLongVideo && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-gray-500 dark:text-gray-400">
+                          {locale === "zh" ? "段数:" : "Segments:"}
+                        </span>
+                        <select
+                          value={longVideoSegmentsCount}
+                          onChange={(e) =>
+                            setLongVideoSegmentsCount(Number(e.target.value))
+                          }
+                          disabled={isRunning}
+                          className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        >
+                          {[2, 3, 4, 5, 6, 7, 8].map((count) => (
+                            <option key={count} value={count}>
+                              {count}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-gray-400">
+                          ({duration}s {locale === "zh" ? "每段" : "each"})
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-gray-400 dark:text-gray-500">
+                    <span>🔒</span>
+                    <span>
+                      {locale === "zh"
+                        ? "长视频生成为会员专属功能"
+                        : "Long video generation is a members-only feature"}
                     </span>
-                    <select
-                      value={longVideoSegmentsCount}
-                      onChange={(e) =>
-                        setLongVideoSegmentsCount(Number(e.target.value))
-                      }
-                      disabled={isRunning}
-                      className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    <Link
+                      href={`/${locale}/settings`}
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
                     >
-                      {[2, 3, 4, 5, 6, 7, 8].map((count) => (
-                        <option key={count} value={count}>
-                          {count}
-                        </option>
-                      ))}
-                    </select>
-                    <span className="text-gray-400">({duration}s each)</span>
+                      {locale === "zh" ? "升级会员 →" : "Subscribe →"}
+                    </Link>
                   </div>
                 )}
               </div>

@@ -22,6 +22,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Long video is a members-only feature — require active subscription
+  const dbUser = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { subscriptionTier: true, subscriptionStatus: true },
+  });
+
+  if (dbUser?.subscriptionStatus !== "active" || !dbUser?.subscriptionTier) {
+    return NextResponse.json(
+      { error: "Long video generation is a members-only feature. Please subscribe to access this feature." },
+      { status: 403 },
+    );
+  }
+
   const body = await request.json();
   const {
     modelId,
