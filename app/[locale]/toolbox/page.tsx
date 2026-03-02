@@ -360,7 +360,7 @@ export default function ToolboxPage() {
         video: "视频",
         imageGeneration: "图片生成",
         videoGeneration: "视频生成",
-        textToVideo: "文字转视频",
+        textToVideo: "文本转视频",
         imageToVideo: "图片转视频",
       }
     : {
@@ -1273,7 +1273,7 @@ export default function ToolboxPage() {
     const needsVoiceover = audioMode === "voiceover" || audioMode === "both";
     const needsBgm = audioMode === "bgm" || audioMode === "both";
     if (needsVoiceover && !voiceoverText.trim()) {
-      setAudioError("请输入旁白文字");
+      setAudioError("请输入旁白文本");
       return;
     }
     if (needsBgm && bgmSource === "upload" && !bgmFile) {
@@ -1468,7 +1468,7 @@ export default function ToolboxPage() {
 
   const handleTtsPreview = async () => {
     if (!voiceoverText.trim()) {
-      setAudioError("请输入旁白文字再预览");
+      setAudioError("请输入旁白文本再预览");
       return;
     }
     setIsTtsPreviewing(true);
@@ -2280,7 +2280,7 @@ export default function ToolboxPage() {
                         videoMode === "i2v"
                           ? setI2vModelId(m.id)
                           : setVideoModelId(m.id);
-                        if (!m.supportsAudio) setGenerateAudio(false);
+                        setGenerateAudio(!!m.supportsAudio);
                         // Clamp duration to what this model supports
                         const supported = m.durations ?? [5, 8];
                         if (!supported.includes(duration))
@@ -2313,6 +2313,11 @@ export default function ToolboxPage() {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 dark:text-white">
                             {m.label}
+                            {tab === "video" && m.supportsAudio && (
+                              <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">
+                                {isZh ? "支持音频" : "Audio"}
+                              </span>
+                            )}
                           </p>
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                             {m.description}
@@ -2463,7 +2468,7 @@ export default function ToolboxPage() {
                   disabled={isRunning}
                   className="h-4 w-4 text-blue-600 border-gray-300 rounded"
                 />
-                Generate audio
+                {isZh ? "生成有声视频" : "Generate audio"}
               </label>
             )}
 
@@ -2990,7 +2995,7 @@ export default function ToolboxPage() {
                           audioMode === "both") && (
                           <div className="space-y-3">
                             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-                              旁白文字
+                              旁白文本
                             </label>
                             <textarea
                               value={voiceoverText}

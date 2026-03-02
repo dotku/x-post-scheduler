@@ -564,7 +564,7 @@ export default function ModelsDocsPage() {
             <span className="text-xl">🎬</span>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
               {locale === "zh"
-                ? "视频生成模型（文字转视频）"
+                ? "视频生成模型（文本转视频）"
                 : "Video Generation Models (Text-to-Video)"}
             </h2>
           </div>

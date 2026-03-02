@@ -210,11 +210,12 @@ export default function LandingContent({
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth={2}
-            d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 12h10"
+            d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
           />
         ),
         title: t("feature5Title"),
         description: t("feature5Desc"),
+        premium: true,
       },
       {
         icon: (
@@ -1852,17 +1853,24 @@ export default function LandingContent({
             {features.map((feature) => (
               <div
                 key={feature.title}
-                className="p-6 rounded-lg border border-gray-200 dark:border-gray-700"
+                className={`p-6 rounded-lg border ${feature.premium ? "border-amber-300 dark:border-amber-600 bg-amber-50/50 dark:bg-amber-900/10" : "border-gray-200 dark:border-gray-700"}`}
               >
-                <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900 mb-4">
-                  <svg
-                    className="w-5 h-5 text-blue-600 dark:text-blue-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    {feature.icon}
-                  </svg>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className={`w-10 h-10 flex items-center justify-center rounded-lg ${feature.premium ? "bg-amber-100 dark:bg-amber-900/40" : "bg-blue-100 dark:bg-blue-900"}`}>
+                    <svg
+                      className={`w-5 h-5 ${feature.premium ? "text-amber-600 dark:text-amber-400" : "text-blue-600 dark:text-blue-400"}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      {feature.icon}
+                    </svg>
+                  </div>
+                  {feature.premium && (
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                      Silver+
+                    </span>
+                  )}
                 </div>
                 <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                   {feature.title}

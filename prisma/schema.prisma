@@ -68,6 +68,7 @@ model User {
   campaigns              Campaign[]
   campaignAttachments    CampaignAttachment[]
   payouts                Payout[]
+  monitorTopics          MonitorTopic[]
 }
 
 model CronRunEvent {
@@ -439,9 +440,12 @@ model Campaign {
 
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  materials   CampaignMaterial[]
-  attachments CampaignAttachment[]
-  payment     CampaignPayment?
+  materials          CampaignMaterial[]
+  attachments        CampaignAttachment[]
+  payment            CampaignPayment?
+  monitorKeywords    MonitorKeyword[]
+  monitorTweets      MonitorTweet[]
+  sentimentSnapshots SentimentSnapshot[]
 
   @@unique([name, userId])
   @@index([userId, status])
@@ -542,5 +546,103 @@ model FollowerSnapshot {
 
   @@index([userId, recordedAt])
   @@index([xAccountId, recordedAt])
+}
+
+model MonitorKeyword {
+  id         String   @id @default(cuid())
+  keyword    String
+  type       String   @default("track") // "track" | "negative" | "competitor"
+  createdAt  DateTime @default(now())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, keyword])
+  @@index([campaignId])
+}
+
+model MonitorTweet {
+  id             String    @id @default(cuid())
+  tweetId        String
+  tweetUrl       String
+  authorUsername String?
+  authorName     String?
+  text           String
+  tweetCreatedAt DateTime?
+  impressions    Int?
+  likes          Int?
+  retweets       Int?
+  replies        Int?
+  source         String    @default("manual") // "manual" | "timeline_scan"
+  sentiment      String?   // "positive" | "negative" | "neutral"
+  sentimentScore Float?    // -1.0 to 1.0
+  keyTopics      String?   // JSON string[]
+  analyzedAt     DateTime?
+  analysisMethod String?   // "ai" | "keyword_rule"
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, tweetId])
+  @@index([campaignId, sentiment])
+  @@index([campaignId, createdAt])
+}
+
+model SentimentSnapshot {
+  id            String   @id @default(cuid())
+  date          DateTime
+  positiveCount Int      @default(0)
+  negativeCount Int      @default(0)
+  neutralCount  Int      @default(0)
+  avgScore      Float    @default(0)
+  tweetCount    Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, date])
+  @@index([campaignId, date])
+}
+
+// ── Standalone Sentiment Monitoring ─────────────────────────────────────────
+
+model MonitorTopic {
+  id          String   @id @default(cuid())
+  name        String
+  nameZh      String?
+  description String?
+  keywords    String   // JSON string[] e.g. ["Biden","#Election2026"]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  snapshots TopicSnapshot[]
+
+  @@unique([name, userId])
+  @@index([userId, updatedAt])
+}
+
+model TopicSnapshot {
+  id            String   @id @default(cuid())
+  tweetCount    Int      @default(0)
+  positiveCount Int      @default(0)
+  negativeCount Int      @default(0)
+  neutralCount  Int      @default(0)
+  avgScore      Float    @default(0)
+  themes        String?  // JSON string[]
+  topTweets     String?  // JSON array of notable tweets with sentiment
+  aiSummary     String?  // Markdown AI analysis
+  rawQuery      String?  // X API search query used
+  modelId       String?  // AI model used for analysis
+  createdAt     DateTime @default(now())
+
+  topicId String
+  topic   MonitorTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@index([topicId, createdAt])
 }
 

@@ -346,3 +346,112 @@ export async function getRecentTweetsWithMetrics(
 
   return results;
 }
+
+export interface TweetLookupResult {
+  id: string;
+  text: string;
+  authorId: string;
+  authorUsername: string;
+  authorName: string;
+  createdAt: Date | null;
+  impressions: number;
+  likes: number;
+  retweets: number;
+  replies: number;
+}
+
+/**
+ * Look up a single tweet by ID with author info and public metrics.
+ */
+export async function lookupTweet(
+  tweetId: string,
+  credentials: XCredentials,
+): Promise<TweetLookupResult | null> {
+  try {
+    const client = createXClient(credentials);
+    const response = await client.v2.singleTweet(tweetId, {
+      expansions: ["author_id"],
+      "tweet.fields": ["created_at", "public_metrics", "author_id"],
+      "user.fields": ["username", "name"],
+    });
+
+    const tweet = response.data;
+    const author = response.includes?.users?.[0];
+    const metrics = tweet.public_metrics;
+
+    return {
+      id: tweet.id,
+      text: tweet.text ?? "",
+      authorId: tweet.author_id ?? "",
+      authorUsername: author?.username ?? "",
+      authorName: author?.name ?? "",
+      createdAt: tweet.created_at ? new Date(tweet.created_at) : null,
+      impressions: metrics?.impression_count ?? 0,
+      likes: metrics?.like_count ?? 0,
+      retweets: metrics?.retweet_count ?? 0,
+      replies: metrics?.reply_count ?? 0,
+    };
+  } catch (error) {
+    console.error(`Error looking up tweet ${tweetId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Batch look up tweets by IDs with author info and public metrics.
+ * Processes in chunks of 100 (X API limit).
+ */
+export async function lookupTweetsByIds(
+  tweetIds: string[],
+  credentials: XCredentials,
+): Promise<TweetLookupResult[]> {
+  if (tweetIds.length === 0) return [];
+
+  const client = createXClient(credentials);
+  const results: TweetLookupResult[] = [];
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < tweetIds.length; i += 100) {
+    chunks.push(tweetIds.slice(i, i + 100));
+  }
+
+  for (const chunk of chunks) {
+    try {
+      const response = await client.v2.tweets(chunk, {
+        expansions: ["author_id"],
+        "tweet.fields": ["created_at", "public_metrics", "author_id"],
+        "user.fields": ["username", "name"],
+      });
+
+      const tweets = Array.isArray(response.data)
+        ? response.data
+        : response.data
+          ? [response.data]
+          : [];
+      const users = response.includes?.users ?? [];
+      const userMap = new Map(users.map((u) => [u.id, u]));
+
+      for (const tweet of tweets) {
+        const author = tweet.author_id ? userMap.get(tweet.author_id) : undefined;
+        const metrics = tweet.public_metrics;
+
+        results.push({
+          id: tweet.id,
+          text: tweet.text ?? "",
+          authorId: tweet.author_id ?? "",
+          authorUsername: author?.username ?? "",
+          authorName: author?.name ?? "",
+          createdAt: tweet.created_at ? new Date(tweet.created_at) : null,
+          impressions: metrics?.impression_count ?? 0,
+          likes: metrics?.like_count ?? 0,
+          retweets: metrics?.retweet_count ?? 0,
+          replies: metrics?.reply_count ?? 0,
+        });
+      }
+    } catch {
+      // Silently skip failed chunks (rate limit, permissions, etc.)
+    }
+  }
+
+  return results;
+}
