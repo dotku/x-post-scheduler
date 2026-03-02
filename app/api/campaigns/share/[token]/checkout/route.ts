@@ -15,13 +15,17 @@ export async function POST(
   try {
     const body = await request.json();
     const clientName = (body.clientName ?? "").trim();
-    const clientEmail = (body.clientEmail ?? "").trim();
+    const clientEmail = (body.clientEmail ?? "").trim() || null;
+    const clientPhone = (body.clientPhone ?? "").trim() || null;
     const locale = body.locale ?? "en";
 
     if (!clientName) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
-    if (!clientEmail || !clientEmail.includes("@")) {
+    if (!clientEmail && !clientPhone) {
+      return NextResponse.json({ error: "Email or phone is required" }, { status: 400 });
+    }
+    if (clientEmail && !clientEmail.includes("@")) {
       return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
     }
 
@@ -50,7 +54,7 @@ export async function POST(
 
     // Calculate fees
     const budgetCents = campaign.budgetCents;
-    const platformFeeCents = Math.ceil(budgetCents * 0.03);
+    const platformFeeCents = Math.ceil(budgetCents * 0.05);
     const totalChargeCents = budgetCents + platformFeeCents;
 
     // Upsert payment record (replace any previous pending attempt)
@@ -60,6 +64,7 @@ export async function POST(
           data: {
             clientName,
             clientEmail,
+            clientPhone,
             budgetCents,
             platformFeeCents,
             totalChargeCents,
@@ -73,6 +78,7 @@ export async function POST(
             campaignId: campaign.id,
             clientName,
             clientEmail,
+            clientPhone,
             budgetCents,
             platformFeeCents,
             totalChargeCents,
@@ -86,7 +92,7 @@ export async function POST(
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
-      customer_email: clientEmail,
+      ...(clientEmail ? { customer_email: clientEmail } : {}),
       line_items: [
         {
           price_data: {
@@ -99,7 +105,7 @@ export async function POST(
         {
           price_data: {
             currency: "usd",
-            product_data: { name: "Platform Service Fee (3%)" },
+            product_data: { name: "Platform Service Fee (5%)" },
             unit_amount: platformFeeCents,
           },
           quantity: 1,
@@ -111,7 +117,8 @@ export async function POST(
         campaignId: campaign.id,
         shareToken: token,
         clientName,
-        clientEmail,
+        ...(clientEmail ? { clientEmail } : {}),
+        ...(clientPhone ? { clientPhone } : {}),
       },
       success_url: `${baseUrl}${prefix}/campaigns/share/${token}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}${prefix}/campaigns/share/${token}?payment=cancelled`,

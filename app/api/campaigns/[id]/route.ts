@@ -48,6 +48,7 @@ export async function GET(
       select: {
         clientName: true,
         clientEmail: true,
+        clientPhone: true,
         paymentStatus: true,
         budgetCents: true,
         platformFeeCents: true,

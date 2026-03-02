@@ -35,6 +35,9 @@ model User {
   lastLoginRewardAt     DateTime?
   // Weixin Channel auth
   weixinCookie          String?
+  // Stripe Connect
+  stripeConnectAccountId  String?   @unique
+  stripeConnectStatus     String?   // "pending" | "active" | "restricted"
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -55,6 +58,7 @@ model User {
   following          UserFollow[] @relation("Follower")
   campaigns              Campaign[]
   campaignAttachments    CampaignAttachment[]
+  payouts                Payout[]
 }
 
 model CronRunEvent {
@@ -469,7 +473,8 @@ model CampaignPayment {
   campaignId            String    @unique
   campaign              Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   clientName            String
-  clientEmail           String
+  clientEmail           String?
+  clientPhone           String?
   budgetCents           Int
   platformFeeCents      Int
   totalChargeCents      Int
@@ -483,5 +488,25 @@ model CampaignPayment {
 
   @@index([campaignId])
   @@index([paymentStatus])
+}
+
+model Payout {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amountCents      Int
+  feeCents         Int       @default(0)
+  netAmountCents   Int
+  method           String    @default("standard") // "standard" | "instant"
+  status           String    @default("pending")  // "pending" | "completed" | "failed"
+  stripeTransferId String?   @unique
+  stripePayoutId   String?   @unique
+  failedReason     String?
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
 }
 

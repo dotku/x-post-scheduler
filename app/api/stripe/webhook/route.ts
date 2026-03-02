@@ -144,6 +144,22 @@ export async function POST(request: NextRequest) {
       break;
     }
 
+    case "account.updated": {
+      const account = event.data.object as Stripe.Account;
+      let connectStatus = "pending";
+      if (account.charges_enabled && account.payouts_enabled) {
+        connectStatus = "active";
+      } else if (account.requirements?.currently_due?.length) {
+        connectStatus = "restricted";
+      }
+      await prisma.user.updateMany({
+        where: { stripeConnectAccountId: account.id },
+        data: { stripeConnectStatus: connectStatus },
+      });
+      console.log(`Connect account updated: ${account.id} -> ${connectStatus}`);
+      break;
+    }
+
     case "invoice.payment_succeeded": {
       const invoice = event.data.object as Stripe.Invoice & {
         subscription?: string | Stripe.Subscription | null;

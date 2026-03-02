@@ -76,7 +76,8 @@ interface Campaign {
   attachments: CampaignAttachment[];
   payment: {
     clientName: string;
-    clientEmail: string;
+    clientEmail: string | null;
+    clientPhone: string | null;
     paymentStatus: string;
     budgetCents: number;
     platformFeeCents: number;
@@ -791,7 +792,7 @@ export default function CampaignDetailPage() {
                       {campaign.payment.paymentStatus === "paid" ? t("paymentPaid") : t("paymentPending")}
                     </span>
                     <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {campaign.payment.clientName} ({campaign.payment.clientEmail})
+                      {campaign.payment.clientName} ({[campaign.payment.clientEmail, campaign.payment.clientPhone].filter(Boolean).join(" / ")})
                     </span>
                   </div>
                   <div className="text-right text-sm">

@@ -81,6 +81,7 @@ export default function SharedCampaignPage() {
   // Sign & Pay form
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
@@ -130,7 +131,8 @@ export default function SharedCampaignPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clientName: clientName.trim(),
-          clientEmail: clientEmail.trim(),
+          clientEmail: clientEmail.trim() || undefined,
+          clientPhone: clientPhone.trim() || undefined,
           locale,
         }),
       });
@@ -498,15 +500,15 @@ export default function SharedCampaignPage() {
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500 dark:text-gray-400">{t("platformFee")} (3%)</span>
+                <span className="text-gray-500 dark:text-gray-400">{t("platformFee")} (5%)</span>
                 <span className="text-gray-500 dark:text-gray-400">
-                  ${(Math.ceil(campaign.budgetCents * 0.03) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ${(Math.ceil(campaign.budgetCents * 0.05) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="border-t border-gray-200 dark:border-gray-600 pt-1.5 flex justify-between font-semibold">
                 <span className="text-gray-900 dark:text-white">{t("totalDue")}</span>
                 <span className="text-gray-900 dark:text-white">
-                  ${((campaign.budgetCents + Math.ceil(campaign.budgetCents * 0.03)) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ${((campaign.budgetCents + Math.ceil(campaign.budgetCents * 0.05)) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>
@@ -527,6 +529,18 @@ export default function SharedCampaignPage() {
                 onChange={(e) => setClientEmail(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
+              <input
+                type="tel"
+                placeholder={t("clientPhonePlaceholder")}
+                value={clientPhone}
+                onChange={(e) => setClientPhone(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {!clientEmail.trim() && !clientPhone.trim() && (
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  {t("emailOrPhoneRequired")}
+                </p>
+              )}
             </div>
 
             {paymentError && (
@@ -535,7 +549,7 @@ export default function SharedCampaignPage() {
 
             <button
               onClick={handleSignAndPay}
-              disabled={submitting || !clientName.trim() || !clientEmail.trim()}
+              disabled={submitting || !clientName.trim() || (!clientEmail.trim() && !clientPhone.trim())}
               className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               {submitting ? t("processing") : t("confirmAndPay")}
