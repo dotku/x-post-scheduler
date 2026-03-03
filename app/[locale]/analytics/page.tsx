@@ -5,8 +5,7 @@ import { redirect } from "next/navigation";
 import { getTranslations, getLocale, setRequestLocale } from "next-intl/server";
 import UserMenu from "@/components/UserMenu";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import dynamic from "next/dynamic";
-const AnalyticsContent = dynamic(() => import("@/components/AnalyticsContent"), { ssr: false });
+import AnalyticsContent from "@/components/AnalyticsContent";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +64,7 @@ export default async function AnalyticsPage({
                 href={`${prefix}/dashboard`}
                 className="text-gray-700 dark:text-gray-200 hover:underline underline-offset-4 flex items-center gap-1"
               >
-               {t("backToDashboard")}
+                {t("backToDashboard")}
               </Link>
               <div className="border-l border-gray-300 dark:border-gray-600 h-5 mx-1 hidden sm:block" />
               <LanguageSwitcher />

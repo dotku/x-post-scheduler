@@ -3,7 +3,7 @@ import { getVideoTask } from "@/lib/wavespeed";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ taskId: string }> }
+  { params }: { params: Promise<{ taskId: string }> },
 ) {
   const { taskId } = await params;
   // Prefer the full poll URL returned in the submit response (task.urls.get)
@@ -16,7 +16,7 @@ export async function GET(
     console.error("WaveSpeed poll error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to get task" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
