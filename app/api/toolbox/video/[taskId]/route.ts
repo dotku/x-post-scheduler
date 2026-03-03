@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { getVideoTask } from "@/lib/wavespeed";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  try {
-    await requireAuth();
-  } catch {
-    return unauthorizedResponse();
-  }
-
   const { taskId } = await params;
   // Prefer the full poll URL returned in the submit response (task.urls.get)
   const pollUrl = request.nextUrl.searchParams.get("pollUrl") ?? taskId;
