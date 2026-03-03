@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { IMAGE_MODELS, VIDEO_MODELS } from "@/lib/wavespeed";
-import { TEXT_MODELS, DEFAULT_TEXT_MODEL } from "@/lib/ai-models";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import LandingEditor from "./landing/LandingEditor";
 
 function detectInAppBrowser(userAgent: string) {
   const ua = userAgent.toLowerCase();
@@ -91,67 +91,7 @@ export default function LandingContent({
   const [copiedWechat, setCopiedWechat] = useState("");
   const [stats, setStats] = useState<PublicStatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
-  const [trialTopic, setTrialTopic] = useState("");
-  const [trialLanguage, setTrialLanguage] = useState("English");
-  const [trialTone, setTrialTone] = useState("");
-  const [trialGoal, setTrialGoal] = useState("");
-  const [trialOutput, setTrialOutput] = useState("");
-  const [trialTextModelId, setTrialTextModelId] = useState(
-    DEFAULT_TEXT_MODEL.id,
-  );
-  const [trialGenerating, setTrialGenerating] = useState(false);
-  const [trialError, setTrialError] = useState<string | null>(null);
-  const [trialRemainingCents, setTrialRemainingCents] = useState<number | null>(
-    null,
-  );
-  const [xKeysOpen, setXKeysOpen] = useState(false);
   const [navMenuOpen, setNavMenuOpen] = useState(false);
-  const [xApiKey, setXApiKey] = useState("");
-  const [xApiSecret, setXApiSecret] = useState("");
-  const [xAccessToken, setXAccessToken] = useState("");
-  const [xAccessTokenSecret, setXAccessTokenSecret] = useState("");
-  const [xPublishing, setXPublishing] = useState(false);
-  const [xPublishResult, setXPublishResult] = useState<{
-    success?: boolean;
-    tweetUrl?: string;
-    error?: string;
-  } | null>(null);
-  // Editor mode tabs
-  const [editorMode, setEditorMode] = useState<
-    "text" | "image" | "video" | "voice"
-  >("text");
-  // Voice (TTS) generation state
-  const [voiceText, setVoiceText] = useState("");
-  const [voiceVoice, setVoiceVoice] = useState<
-    "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer"
-  >("nova");
-  const [voiceSpeed, setVoiceSpeed] = useState(1.0);
-  const [voiceGenerating, setVoiceGenerating] = useState(false);
-  const [voiceOutput, setVoiceOutput] = useState<string | null>(null);
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-  // Image generation state
-  const t2iModels = useMemo(
-    () => IMAGE_MODELS.filter((m) => !m.mode || m.mode === "t2i"),
-    [],
-  );
-  const [imgModelId, setImgModelId] = useState("bytedance/seedream-v4.5");
-  const [imgPrompt, setImgPrompt] = useState("");
-  const [imgAspect, setImgAspect] = useState("1:1");
-  const [imgGenerating, setImgGenerating] = useState(false);
-  const [imgOutput, setImgOutput] = useState<string | null>(null);
-  const [imgError, setImgError] = useState<string | null>(null);
-  // Video generation state
-  const t2vModels = useMemo(() => VIDEO_MODELS, []);
-  const [vidModelId, setVidModelId] = useState(
-    "wavespeed-ai/wan-2.2/t2v-480p-ultra-fast",
-  );
-  const [vidPrompt, setVidPrompt] = useState("");
-  const [vidAspect, setVidAspect] = useState("16:9");
-  const [vidDuration, setVidDuration] = useState(5);
-  const [vidGenerating, setVidGenerating] = useState(false);
-  const [vidOutput, setVidOutput] = useState<string | null>(null);
-  const [vidError, setVidError] = useState<string | null>(null);
-  const vidPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const browserEnv = useMemo(() => detectInAppBrowser(userAgent), [userAgent]);
 
   const features = useMemo(
@@ -280,49 +220,6 @@ export default function LandingContent({
       .map(([vendor, requests]) => ({ vendor, requests }));
   }, [stats]);
 
-  // Cleanup poll timers on unmount
-  useEffect(() => {
-    return () => {
-      if (vidPollRef.current) clearTimeout(vidPollRef.current);
-    };
-  }, []);
-
-  // Auto-save generated images to community gallery
-  useEffect(() => {
-    if (!imgOutput) return;
-    const model = t2iModels.find((m) => m.id === imgModelId);
-    fetch("/api/landing/save-gallery", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "image",
-        modelId: imgModelId,
-        modelLabel: model?.label ?? imgModelId,
-        prompt: imgPrompt,
-        sourceUrl: imgOutput,
-        aspectRatio: imgAspect,
-      }),
-    }).catch(() => {}); // fire-and-forget
-  }, [imgOutput]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-save generated videos to community gallery
-  useEffect(() => {
-    if (!vidOutput) return;
-    const model = t2vModels.find((m) => m.id === vidModelId);
-    fetch("/api/landing/save-gallery", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "video",
-        modelId: vidModelId,
-        modelLabel: model?.label ?? vidModelId,
-        prompt: vidPrompt,
-        sourceUrl: vidOutput,
-        aspectRatio: vidAspect,
-      }),
-    }).catch(() => {}); // fire-and-forget
-  }, [vidOutput]); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
     fetch("/api/public/stats")
       .then(async (res) => {
@@ -333,62 +230,6 @@ export default function LandingContent({
       .finally(() => setStatsLoading(false));
   }, []);
 
-  // Fetch trial/user credit balance on load
-  useEffect(() => {
-    fetch("/api/landing/balance")
-      .then(async (res) => {
-        if (!res.ok) return;
-        const data = await res.json();
-        if (typeof data.remainingCents === "number") {
-          setTrialRemainingCents(data.remainingCents);
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const saved = window.sessionStorage.getItem("landing-editor-draft");
-    if (!saved) return;
-    try {
-      const parsed = JSON.parse(saved) as {
-        topic?: string;
-        xHandle?: string;
-        xCredentials?: {
-          apiKey: string;
-          apiSecret: string;
-          accessToken: string;
-          accessTokenSecret: string;
-        };
-        language?: string;
-        tone?: string;
-        goal?: string;
-        output?: string;
-      };
-      setTrialTopic(parsed.topic ?? "");
-      setTrialLanguage(parsed.language ?? "English");
-      setTrialTone(parsed.tone ?? "");
-      setTrialGoal(parsed.goal ?? "");
-      setTrialOutput(parsed.output ?? "");
-    } catch {
-      // ignore invalid session payload
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.sessionStorage.setItem(
-      "landing-editor-draft",
-      JSON.stringify({
-        topic: trialTopic,
-        language: trialLanguage,
-        tone: trialTone,
-        goal: trialGoal,
-        output: trialOutput,
-      }),
-    );
-  }, [trialTopic, trialLanguage, trialTone, trialGoal, trialOutput]);
-
   async function handleCopyLink() {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -396,280 +237,6 @@ export default function LandingContent({
       setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
-    }
-  }
-
-  async function handleGenerateTrialPost() {
-    const topic = trialTopic.trim();
-    const tone = trialTone.trim();
-    const goal = trialGoal.trim();
-
-    if (!topic || !tone || !goal) return;
-
-    setTrialGenerating(true);
-    setTrialError(null);
-    setXPublishResult(null);
-
-    try {
-      const res = await fetch("/api/landing/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          topic,
-          tone,
-          goal,
-          language: trialLanguage,
-          model: trialTextModelId,
-        }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (data.error === "trial_exhausted") {
-          setTrialError(
-            locale === "zh"
-              ? "今日 $1 免费额度已用完。注册后赠送 $5 正式额度。"
-              : "Your free trial ($1/day) is used up. Sign up to get $5 free credits.",
-          );
-        } else {
-          setTrialError(data.message || data.error || "Generation failed");
-        }
-        return;
-      }
-
-      setTrialOutput(data.content ?? "");
-      if (typeof data.remainingCents === "number") {
-        setTrialRemainingCents(data.remainingCents);
-      }
-    } catch {
-      setTrialError(
-        locale === "zh"
-          ? "生成失败，请重试"
-          : "Generation failed, please try again",
-      );
-    } finally {
-      setTrialGenerating(false);
-    }
-  }
-
-  async function handlePublishToX() {
-    if (!trialOutput.trim()) return;
-    setXPublishing(true);
-    setXPublishResult(null);
-    try {
-      const res = await fetch("/api/landing/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content: trialOutput,
-          xApiKey,
-          xApiSecret,
-          xAccessToken,
-          xAccessTokenSecret,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setXPublishResult({
-          success: false,
-          error: data.error || "Publish failed",
-        });
-      } else {
-        setXPublishResult({ success: true, tweetUrl: data.tweetUrl });
-      }
-    } catch {
-      setXPublishResult({
-        success: false,
-        error:
-          locale === "zh"
-            ? "发布失败，请重试"
-            : "Publish failed, please try again",
-      });
-    } finally {
-      setXPublishing(false);
-    }
-  }
-
-  function handleInsufficientCredits(data: { error?: string }) {
-    const exhaustedMsg =
-      locale === "zh"
-        ? "今日 $1 免费额度已用完。注册后赠送 $5 正式额度。"
-        : "Your free trial ($1/day) is used up. Sign up to get $5 free credits.";
-    return data.error?.includes("INSUFFICIENT") ||
-      data.error?.includes("trial_exhausted")
-      ? exhaustedMsg
-      : data.error ||
-          (locale === "zh" ? "生成失败，请重试" : "Generation failed");
-  }
-
-  async function handleGenerateImage() {
-    if (!imgPrompt.trim()) return;
-    setImgGenerating(true);
-    setImgOutput(null);
-    setImgError(null);
-    try {
-      const res = await fetch("/api/toolbox/image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modelId: imgModelId,
-          prompt: imgPrompt,
-          aspectRatio: imgAspect,
-          mode: "t2i",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setImgError(handleInsufficientCredits(data));
-        return;
-      }
-
-      // Update balance from response
-      if (typeof data.remainingCents === "number") {
-        setTrialRemainingCents(data.remainingCents);
-      }
-
-      // Sync: outputs returned immediately
-      let output = data.task?.outputs?.[0] ?? null;
-      if (output) {
-        setImgOutput(output);
-        return;
-      }
-
-      // Async: poll until completed (max ~2 min)
-      const taskId = data.task?.id;
-      const pollUrl = data.task?.urls?.get;
-      if (!taskId) {
-        setImgError(locale === "zh" ? "生成失败，请重试" : "Generation failed");
-        return;
-      }
-      for (let i = 0; i < 60; i++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const endpoint = pollUrl
-          ? `/api/toolbox/video/${taskId}?pollUrl=${encodeURIComponent(pollUrl)}`
-          : `/api/toolbox/video/${taskId}`;
-        const pollRes = await fetch(endpoint);
-        const pollData = await pollRes.json();
-        const task = pollData.task;
-        if (task?.status === "completed") {
-          output = task.outputs?.[0] ?? null;
-          if (output) setImgOutput(output);
-          else setImgError(locale === "zh" ? "生成失败，请重试" : "Generation failed");
-          return;
-        }
-        if (task?.status === "failed") {
-          setImgError(task.error || (locale === "zh" ? "生成失败" : "Generation failed"));
-          return;
-        }
-      }
-      setImgError(locale === "zh" ? "生成超时，请重试" : "Generation timed out");
-    } catch {
-      setImgError(locale === "zh" ? "网络错误" : "Network error");
-    } finally {
-      setImgGenerating(false);
-    }
-  }
-
-  function pollVideoStatus(taskId: string, pollUrl?: string) {
-    vidPollRef.current = setTimeout(async () => {
-      try {
-        const url = pollUrl
-          ? `/api/toolbox/video/${taskId}?pollUrl=${encodeURIComponent(pollUrl)}`
-          : `/api/toolbox/video/${taskId}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        const task = data.task;
-        if (task?.status === "completed") {
-          setVidOutput(task.outputs?.[0] ?? null);
-          setVidGenerating(false);
-        } else if (task?.status === "failed") {
-          setVidError(
-            task.error || (locale === "zh" ? "生成失败" : "Generation failed"),
-          );
-          setVidGenerating(false);
-        } else {
-          pollVideoStatus(taskId, pollUrl);
-        }
-      } catch {
-        setVidError(locale === "zh" ? "网络错误" : "Network error");
-        setVidGenerating(false);
-      }
-    }, 3000);
-  }
-
-  async function handleGenerateVideo() {
-    if (!vidPrompt.trim()) return;
-    if (vidPollRef.current) clearTimeout(vidPollRef.current);
-    setVidGenerating(true);
-    setVidOutput(null);
-    setVidError(null);
-    try {
-      const res = await fetch("/api/toolbox/video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modelId: vidModelId,
-          prompt: vidPrompt,
-          duration: vidDuration,
-          aspectRatio: vidAspect,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setVidError(handleInsufficientCredits(data));
-        setVidGenerating(false);
-        return;
-      }
-      if (typeof data.remainingCents === "number") {
-        setTrialRemainingCents(data.remainingCents);
-      }
-      const taskId = data.task?.id;
-      const taskPollUrl = data.task?.urls?.get;
-      if (taskId) {
-        pollVideoStatus(taskId, taskPollUrl);
-      } else {
-        setVidError(locale === "zh" ? "生成失败" : "Generation failed");
-        setVidGenerating(false);
-      }
-    } catch {
-      setVidError(locale === "zh" ? "网络错误" : "Network error");
-      setVidGenerating(false);
-    }
-  }
-
-  async function handleGenerateVoice() {
-    if (!voiceText.trim()) return;
-    setVoiceGenerating(true);
-    setVoiceOutput(null);
-    setVoiceError(null);
-    try {
-      const res = await fetch("/api/toolbox/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: voiceText,
-          voice: voiceVoice,
-          speed: voiceSpeed,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setVoiceError(
-          res.status === 401
-            ? locale === "zh"
-              ? "请先登录后使用语音功能"
-              : "Please sign in to use voice generation"
-            : handleInsufficientCredits(data),
-        );
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setVoiceOutput(url);
-    } catch {
-      setVoiceError(locale === "zh" ? "网络错误" : "Network error");
-    } finally {
-      setVoiceGenerating(false);
     }
   }
 
@@ -929,8 +496,9 @@ export default function LandingContent({
       </section>
 
       {/* Try editor */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
-        <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 sm:p-8">
+      <LandingEditor isLoggedIn={isLoggedIn} />
+
+      {/* EDITOR_SECTION_START_REMOVAL */}
           <div className="flex flex-col gap-2 mb-6">
             <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
               {t("editorTitle")}

@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { getTranslations, getLocale, setRequestLocale } from "next-intl/server";
 import UserMenu from "@/components/UserMenu";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
-import AnalyticsContent from "@/components/AnalyticsContent";
+import dynamic from "next/dynamic";
+const AnalyticsContent = dynamic(() => import("@/components/AnalyticsContent"), { ssr: false });
 
 export const dynamic = "force-dynamic";
 

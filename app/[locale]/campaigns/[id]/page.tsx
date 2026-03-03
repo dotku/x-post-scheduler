@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import ReactMarkdown from "react-markdown";
-import SentimentMonitor from "@/components/SentimentMonitor";
+import dynamic from "next/dynamic";
+const SentimentMonitor = dynamic(() => import("@/components/SentimentMonitor"), { ssr: false });
 
 interface KnowledgeSourceRef {
   id: string;

@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { format } from "date-fns";
 
 /* ------------------------------------------------------------------ */
@@ -22,6 +22,8 @@ function SinglePostForm({
   const router = useRouter();
   const searchParams = useSearchParams();
   const t = useTranslations("schedule");
+  const locale = useLocale();
+  const prefix = locale === "zh" ? "/zh" : "";
 
   const [content, setContent] = useState("");
   const [scheduleType, setScheduleType] = useState<"now" | "later">("now");
@@ -81,7 +83,7 @@ function SinglePostForm({
         const data = await res.json();
         throw new Error(data.error || "Failed to create post");
       }
-      router.push("/dashboard");
+      router.push(`${prefix}/dashboard`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -391,6 +393,8 @@ function ThreadForm({
 }) {
   const router = useRouter();
   const t = useTranslations("schedule");
+  const locale = useLocale();
+  const prefix = locale === "zh" ? "/zh" : "";
 
   const [prompt, setPrompt] = useState("");
   const [threadCount, setThreadCount] = useState(5);
@@ -448,7 +452,7 @@ function ThreadForm({
         const data = await res.json();
         throw new Error(data.error || "Failed to post thread");
       }
-      router.push("/dashboard");
+      router.push(`${prefix}/dashboard`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");

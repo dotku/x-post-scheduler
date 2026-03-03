@@ -114,6 +114,10 @@ model Post {
   xAccountId   String?
   user         User?     @relation(fields: [userId], references: [id])
   xAccount     XAccount? @relation(fields: [xAccountId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, scheduledAt])
+  @@index([userId, status, postedAt])
 }
 
 model RecurringSchedule {
@@ -134,6 +138,9 @@ model RecurringSchedule {
   xAccountId  String?
   user        User?    @relation(fields: [userId], references: [id])
   xAccount    XAccount? @relation(fields: [xAccountId], references: [id])
+
+  @@index([isActive, nextRunAt])
+  @@index([userId, isActive])
 }
 
 model KnowledgeSource {

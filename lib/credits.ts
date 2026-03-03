@@ -192,9 +192,18 @@ export async function deductCredits(params: {
   const costCents = Math.max(1, Math.ceil(rawCostCents * discountMultiplier));
   const savedCents = rawCostCents - costCents;
 
-  const updatedUser = await prisma.user.update({
-    where: { id: params.userId },
+  // Atomic deduction with negative-balance guard
+  const result = await prisma.user.updateMany({
+    where: { id: params.userId, creditBalanceCents: { gte: costCents } },
     data: { creditBalanceCents: { decrement: costCents } },
+  });
+
+  if (result.count === 0) {
+    throw new Error("INSUFFICIENT_CREDITS");
+  }
+
+  const updatedUser = await prisma.user.findUniqueOrThrow({
+    where: { id: params.userId },
     select: { creditBalanceCents: true },
   });
 
@@ -232,9 +241,18 @@ export async function deductFlatFee(params: {
   );
   const savedCents = params.feeCents - costCents;
 
-  const updatedUser = await prisma.user.update({
-    where: { id: params.userId },
+  // Atomic deduction with negative-balance guard
+  const result = await prisma.user.updateMany({
+    where: { id: params.userId, creditBalanceCents: { gte: costCents } },
     data: { creditBalanceCents: { decrement: costCents } },
+  });
+
+  if (result.count === 0) {
+    throw new Error("INSUFFICIENT_CREDITS");
+  }
+
+  const updatedUser = await prisma.user.findUniqueOrThrow({
+    where: { id: params.userId },
     select: { creditBalanceCents: true },
   });
 

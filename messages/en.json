@@ -1,5 +1,6 @@
 {
   "nav": {
+    "dashboard": "Dashboard",
     "gallery": "Community",
     "toolbox": "Media Studio",
     "generate": "AI Post Scheduler",

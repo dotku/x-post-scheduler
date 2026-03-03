@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0-client";
+import { requireAdmin } from "@/lib/admin";
 
 const DEFAULT_ROLE_CLAIM_KEYS = [
   "https://x-post-scheduler/roles",
@@ -73,6 +74,12 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 }
 
 export async function GET() {
+  try {
+    await requireAdmin();
+  } catch {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const session = await auth0.getSession();
   if (!session?.user) {
     return NextResponse.json({ authenticated: false }, { status: 401 });

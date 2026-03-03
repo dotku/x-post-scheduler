@@ -75,8 +75,20 @@ function extractImageUrlFromSrcset(srcset: string | undefined): string | null {
   return first || null;
 }
 
+const BLOCKED_HOSTS = /^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.\d+\.\d+|\[::1])/i;
+
+function isBlockedUrl(urlString: string): boolean {
+  try {
+    const parsed = new URL(urlString);
+    return BLOCKED_HOSTS.test(parsed.hostname);
+  } catch {
+    return true;
+  }
+}
+
 // Scrape a single page
 async function scrapeSinglePage(url: string): Promise<PageContent | null> {
+  if (isBlockedUrl(url)) return null;
   try {
     const response = await fetch(url, {
       headers: {
