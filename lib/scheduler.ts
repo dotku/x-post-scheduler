@@ -148,13 +148,17 @@ export async function processRecurringSchedules() {
       membershipCache.set(schedule.userId!, membershipActive);
     }
 
+    // Allow non-members if they have credits (pay-per-use)
     if (!membershipActive) {
-      await prisma.recurringSchedule.update({
-        where: { id: schedule.id },
-        data: { isActive: false },
-      });
-      console.log(`Schedule ${schedule.id} paused: membership inactive`);
-      continue;
+      const userHasCredits = await hasCredits(schedule.userId!);
+      if (!userHasCredits) {
+        await prisma.recurringSchedule.update({
+          where: { id: schedule.id },
+          data: { isActive: false },
+        });
+        console.log(`Schedule ${schedule.id} paused: no membership or credits`);
+        continue;
+      }
     }
 
     const resolved = await getUserXCredentials(

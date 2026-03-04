@@ -76,13 +76,6 @@ export async function GET() {
 
   const membership = await getMembership(user.id);
 
-  if (!membership.active) {
-    await prisma.recurringSchedule.updateMany({
-      where: { userId: user.id, isActive: true },
-      data: { isActive: false },
-    });
-  }
-
   const [schedules, recurringUsage, dbUser] = await Promise.all([
     prisma.recurringSchedule.findMany({
       where: { userId: user.id },
@@ -101,6 +94,14 @@ export async function GET() {
       select: { creditBalanceCents: true },
     }),
   ]);
+
+  // Deactivate schedules only if no membership AND no credits
+  if (!membership.active && (dbUser?.creditBalanceCents ?? 0) <= 0) {
+    await prisma.recurringSchedule.updateMany({
+      where: { userId: user.id, isActive: true },
+      data: { isActive: false },
+    });
+  }
 
   const normalizedSchedules = schedules.map((schedule) => {
     const decoded = decodeRecurringAiPrompt(schedule.aiPrompt);
@@ -136,8 +137,16 @@ export async function POST(request: NextRequest) {
   }
 
   const membership = await getMembership(user.id);
+
+  // Allow non-members if they have credits (pay-per-use)
   if (!membership.active) {
-    return NextResponse.json({ error: "MEMBERSHIP_REQUIRED" }, { status: 403 });
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { creditBalanceCents: true },
+    });
+    if (!dbUser || dbUser.creditBalanceCents <= 0) {
+      return NextResponse.json({ error: "CREDITS_OR_MEMBERSHIP_REQUIRED" }, { status: 403 });
+    }
   }
 
   const body = await request.json();
@@ -180,9 +189,9 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-  } else if (normalizedPrompt && normalizedPrompt.length > 500) {
+  } else if (normalizedPrompt && normalizedPrompt.length > 1000) {
     return NextResponse.json(
-      { error: "AI prompt exceeds 500 characters" },
+      { error: "AI prompt exceeds 1000 characters" },
       { status: 400 },
     );
   }

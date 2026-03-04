@@ -52,6 +52,58 @@ const IMAGE_MODELS_IDS = [
   { id: "alibaba/wan-2.6/text-to-image", label: "Wan 2.6 Image" },
 ];
 
+// --- Client-side cost estimation for model selection ---
+// Text model pricing: cents per 1M tokens (matches server-side PRICING in lib/credits.ts)
+const TEXT_MODEL_PRICING: Record<string, { inputPer1M: number; outputPer1M: number }> = {
+  "openai/gpt-4o":      { inputPer1M: 250, outputPer1M: 1000 },
+  "openai/gpt-4o-mini": { inputPer1M: 15,  outputPer1M: 60 },
+  "openai/gpt-5":       { inputPer1M: 125, outputPer1M: 1000 },
+  "anthropic/claude-sonnet-4":  { inputPer1M: 300, outputPer1M: 1500 },
+  "anthropic/claude-3.5-haiku": { inputPer1M: 80,  outputPer1M: 400 },
+  "google/gemini-2.5-flash":    { inputPer1M: 30,  outputPer1M: 250 },
+  "google/gemini-2.5-pro":      { inputPer1M: 125, outputPer1M: 1000 },
+  "xai/grok-3":        { inputPer1M: 300, outputPer1M: 1500 },
+  "xai/grok-3-mini":   { inputPer1M: 30,  outputPer1M: 50 },
+  "mistral/mistral-small":  { inputPer1M: 10, outputPer1M: 30 },
+  "mistral/mistral-medium": { inputPer1M: 40, outputPer1M: 200 },
+};
+const TEXT_MARKUP = Number(process.env.NEXT_PUBLIC_OPENAI_CHARGE_MULTIPLIER) || 60;
+// Typical auto-post: ~800 input tokens (system + prompt + trends), ~150 output tokens (tweet)
+const TYPICAL_INPUT_TOKENS = 800;
+const TYPICAL_OUTPUT_TOKENS = 150;
+
+function getTextModelEstCents(modelId: string): number {
+  const rates = TEXT_MODEL_PRICING[modelId];
+  if (!rates) return 0;
+  const raw =
+    (TYPICAL_INPUT_TOKENS / 1_000_000) * rates.inputPer1M +
+    (TYPICAL_OUTPUT_TOKENS / 1_000_000) * rates.outputPer1M;
+  return Math.max(1, Math.ceil(raw * TEXT_MARKUP));
+}
+
+// Image model base cost in cents (matches WAVESPEED_MODEL_BASE_COST_CENTS in lib/credits.ts)
+const IMAGE_BASE_COST: Record<string, number> = {
+  "bytedance/seedream-v4.5": 4,
+  "bytedance/seedream-v4": 4,
+  "bytedance/dreamina-v3.1/text-to-image": 6,
+  "wavespeed-ai/qwen-image/text-to-image": 5,
+  "alibaba/wan-2.6/text-to-image": 8,
+};
+const IMAGE_MULTIPLIER =
+  Number(process.env.NEXT_PUBLIC_WAVESPEED_IMAGE_CHARGE_MULTIPLIER) ||
+  Number(process.env.NEXT_PUBLIC_WAVESPEED_CHARGE_MULTIPLIER) || 5;
+
+function getImageModelEstCents(modelId: string): number {
+  const base = IMAGE_BASE_COST[modelId];
+  if (!base) return 0;
+  return Math.max(1, Math.ceil(base * IMAGE_MULTIPLIER));
+}
+
+function formatEstCost(cents: number): string {
+  if (cents <= 0) return "";
+  return `~$${(cents / 100).toFixed(2)}`;
+}
+
 type ScheduleFrequency =
   | "daily"
   | "weekly"
@@ -250,7 +302,7 @@ export default function RecurringPage() {
     e.preventDefault();
     setError("");
 
-    if (aiPrompt.length > 500) {
+    if (aiPrompt.length > 1000) {
       setError(t("errorAiPrompt"));
       return;
     }
@@ -957,11 +1009,14 @@ export default function RecurringPage() {
                   onChange={(e) => setTextModelId(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 >
-                  {TEXT_MODELS.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.label} · {model.provider}
-                    </option>
-                  ))}
+                  {TEXT_MODELS.map((model) => {
+                    const est = formatEstCost(getTextModelEstCents(model.id));
+                    return (
+                      <option key={model.id} value={model.id}>
+                        {model.label} · {model.provider}{est ? ` (${est}/post)` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
               <div>
@@ -977,13 +1032,16 @@ export default function RecurringPage() {
                   onChange={(e) => setImageModelId(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 >
-                  {IMAGE_MODELS_IDS.map((model) => (
-                    <option key={model.id || "none"} value={model.id}>
-                      {model.labelKey
-                        ? t(model.labelKey as Parameters<typeof t>[0])
-                        : model.label}
-                    </option>
-                  ))}
+                  {IMAGE_MODELS_IDS.map((model) => {
+                    const est = model.id ? formatEstCost(getImageModelEstCents(model.id)) : "";
+                    return (
+                      <option key={model.id || "none"} value={model.id}>
+                        {model.labelKey
+                          ? t(model.labelKey as Parameters<typeof t>[0])
+                          : model.label}{est ? ` (${est}/img)` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   {t("imageModelHint")}
@@ -1129,7 +1187,7 @@ export default function RecurringPage() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               {t("yourSchedules")}
             </h2>
-            {membershipReady && !membershipActive && (
+            {membershipReady && !membershipActive && balanceCents <= 0 && (
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
                 <p className="font-medium">{t("subscribeReminderTitle")}</p>
                 <p className="mt-0.5">
@@ -1293,11 +1351,14 @@ export default function RecurringPage() {
                                 }
                                 className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                               >
-                                {TEXT_MODELS.map((model) => (
-                                  <option key={model.id} value={model.id}>
-                                    {model.label} · {model.provider}
-                                  </option>
-                                ))}
+                                {TEXT_MODELS.map((model) => {
+                                  const est = formatEstCost(getTextModelEstCents(model.id));
+                                  return (
+                                    <option key={model.id} value={model.id}>
+                                      {model.label} · {model.provider}{est ? ` (${est}/post)` : ""}
+                                    </option>
+                                  );
+                                })}
                               </select>
                             </div>
                             <div>
@@ -1311,20 +1372,23 @@ export default function RecurringPage() {
                                 }
                                 className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                               >
-                                {IMAGE_MODELS_IDS.map((model) => (
-                                  <option
-                                    key={model.id || "none"}
-                                    value={model.id}
-                                  >
-                                    {model.labelKey
-                                      ? t(
-                                          model.labelKey as Parameters<
-                                            typeof t
-                                          >[0],
-                                        )
-                                      : model.label}
-                                  </option>
-                                ))}
+                                {IMAGE_MODELS_IDS.map((model) => {
+                                  const est = model.id ? formatEstCost(getImageModelEstCents(model.id)) : "";
+                                  return (
+                                    <option
+                                      key={model.id || "none"}
+                                      value={model.id}
+                                    >
+                                      {model.labelKey
+                                        ? t(
+                                            model.labelKey as Parameters<
+                                              typeof t
+                                            >[0],
+                                          )
+                                        : model.label}{est ? ` (${est}/img)` : ""}
+                                    </option>
+                                  );
+                                })}
                               </select>
                             </div>
                             {/* Trending region for edit */}

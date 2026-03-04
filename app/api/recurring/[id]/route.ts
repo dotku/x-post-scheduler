@@ -92,12 +92,19 @@ export async function PATCH(
     membership?.subscriptionStatus,
   );
 
+  // Allow non-members if they have credits (pay-per-use)
   if (!membershipActive) {
-    await prisma.recurringSchedule.updateMany({
-      where: { userId: user.id, isActive: true },
-      data: { isActive: false },
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { creditBalanceCents: true },
     });
-    return NextResponse.json({ error: "MEMBERSHIP_REQUIRED" }, { status: 403 });
+    if (!dbUser || dbUser.creditBalanceCents <= 0) {
+      await prisma.recurringSchedule.updateMany({
+        where: { userId: user.id, isActive: true },
+        data: { isActive: false },
+      });
+      return NextResponse.json({ error: "CREDITS_OR_MEMBERSHIP_REQUIRED" }, { status: 403 });
+    }
   }
 
   const body = await request.json();
@@ -144,9 +151,9 @@ export async function PATCH(
   if ("aiPrompt" in body) {
     const aiPrompt =
       typeof body.aiPrompt === "string" ? body.aiPrompt.trim() : "";
-    if (aiPrompt.length > 500) {
+    if (aiPrompt.length > 1000) {
       return NextResponse.json(
-        { error: "AI prompt exceeds 500 characters" },
+        { error: "AI prompt exceeds 1000 characters" },
         { status: 400 },
       );
     }
