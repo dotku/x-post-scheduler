@@ -11,6 +11,12 @@ export default function DocsPage() {
             </h1>
             <div className="flex gap-3">
               <Link
+                href="/docs/api"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                REST API →
+              </Link>
+              <Link
                 href="/docs/models"
                 className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
               >

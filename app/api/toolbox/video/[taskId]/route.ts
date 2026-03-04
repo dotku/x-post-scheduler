@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getVideoTask } from "@/lib/wavespeed";
+import { pollVideo, type VideoProvider } from "@/lib/video-provider";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> },
 ) {
   const { taskId } = await params;
-  // Prefer the full poll URL returned in the submit response (task.urls.get)
-  const pollUrl = request.nextUrl.searchParams.get("pollUrl") ?? taskId;
 
   try {
-    const task = await getVideoTask(pollUrl);
+    const provider = (request.nextUrl.searchParams.get("provider") ?? "wavespeed") as VideoProvider;
+    const pollUrl = request.nextUrl.searchParams.get("pollUrl") ?? taskId;
+    // Seedance uses task ID directly; Wavespeed uses pollUrl
+    const task = await pollVideo(provider === "seedance" ? taskId : pollUrl, provider);
     return NextResponse.json({ task });
   } catch (error) {
-    console.error("WaveSpeed poll error:", error);
+    console.error("Video poll error:", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to get task" },
       { status: 500 },

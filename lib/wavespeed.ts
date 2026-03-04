@@ -19,6 +19,8 @@ export interface VideoSubmitParams {
   imageUrl?: string;
   /** Whether to generate audio/sound */
   generateAudio?: boolean;
+  /** Lock camera position (Seedance 2.0 only) */
+  lockCamera?: boolean;
 }
 
 export interface VideoTask {

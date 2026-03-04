@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
-import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
-import { getCreditBalance, deductFlatFee } from "@/lib/credits";
+import { getAuthenticatedUser } from "@/lib/auth0";
+import {
+  getCreditBalance,
+  deductFlatFee,
+  getOrCreateTrialUser,
+  isDailyTrialCapReached,
+} from "@/lib/credits";
 
 const ALLOWED_VOICES = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"] as const;
 type Voice = (typeof ALLOWED_VOICES)[number];
@@ -11,12 +16,51 @@ function getTtsFeeCents(charCount: number): number {
   return Math.max(1, Math.ceil((charCount / 1000) * 7.5));
 }
 
+function getClientIp(request: NextRequest): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  const cfConnectingIp = request.headers.get("cf-connecting-ip");
+  const ip = forwarded
+    ? forwarded.split(",")[0].trim()
+    : cfConnectingIp || "unknown";
+  return ip;
+}
+
 export async function POST(request: NextRequest) {
-  let user;
+  let user: Awaited<ReturnType<typeof getAuthenticatedUser>> | null = null;
+  const clientIp = getClientIp(request);
+  const userAgent = request.headers.get("user-agent") || "unknown";
+
   try {
-    user = await requireAuth();
+    const authenticatedUser = await getAuthenticatedUser();
+    if (authenticatedUser) {
+      user = authenticatedUser;
+    }
   } catch {
-    return unauthorizedResponse();
+    // Not authenticated
+  }
+
+  if (!user) {
+    if (await isDailyTrialCapReached()) {
+      return NextResponse.json(
+        {
+          error:
+            "Daily trial limit reached. Sign up for a free account to continue!",
+          trialMessage:
+            "The platform's daily trial quota has been reached. Sign up to get $5 free credits!",
+        },
+        { status: 402 },
+      );
+    }
+    const trialUserId = await getOrCreateTrialUser(clientIp, userAgent);
+    user = {
+      id: trialUserId,
+      auth0Sub: "trial",
+      email: null,
+      name: "Trial User",
+      picture: null,
+      language: "en",
+      weixinCookie: null,
+    };
   }
 
   const body = await request.json();
@@ -34,9 +78,14 @@ export async function POST(request: NextRequest) {
   const feeCents = getTtsFeeCents(text.length);
   const balanceCents = await getCreditBalance(user.id);
   if (balanceCents < feeCents) {
+    const isTrialUser = user.id.startsWith("trial-");
     return NextResponse.json(
       {
         error: `INSUFFICIENT_CREDITS. Need $${(feeCents / 100).toFixed(2)} (${text.length} chars) but balance is $${(balanceCents / 100).toFixed(2)}.`,
+        ...(isTrialUser && {
+          trialMessage:
+            "You've used your daily $1 trial credit. Sign up for a free account to unlock more credits!",
+        }),
       },
       { status: 402 },
     );

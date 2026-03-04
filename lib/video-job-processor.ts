@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { getVideoTask, submitVideoTask } from "./wavespeed";
+import { submitVideo, pollVideo, detectVideoProvider } from "./video-provider";
 import { deductWavespeedCredits } from "./credits";
 import { trackWavespeedUsage } from "./usage-tracking";
 import { put } from "@vercel/blob";
@@ -28,6 +28,7 @@ const T2V_TO_I2V: Record<string, string> = {
   "alibaba/wan-2.6/text-to-video": "wavespeed-ai/uno",
   "bytedance/seedance-v1.5-pro/text-to-video": "wavespeed-ai/uno",
   "kwaivgi/kling-video-o3-std/text-to-video": "wavespeed-ai/uno",
+  "seedance-2.0/text-to-video": "seedance-2.0/image-to-video",
 };
 
 interface JobSegment {
@@ -181,7 +182,7 @@ export async function processVideoJob(jobId: string) {
             : (job.i2vImageUrl ?? undefined);
 
         // Submit segment generation
-        const taskRes = await submitVideoTask({
+        const taskRes = await submitVideo({
           modelId: segModelId,
           prompt: segment.prompt || job.prompt,
           duration: job.duration,
@@ -270,7 +271,8 @@ export async function processVideoJob(jobId: string) {
 
           // Poll again in 3 seconds
           await new Promise((resolve) => setTimeout(resolve, 3000));
-          task = await getVideoTask(task.urls?.get || task.id);
+          const provider = detectVideoProvider(segModelId);
+          task = await pollVideo(provider === "seedance" ? task.id : (task.urls?.get || task.id), provider);
         }
 
         if (task.status !== "completed") {
@@ -369,7 +371,7 @@ export async function processVideoJob(jobId: string) {
           sourceUrl: completedUrls[0],
           aspectRatio: job.aspectRatio || "16:9",
           generationMeta: {
-            provider: "wavespeed",
+            provider: detectVideoProvider(job.modelId) as string,
             kind: "video",
             mode: job.videoMode,
             longVideo: true,

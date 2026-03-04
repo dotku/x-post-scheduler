@@ -100,6 +100,9 @@ const WAVESPEED_MODEL_BASE_COST_CENTS: Record<string, number> = {
   "alibaba/wan-2.6/text-to-video": 40,
   "bytedance/seedance-v1.5-pro/text-to-video": 50,
   "kwaivgi/kling-video-o3-std/text-to-video": 60,
+  // Seedance 2.0 (via seedanceapi.org)
+  "seedance-2.0/text-to-video": 60,
+  "seedance-2.0/image-to-video": 60,
 };
 
 /**

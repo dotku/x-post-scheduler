@@ -7,6 +7,7 @@ import { getWavespeedFeeCents } from "@/lib/credits";
 import AdminCreditTopup from "@/components/AdminCreditTopup";
 import AdminMembershipManager from "@/components/AdminMembershipManager";
 import AdminMediaNewsTrigger from "@/components/AdminMediaNewsTrigger";
+import AdminUserGrowthChart from "@/components/AdminUserGrowthChart";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
@@ -211,6 +212,7 @@ export default async function AdminPage() {
     revenueAllTimeAgg,
     payingUsers30d,
     payingUsersAllTime,
+    userGrowthRaw,
   ] = await Promise.all([
     prisma.cronRunEvent.count({ where: { createdAt: { gte: since24h } } }),
     prisma.cronRunEvent.count({ where: { createdAt: { gte: since7d } } }),
@@ -328,6 +330,13 @@ export default async function AdminPage() {
       distinct: ["userId"],
       select: { userId: true },
     }),
+    prisma.$queryRaw<Array<{ date: string; count: bigint }>>`
+      SELECT DATE("createdAt") AS date, COUNT(*)::bigint AS count
+      FROM "User"
+      WHERE "createdAt" >= ${since30d}
+      GROUP BY DATE("createdAt")
+      ORDER BY date ASC
+    `,
   ]);
 
   let webVisits24h = 0;
@@ -370,6 +379,19 @@ export default async function AdminPage() {
       console.error("Failed to load Website Traffic stats:", error);
     }
   }
+  const usersBeforeWindow = totalUsers - userGrowthRaw.reduce((sum, r) => sum + Number(r.count), 0);
+  let cumulativeUsers = usersBeforeWindow;
+  const userGrowthData = userGrowthRaw.map((row) => {
+    const newUsers = Number(row.count);
+    cumulativeUsers += newUsers;
+    const d = new Date(row.date);
+    return {
+      date: `${d.getMonth() + 1}/${d.getDate()}`,
+      newUsers,
+      totalUsers: cumulativeUsers,
+    };
+  });
+
   const revenue24hCents = revenue24hAgg._sum.amountCents ?? 0;
   const revenue30dCents = revenue30dAgg._sum.amountCents ?? 0;
   const revenueAllTimeCents = revenueAllTimeAgg._sum.amountCents ?? 0;
@@ -491,6 +513,27 @@ export default async function AdminPage() {
             title={t("activeSchedules")}
             value={activeSchedules.toLocaleString()}
           />
+        </section>
+
+        <section className="bg-white dark:bg-gray-800 rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t("userGrowth")}
+            </h2>
+          </div>
+          <div className="p-6">
+            {userGrowthData.length > 0 ? (
+              <AdminUserGrowthChart
+                data={userGrowthData}
+                newUsersLabel={t("newUsers")}
+                totalUsersLabel={t("totalUsersLabel")}
+              />
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {t("noUserGrowthData")}
+              </p>
+            )}
+          </div>
         </section>
 
         <section className="bg-white dark:bg-gray-800 rounded-lg shadow">

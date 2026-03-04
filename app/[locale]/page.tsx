@@ -20,8 +20,8 @@ export async function generateMetadata({
     : "xPilot — AI Social Media Marketing Copilot";
 
   const description = isZh
-    ? "AI 驱动的社媒内容调度与自动发布平台。文生图、文生视频、知识库驱动创作，Campaign 管理与传媒行业日报，一站式助力品牌增长。"
-    : "AI-powered social media scheduling and automation. Generate images, videos, and posts from your knowledge base. Campaign management, media industry reports, and multi-account publishing — all in one platform.";
+    ? "AI 驱动的社媒内容调度与自动发布平台。支持文生视频、文生图、知识库驱动创作，Campaign 管理与传媒行业日报，一站式助力品牌增长。"
+    : "AI-powered social media scheduling and automation. Featuring AI video generation, image generation, and knowledge-base-driven content creation. Campaign management, media reports, and multi-account publishing — all in one platform.";
 
   return {
     title: { absolute: titleText },
@@ -81,7 +81,7 @@ export default async function LandingPage({
         applicationCategory: "BusinessApplication",
         operatingSystem: "Web",
         description:
-          "AI-powered social media scheduling, content creation, and marketing automation platform.",
+          "AI-powered social media scheduling, content creation, and marketing automation platform with AI video and image generation.",
         offers: {
           "@type": "Offer",
           price: "0",

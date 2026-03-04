@@ -2453,6 +2453,38 @@ export default function SettingsPage() {
           )}
         </div>
         {/* end Credits+AI Usage grid */}
+
+        {/* Developer & API section */}
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Link
+            href={`${pathname.startsWith("/zh") ? "/zh" : ""}/settings/api-keys`}
+            className="block bg-white dark:bg-gray-800 rounded-lg shadow p-5 hover:ring-2 hover:ring-blue-500 transition-all"
+          >
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+              {tr("API Keys", "API 密钥")}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {tr(
+                "Manage API keys for programmatic access to xPilot",
+                "管理 API 密钥，通过 REST API 访问 xPilot",
+              )}
+            </p>
+          </Link>
+          <Link
+            href={`${pathname.startsWith("/zh") ? "/zh" : ""}/settings/provider-keys`}
+            className="block bg-white dark:bg-gray-800 rounded-lg shadow p-5 hover:ring-2 hover:ring-blue-500 transition-all"
+          >
+            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+              {tr("Provider API Keys (BYOK)", "第三方 API Key (自带 Key)")}
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {tr(
+                "Use your own Seedance API key to bypass platform credits",
+                "填入你自己的 Seedance API Key，免除平台费用",
+              )}
+            </p>
+          </Link>
+        </div>
       </main>
     </div>
   );

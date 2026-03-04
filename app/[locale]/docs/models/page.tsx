@@ -123,6 +123,14 @@ const VIDEO_T2V_MODELS: ModelEntry[] = [
     descEn: "Best motion quality · Premium dynamics",
     tier: "premium",
   },
+  {
+    name: "Seedance 2.0",
+    developer: "ByteDance",
+    descZh: "最新 Seedance · 支持音频 + 锁定镜头 · 最长 12 秒",
+    descEn: "Latest Seedance · Audio + lock camera · Up to 12s",
+    tier: "premium",
+    badge: "audio",
+  },
 ];
 
 const VIDEO_I2V_MODELS: ModelEntry[] = [
@@ -145,6 +153,14 @@ const VIDEO_I2V_MODELS: ModelEntry[] = [
     developer: "ByteDance",
     descZh: "图片转视频 · 电影级 · 支持音频",
     descEn: "Image-to-video · Cinematic · Audio support",
+    tier: "premium",
+    badge: "audio",
+  },
+  {
+    name: "Seedance 2.0 i2v",
+    developer: "ByteDance",
+    descZh: "图片转视频 · 最新 Seedance · 支持音频 + 锁定镜头 · 最长 12 秒",
+    descEn: "Image-to-video · Latest Seedance · Audio + lock camera · Up to 12s",
     tier: "premium",
     badge: "audio",
   },

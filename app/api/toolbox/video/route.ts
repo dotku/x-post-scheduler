@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth0";
-import { submitVideoTask, VIDEO_MODELS, I2V_MODELS } from "@/lib/wavespeed";
+import { VIDEO_MODELS, I2V_MODELS } from "@/lib/wavespeed";
+import { SEEDANCE_VIDEO_MODELS, SEEDANCE_I2V_MODELS } from "@/lib/seedance";
+import { submitVideo, detectVideoProvider } from "@/lib/video-provider";
 import { trackWavespeedUsage } from "@/lib/usage-tracking";
 import {
   deductWavespeedCredits,
@@ -9,6 +11,8 @@ import {
   getOrCreateTrialUser,
   isDailyTrialCapReached,
 } from "@/lib/credits";
+import { prisma } from "@/lib/db";
+import { decrypt } from "@/lib/encryption";
 
 function getClientIp(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -58,7 +62,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { modelId, prompt, duration, aspectRatio, imageUrl, generateAudio } =
+  const { modelId, prompt, duration, aspectRatio, imageUrl, generateAudio, lockCamera } =
     body as {
       modelId: string;
       prompt: string;
@@ -66,70 +70,94 @@ export async function POST(request: NextRequest) {
       aspectRatio?: string;
       imageUrl?: string;
       generateAudio?: boolean;
+      lockCamera?: boolean;
     };
 
   if (!prompt?.trim()) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
   }
 
-  const allVideoModels = [...VIDEO_MODELS, ...I2V_MODELS];
+  const allVideoModels = [...VIDEO_MODELS, ...I2V_MODELS, ...SEEDANCE_VIDEO_MODELS, ...SEEDANCE_I2V_MODELS];
   const validModel = allVideoModels.find((m) => m.id === modelId);
   if (!validModel) {
     return NextResponse.json({ error: "Invalid model" }, { status: 400 });
   }
 
-  const feeCents = getWavespeedFeeCents(modelId, "video");
-  const balanceCents = await getCreditBalance(user.id);
-  if (balanceCents < feeCents) {
-    const isTrialUser = user.id.startsWith("trial-");
-    return NextResponse.json(
-      {
-        error: `Insufficient credits. Need $${(feeCents / 100).toFixed(2)} to generate this video.`,
-        ...(isTrialUser && {
-          trialMessage:
-            "You've used your daily $1 trial credit. Sign up for a free account to unlock more credits!",
-        }),
-      },
-      { status: 402 },
-    );
+  // Check for BYOK Seedance key
+  let userSeedanceKey: string | null = null;
+  const isSeedanceModel = detectVideoProvider(modelId) === "seedance";
+  if (isSeedanceModel && !user.id.startsWith("trial-")) {
+    try {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { seedanceApiKey: true },
+      });
+      if (dbUser?.seedanceApiKey) {
+        userSeedanceKey = decrypt(dbUser.seedanceApiKey);
+      }
+    } catch (e) {
+      console.error("Failed to fetch BYOK key:", e);
+    }
+  }
+
+  const useBYOK = isSeedanceModel && !!userSeedanceKey;
+
+  // Skip credit check if using BYOK
+  if (!useBYOK) {
+    const feeCents = getWavespeedFeeCents(modelId, "video");
+    const balanceCents = await getCreditBalance(user.id);
+    if (balanceCents < feeCents) {
+      const isTrialUser = user.id.startsWith("trial-");
+      return NextResponse.json(
+        {
+          error: `Insufficient credits. Need $${(feeCents / 100).toFixed(2)} to generate this video.`,
+          ...(isTrialUser && {
+            trialMessage:
+              "You've used your daily $1 trial credit. Sign up for a free account to unlock more credits!",
+          }),
+        },
+        { status: 402 },
+      );
+    }
   }
 
   try {
-    const task = await submitVideoTask({
-      modelId,
-      prompt,
-      duration,
-      aspectRatio,
-      imageUrl,
-      generateAudio,
-    });
-    try {
-      await deductWavespeedCredits({
-        userId: user.id,
-        modelId,
-        mediaType: "video",
-        source: "toolbox_video_generate",
-        taskId: task.id,
-      });
-    } catch (creditError) {
-      if (
-        creditError instanceof Error &&
-        creditError.message === "INSUFFICIENT_CREDITS"
-      ) {
-        const isTrialUser = user.id.startsWith("trial-");
-        return NextResponse.json(
-          {
-            error: `Insufficient credits. Need $${(feeCents / 100).toFixed(2)} to generate this video.`,
-            ...(isTrialUser && {
-              trialMessage:
-                "You've used your daily $1 trial credit. Sign up for a free account to unlock more credits!",
-            }),
-          },
-          { status: 402 },
-        );
+    const task = await submitVideo(
+      { modelId, prompt, duration, aspectRatio, imageUrl, generateAudio, lockCamera },
+      useBYOK ? { userSeedanceKey: userSeedanceKey! } : undefined,
+    );
+
+    // Skip credit deduction if using BYOK
+    if (!useBYOK) {
+      try {
+        await deductWavespeedCredits({
+          userId: user.id,
+          modelId,
+          mediaType: "video",
+          source: "toolbox_video_generate",
+          taskId: task.id,
+        });
+      } catch (creditError) {
+        if (
+          creditError instanceof Error &&
+          creditError.message === "INSUFFICIENT_CREDITS"
+        ) {
+          const isTrialUser = user.id.startsWith("trial-");
+          return NextResponse.json(
+            {
+              error: `Insufficient credits. Need $${(getWavespeedFeeCents(modelId, "video") / 100).toFixed(2)} to generate this video.`,
+              ...(isTrialUser && {
+                trialMessage:
+                  "You've used your daily $1 trial credit. Sign up for a free account to unlock more credits!",
+              }),
+            },
+            { status: 402 },
+          );
+        }
+        console.error("Failed to deduct video credits:", creditError);
       }
-      console.error("Failed to deduct WaveSpeed video credits:", creditError);
     }
+
     try {
       await trackWavespeedUsage({
         userId: user.id,
@@ -139,15 +167,16 @@ export async function POST(request: NextRequest) {
         metadata: {
           duration: duration ?? 5,
           aspectRatio: aspectRatio ?? "16:9",
+          byok: useBYOK,
         },
       });
     } catch (usageError) {
-      console.error("Failed to track WaveSpeed video usage:", usageError);
+      console.error("Failed to track video usage:", usageError);
     }
     const remainingCents = await getCreditBalance(user.id);
-    return NextResponse.json({ task, remainingCents });
+    return NextResponse.json({ task, remainingCents, byok: useBYOK });
   } catch (error) {
-    console.error("WaveSpeed submit error:", error);
+    console.error("Video submit error:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to submit task",

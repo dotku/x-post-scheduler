@@ -65,7 +65,7 @@ export default function LandingEditor({
   const [imgOutput, setImgOutput] = useState<string | null>(null);
   const [imgError, setImgError] = useState<string | null>(null);
   // Video generation state
-  const t2vModels = useMemo(() => VIDEO_MODELS, []);
+  const t2vModels = useMemo(() => [...VIDEO_MODELS], []);
   const [vidModelId, setVidModelId] = useState(
     "wavespeed-ai/wan-2.2/t2v-480p-ultra-fast",
   );
@@ -356,9 +356,10 @@ export default function LandingEditor({
   function pollVideoStatus(taskId: string, pollUrl?: string) {
     vidPollRef.current = setTimeout(async () => {
       try {
-        const url = pollUrl
-          ? `/api/toolbox/video/${taskId}?pollUrl=${encodeURIComponent(pollUrl)}`
-          : `/api/toolbox/video/${taskId}`;
+        const qs = pollUrl
+          ? `?pollUrl=${encodeURIComponent(pollUrl)}`
+          : "";
+        const url = `/api/toolbox/video/${taskId}${qs}`;
         const res = await fetch(url);
         const data = await res.json();
         const task = data.task;

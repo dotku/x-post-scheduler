@@ -35,6 +35,8 @@ model User {
   lastLoginRewardAt     DateTime?
   // Weixin Channel auth
   weixinCookie          String?
+  // BYOK: user-provided third-party API keys (encrypted with AES-256-GCM)
+  seedanceApiKey        String?
   // Stripe Connect (Express)
   stripeConnectAccountId  String?   @unique
   stripeConnectStatus     String?   // "pending" | "active" | "restricted"
@@ -69,6 +71,7 @@ model User {
   campaignAttachments    CampaignAttachment[]
   payouts                Payout[]
   monitorTopics          MonitorTopic[]
+  apiKeys                ApiKey[]
 }
 
 model CronRunEvent {
@@ -653,5 +656,23 @@ model TopicSnapshot {
   topic   MonitorTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
   @@index([topicId, createdAt])
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  name       String
+  keyPrefix  String
+  keyHash    String    @unique
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  isRevoked  Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([keyHash])
+  @@index([userId, isRevoked])
 }
 
