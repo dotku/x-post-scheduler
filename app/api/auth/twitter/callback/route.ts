@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   const storedOauthToken = cookieStore.get("tw_oauth_token")?.value;
 
   const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.NEXT_PUBLIC_APP_PUBLIC_URL ||
     (request.headers.get("origin") ?? "http://localhost:3000");
 
   if (

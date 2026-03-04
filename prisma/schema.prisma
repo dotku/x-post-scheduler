@@ -72,6 +72,7 @@ model User {
   payouts                Payout[]
   monitorTopics          MonitorTopic[]
   apiKeys                ApiKey[]
+  stitchJobs             StitchJob[]
 }
 
 model CronRunEvent {
@@ -674,5 +675,25 @@ model ApiKey {
 
   @@index([keyHash])
   @@index([userId, isRevoked])
+}
+
+model StitchJob {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  config      String    // JSON: { clips: [{ url, trimStart, trimEnd }], crossfadeDuration, bgm }
+  clipCount   Int
+  status      String    @default("processing") // "processing" | "completed" | "failed"
+  resultUrl   String?
+  error       String?
+  costCents   Int       @default(0)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([userId, status])
+  @@index([createdAt])
 }
 

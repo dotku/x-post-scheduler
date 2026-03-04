@@ -57,6 +57,10 @@ export function getImageModePath(mode: "t2i" | "i2i" | "i2i_text") {
   }
 }
 
+export function getStitchEstimateCents(clipCount: number): number {
+  return 10 + 5 * clipCount;
+}
+
 export function getToolboxVisitingPath(
   tab: Tab,
   videoMode: "t2v" | "i2v",

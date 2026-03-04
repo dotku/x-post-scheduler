@@ -44,6 +44,14 @@ export default function ToolboxHeader({
               >
                 {uiText.videoJobs}
               </Link>
+              {uiText.videoStitch && (
+                <Link
+                  href={`${prefix}/toolbox/video-stitch`}
+                  className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                >
+                  {uiText.videoStitch}
+                </Link>
+              )}
               <Link
                 href={`${prefix}/docs/models`}
                 className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"

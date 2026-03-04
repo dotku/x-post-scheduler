@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   }
 
   const baseUrl =
-    process.env.NEXT_PUBLIC_BASE_URL ||
+    process.env.NEXT_PUBLIC_APP_PUBLIC_URL ||
     (request.headers.get("origin") ?? "http://localhost:3000");
   const callbackUrl = `${baseUrl}/api/auth/twitter/callback`;
 
