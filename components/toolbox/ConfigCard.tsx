@@ -382,62 +382,73 @@ export default function ConfigCard({
             Model
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {currentModels.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => onSelectModel(m.id, m)}
-                disabled={isRunning}
-                className={`flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-colors ${
-                  currentModelId === m.id
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                }`}
-              >
-                {(() => {
-                  const mediaType: "image" | "video" =
-                    tab === "video"
-                      ? "video"
-                      : inferMediaTypeFromModelId(m.id);
-                  const singleBaseCostCents = Math.round(
-                    getEstimatedBaseCostCents(m.id, mediaType) *
-                      (tab === "video" ? Math.max(1, duration / 5) : 1),
-                  );
-                  const singleChargeCents = Math.round(
-                    getEstimatedChargeCents(m.id, mediaType) *
-                      (tab === "video" ? Math.max(1, duration / 5) : 1),
-                  );
-                  return (
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        {m.label}
-                        {tab === "video" && m.supportsAudio && (
-                          <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">
-                            {isZh ? "支持音频" : "Audio"}
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        {m.description}
-                      </p>
-                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                        Cost est: {formatUsdFromCents(singleChargeCents)}{" "}
-                        charged · {formatUsdFromCents(singleBaseCostCents)}{" "}
-                        model cost · token est ~
-                        {Math.max(
-                          0,
-                          Math.ceil((prompt.trim().length || 0) / 4),
-                        ).toLocaleString()}
-                      </p>
-                    </div>
-                  );
-                })()}
-                <span
-                  className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${TIER_COLORS[m.tier]}`}
+            {currentModels.map((m) => {
+              const isPremiumLocked = m.tier === "premium" && !subscriptionTier;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => !isPremiumLocked && onSelectModel(m.id, m)}
+                  disabled={isRunning || isPremiumLocked}
+                  className={`flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-colors ${
+                    isPremiumLocked
+                      ? "border-gray-200 dark:border-gray-700 opacity-60 cursor-not-allowed"
+                      : currentModelId === m.id
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
+                  }`}
                 >
-                  {m.tier}
-                </span>
-              </button>
-            ))}
+                  {(() => {
+                    const mediaType: "image" | "video" =
+                      tab === "video"
+                        ? "video"
+                        : inferMediaTypeFromModelId(m.id);
+                    const singleBaseCostCents = Math.round(
+                      getEstimatedBaseCostCents(m.id, mediaType) *
+                        (tab === "video" ? Math.max(1, duration / 5) : 1),
+                    );
+                    const singleChargeCents = Math.round(
+                      getEstimatedChargeCents(m.id, mediaType) *
+                        (tab === "video" ? Math.max(1, duration / 5) : 1),
+                    );
+                    return (
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          {m.label}
+                          {tab === "video" && m.supportsAudio && (
+                            <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 font-medium">
+                              {isZh ? "支持音频" : "Audio"}
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                          {m.description}
+                        </p>
+                        {isPremiumLocked ? (
+                          <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 font-medium">
+                            {isZh ? "需要会员订阅" : "Membership required"}
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                            Cost est: {formatUsdFromCents(singleChargeCents)}{" "}
+                            charged · {formatUsdFromCents(singleBaseCostCents)}{" "}
+                            model cost · token est ~
+                            {Math.max(
+                              0,
+                              Math.ceil((prompt.trim().length || 0) / 4),
+                            ).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  <span
+                    className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${TIER_COLORS[m.tier]}`}
+                  >
+                    {isPremiumLocked ? (isZh ? "会员" : "Members") : m.tier}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

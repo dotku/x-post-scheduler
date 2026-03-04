@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import type { TokenUsage } from "./usage-tracking";
+import { deductTeamCredits as deductFromTeam } from "./team";
 
 // LLM pricing in cents per 1M tokens (base cost before markup).
 // Covers both legacy direct-API keys and AI Gateway model IDs (provider/model format).
@@ -189,11 +190,22 @@ export async function deductCredits(params: {
   usage: TokenUsage;
   model?: string;
   source: string;
+  teamId?: string;
 }): Promise<{ costCents: number; newBalance: number }> {
   const rawCostCents = calculateCostCents(params.usage, params.model);
   const discountMultiplier = await getSubscriptionDiscount(params.userId);
   const costCents = Math.max(1, Math.ceil(rawCostCents * discountMultiplier));
   const savedCents = rawCostCents - costCents;
+
+  // If team context, deduct from team balance instead
+  if (params.teamId) {
+    return deductFromTeam({
+      teamId: params.teamId,
+      costCents,
+      performedBy: params.userId,
+      description: `AI generation (${params.source}) - ${params.usage.totalTokens} tokens`,
+    });
+  }
 
   // Atomic deduction with negative-balance guard
   const result = await prisma.user.updateMany({
@@ -236,6 +248,7 @@ export async function deductFlatFee(params: {
   userId: string;
   feeCents: number;
   source: string;
+  teamId?: string;
 }): Promise<{ costCents: number; newBalance: number }> {
   const discountMultiplier = await getSubscriptionDiscount(params.userId);
   const costCents = Math.max(
@@ -243,6 +256,16 @@ export async function deductFlatFee(params: {
     Math.ceil(params.feeCents * discountMultiplier),
   );
   const savedCents = params.feeCents - costCents;
+
+  // If team context, deduct from team balance instead
+  if (params.teamId) {
+    return deductFromTeam({
+      teamId: params.teamId,
+      costCents,
+      performedBy: params.userId,
+      description: `AI generation (${params.source}) - flat fee`,
+    });
+  }
 
   // Atomic deduction with negative-balance guard
   const result = await prisma.user.updateMany({
@@ -286,11 +309,22 @@ export async function deductWavespeedCredits(params: {
   mediaType: "image" | "video";
   source: string;
   taskId?: string;
+  teamId?: string;
 }): Promise<{ costCents: number; newBalance: number }> {
   const rawCostCents = getWavespeedFeeCents(params.modelId, params.mediaType);
   const discountMultiplier = await getSubscriptionDiscount(params.userId);
   const costCents = Math.max(1, Math.ceil(rawCostCents * discountMultiplier));
   const savedCents = rawCostCents - costCents;
+
+  // If team context, deduct from team balance instead
+  if (params.teamId) {
+    return deductFromTeam({
+      teamId: params.teamId,
+      costCents,
+      performedBy: params.userId,
+      description: `WaveSpeed ${params.mediaType} generation (${params.source})`,
+    });
+  }
 
   const updated = await prisma.user.updateMany({
     where: {

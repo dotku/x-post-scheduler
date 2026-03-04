@@ -241,6 +241,7 @@ export default function RecurringPage() {
       if (!res.ok) {
         setMembershipReady(true);
         setMembershipActive(false);
+        setCanUseTrending(true);
         return;
       }
       const sub = await res.json();
@@ -250,9 +251,7 @@ export default function RecurringPage() {
       setMembershipReady(true);
       setMembershipActive(hasMembership);
       setUserTier(activeTier);
-      setCanUseTrending(
-        activeTier ? isTierAtLeast(activeTier, "silver") : false,
-      );
+      setCanUseTrending(true);
     })();
   }, []);
 

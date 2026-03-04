@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth0";
-import { VIDEO_MODELS, I2V_MODELS } from "@/lib/wavespeed";
+import { VIDEO_MODELS, I2V_MODELS, isPremiumModel } from "@/lib/wavespeed";
 import { SEEDANCE_VIDEO_MODELS, SEEDANCE_I2V_MODELS } from "@/lib/seedance";
 import { submitVideo, detectVideoProvider } from "@/lib/video-provider";
 import { trackWavespeedUsage } from "@/lib/usage-tracking";
@@ -81,6 +81,21 @@ export async function POST(request: NextRequest) {
   const validModel = allVideoModels.find((m) => m.id === modelId);
   if (!validModel) {
     return NextResponse.json({ error: "Invalid model" }, { status: 400 });
+  }
+
+  // Premium model restriction: members only
+  if (isPremiumModel(modelId) && !user.id.startsWith("trial-")) {
+    const membership = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { subscriptionTier: true, subscriptionStatus: true },
+    });
+    const { isVerifiedMember } = await import("@/lib/subscription");
+    if (!isVerifiedMember(membership?.subscriptionTier, membership?.subscriptionStatus)) {
+      return NextResponse.json(
+        { error: "Premium models require an active membership. Please subscribe to access this model." },
+        { status: 403 },
+      );
+    }
   }
 
   // Check for BYOK Seedance key

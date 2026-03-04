@@ -13,6 +13,7 @@ import {
   normalizeTier,
 } from "@/lib/subscription";
 import type { TierKey } from "@/lib/subscription";
+import TeamSection from "@/components/TeamSection";
 
 interface XAccount {
   id: string;
@@ -2453,6 +2454,11 @@ export default function SettingsPage() {
           )}
         </div>
         {/* end Credits+AI Usage grid */}
+
+        {/* Teams section */}
+        <div className="mt-6">
+          <TeamSection tr={tr} />
+        </div>
 
         {/* Developer & API section */}
         <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">

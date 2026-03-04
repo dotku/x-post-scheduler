@@ -196,6 +196,11 @@ export default function LandingContent({
         mode: "video",
       });
     }
+    // Seedance 2.0 (separate provider, not in VIDEO_MODELS)
+    ensure("ByteDance", "Image/Video").models.push(
+      { id: "seedance-2.0/text-to-video", label: "Seedance 2.0", mode: "video" },
+      { id: "seedance-2.0/image-to-video", label: "Seedance 2.0 i2v", mode: "video" },
+    );
     ensure("OpenAI", "Text").models.push({
       id: "gpt-4o",
       label: "GPT-4o (tweet generation)",

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { addDays, addWeeks, addMonths, addHours } from "date-fns";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { getUserXCredentials } from "@/lib/user-credentials";
-import { IMAGE_MODELS } from "@/lib/wavespeed";
+import { IMAGE_MODELS, isPremiumModel } from "@/lib/wavespeed";
 import {
   decodeRecurringAiPrompt,
   encodeRecurringAiPrompt,
@@ -208,6 +208,13 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
+    // Premium image models require membership
+    if (isPremiumModel(normalizedImageModelId) && !membership.active) {
+      return NextResponse.json(
+        { error: "Premium models require an active membership." },
+        { status: 403 },
+      );
+    }
   }
 
   if (!frequency || !ALL_FREQUENCIES.includes(frequency)) {
@@ -218,27 +225,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Time is required" }, { status: 400 });
   }
 
-  // Check tier requirements for trendRegion and hourly frequencies
-  const needsTierCheck =
-    normalizedTrendRegion || frequency in HOURLY_FREQUENCIES;
-  if (needsTierCheck) {
-    // trendRegion 功能仅限白银及以上会员
-    if (normalizedTrendRegion && !isTierAtLeast(membership.tier, "silver")) {
+  // Check tier requirements for hourly frequencies
+  if (frequency in HOURLY_FREQUENCIES) {
+    const required = HOURLY_FREQUENCIES[frequency].minTier;
+    if (!isTierAtLeast(membership.tier, required)) {
       return NextResponse.json(
-        { error: "TIER_REQUIRED", minTier: "silver" },
+        { error: "TIER_REQUIRED", minTier: required },
         { status: 403 },
       );
-    }
-
-    // Hourly frequency tier check
-    if (frequency in HOURLY_FREQUENCIES) {
-      const required = HOURLY_FREQUENCIES[frequency].minTier;
-      if (!isTierAtLeast(membership.tier, required)) {
-        return NextResponse.json(
-          { error: "TIER_REQUIRED", minTier: required },
-          { status: 403 },
-        );
-      }
     }
   }
 

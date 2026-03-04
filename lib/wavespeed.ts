@@ -482,6 +482,26 @@ export const IMAGE_MODELS: {
   },
 ];
 
+/**
+ * Check if a model ID is "premium" tier.
+ * Checks IMAGE_MODELS, VIDEO_MODELS, and I2V_MODELS.
+ * Also matches known premium models not in server-side arrays (e.g. seedance 2.0 studio models).
+ */
+export function isPremiumModel(modelId: string): boolean {
+  const img = IMAGE_MODELS.find((m) => m.id === modelId);
+  if (img) return img.tier === "premium";
+  const vid = VIDEO_MODELS.find((m) => m.id === modelId);
+  if (vid) return vid.tier === "premium";
+  const i2v = I2V_MODELS.find((m) => m.id === modelId);
+  if (i2v) return i2v.tier === "premium";
+  // Studio-only models (seedance 2.0 etc.) — defined in client constants
+  const knownPremium = [
+    "seedance-2.0/text-to-video",
+    "seedance-2.0/image-to-video",
+  ];
+  return knownPremium.includes(modelId);
+}
+
 export const I2V_MODELS: {
   id: string;
   label: string;

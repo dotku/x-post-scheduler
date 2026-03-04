@@ -73,6 +73,7 @@ model User {
   monitorTopics          MonitorTopic[]
   apiKeys                ApiKey[]
   stitchJobs             StitchJob[]
+  teamMemberships        TeamMember[]
 }
 
 model CronRunEvent {
@@ -695,5 +696,69 @@ model StitchJob {
 
   @@index([userId, status])
   @@index([createdAt])
+}
+
+// ── Team System ──────────────────────────────────────────────────────────────
+
+model Team {
+  id                 String   @id @default(cuid())
+  name               String
+  inviteCode         String   @unique
+  creditBalanceCents Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  members            TeamMember[]
+  creditTransactions TeamCreditTransaction[]
+  invitations        TeamInvitation[]
+
+  @@index([inviteCode])
+}
+
+model TeamMember {
+  id       String   @id @default(cuid())
+  role     String   @default("viewer") // "owner" | "editor" | "viewer"
+  joinedAt DateTime @default(now())
+
+  userId String
+  teamId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team   Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+model TeamInvitation {
+  id        String   @id @default(cuid())
+  email     String
+  role      String   @default("editor")
+  status    String   @default("pending") // "pending" | "accepted" | "revoked"
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  teamId    String
+  invitedBy String
+  team      Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, email, status])
+  @@index([email, status])
+  @@index([teamId])
+}
+
+model TeamCreditTransaction {
+  id           String   @id @default(cuid())
+  type         String   // "deduction" | "topup" | "transfer_in" | "transfer_out"
+  amountCents  Int
+  balanceAfter Int
+  description  String?
+  performedBy  String
+  createdAt    DateTime @default(now())
+
+  teamId String
+  team   Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId, createdAt])
 }
 

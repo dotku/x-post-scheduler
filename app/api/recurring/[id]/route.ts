@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { addDays, addWeeks, addMonths, addHours } from "date-fns";
 import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { getUserXCredentials } from "@/lib/user-credentials";
-import { IMAGE_MODELS } from "@/lib/wavespeed";
+import { IMAGE_MODELS, isPremiumModel } from "@/lib/wavespeed";
 import {
   decodeRecurringAiPrompt,
   encodeRecurringAiPrompt,
@@ -173,6 +173,19 @@ export async function PATCH(
           { status: 400 },
         );
       }
+      // Premium image models require membership
+      if (isPremiumModel(imageModelId)) {
+        const membershipActive = isVerifiedMember(
+          membership?.subscriptionTier,
+          membership?.subscriptionStatus,
+        );
+        if (!membershipActive) {
+          return NextResponse.json(
+            { error: "Premium models require an active membership." },
+            { status: 403 },
+          );
+        }
+      }
       updateData.imageModelId = imageModelId;
     } else {
       updateData.imageModelId = null;
@@ -249,26 +262,14 @@ export async function PATCH(
   const nextTrendRegion =
     "trendRegion" in updateData ? updateData.trendRegion : existing.trendRegion;
 
-  // Keep tier checks aligned with POST behavior.
-  if (nextTrendRegion || nextFrequency in HOURLY_FREQUENCIES) {
-    if (
-      nextTrendRegion &&
-      !isTierAtLeast(membership?.subscriptionTier, "silver")
-    ) {
+  // Keep tier checks aligned with POST behavior (hourly frequencies only).
+  if (nextFrequency in HOURLY_FREQUENCIES) {
+    const required = HOURLY_FREQUENCIES[nextFrequency].minTier;
+    if (!isTierAtLeast(membership?.subscriptionTier, required)) {
       return NextResponse.json(
-        { error: "TIER_REQUIRED", minTier: "silver" },
+        { error: "TIER_REQUIRED", minTier: required },
         { status: 403 },
       );
-    }
-
-    if (nextFrequency in HOURLY_FREQUENCIES) {
-      const required = HOURLY_FREQUENCIES[nextFrequency].minTier;
-      if (!isTierAtLeast(membership?.subscriptionTier, required)) {
-        return NextResponse.json(
-          { error: "TIER_REQUIRED", minTier: required },
-          { status: 403 },
-        );
-      }
     }
   }
 

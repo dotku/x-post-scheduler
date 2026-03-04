@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/auth0";
-import { submitImageTask, IMAGE_MODELS } from "@/lib/wavespeed";
+import { submitImageTask, IMAGE_MODELS, isPremiumModel } from "@/lib/wavespeed";
+import { prisma } from "@/lib/db";
+import { isVerifiedMember } from "@/lib/subscription";
 import { trackWavespeedUsage } from "@/lib/usage-tracking";
 import {
   deductWavespeedCredits,
@@ -90,6 +92,20 @@ export async function POST(request: NextRequest) {
   const validModel = IMAGE_MODELS.find((m) => m.id === modelId);
   if (!validModel) {
     return NextResponse.json({ error: "Invalid model" }, { status: 400 });
+  }
+
+  // Premium model restriction: members only
+  if (isPremiumModel(modelId) && !user.id.startsWith("trial-")) {
+    const membership = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { subscriptionTier: true, subscriptionStatus: true },
+    });
+    if (!isVerifiedMember(membership?.subscriptionTier, membership?.subscriptionStatus)) {
+      return NextResponse.json(
+        { error: "Premium models require an active membership. Please subscribe to access this model." },
+        { status: 403 },
+      );
+    }
   }
 
   const feeCents = getWavespeedFeeCents(modelId, "image");
