@@ -193,8 +193,8 @@ export const TIER_COLORS: Record<string, string> = {
     "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
 };
 
-const CLIENT_DEFAULT_MARKUP_MULTIPLIER = 60; // For OpenAI
-const CLIENT_DEFAULT_WAVESPEED_MULTIPLIER = 2; // For Wavespeed
+const CLIENT_DEFAULT_MARKUP_MULTIPLIER = 20; // For text/LLM
+const CLIENT_DEFAULT_WAVESPEED_MULTIPLIER = 3; // For Wavespeed
 export const CLIENT_WAVESPEED_CHARGE_MULTIPLIER = Number(
   process.env.NEXT_PUBLIC_WAVESPEED_CHARGE_MULTIPLIER ??
     CLIENT_DEFAULT_WAVESPEED_MULTIPLIER,

@@ -40,10 +40,10 @@ function parsePositiveMultiplier(raw: string | undefined, fallback: number) {
   return parsed;
 }
 
-// OpenAI pricing multiplier (configurable via OPENAI_CHARGE_MULTIPLIER)
+// Text/LLM pricing multiplier (configurable via OPENAI_CHARGE_MULTIPLIER)
 const MARKUP_MULTIPLIER = parsePositiveMultiplier(
   process.env.OPENAI_CHARGE_MULTIPLIER,
-  60,
+  20,
 );
 
 /** Flat fee in cents for agent service calls (no per-token data available). */

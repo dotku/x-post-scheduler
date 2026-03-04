@@ -67,7 +67,7 @@ const TEXT_MODEL_PRICING: Record<string, { inputPer1M: number; outputPer1M: numb
   "mistral/mistral-small":  { inputPer1M: 10, outputPer1M: 30 },
   "mistral/mistral-medium": { inputPer1M: 40, outputPer1M: 200 },
 };
-const TEXT_MARKUP = Number(process.env.NEXT_PUBLIC_OPENAI_CHARGE_MULTIPLIER) || 60;
+const TEXT_MARKUP = Number(process.env.NEXT_PUBLIC_OPENAI_CHARGE_MULTIPLIER) || 20;
 // Typical auto-post: ~800 input tokens (system + prompt + trends), ~150 output tokens (tweet)
 const TYPICAL_INPUT_TOKENS = 800;
 const TYPICAL_OUTPUT_TOKENS = 150;
