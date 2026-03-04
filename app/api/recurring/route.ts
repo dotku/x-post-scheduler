@@ -95,8 +95,10 @@ export async function GET() {
     }),
   ]);
 
+  const hasAccess = membership.active || (dbUser?.creditBalanceCents ?? 0) > 0;
+
   // Deactivate schedules only if no membership AND no credits
-  if (!membership.active && (dbUser?.creditBalanceCents ?? 0) <= 0) {
+  if (!hasAccess) {
     await prisma.recurringSchedule.updateMany({
       where: { userId: user.id, isActive: true },
       data: { isActive: false },

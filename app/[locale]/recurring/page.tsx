@@ -1142,6 +1142,14 @@ export default function RecurringPage() {
                 <p className="text-red-600 dark:text-red-400 text-sm">
                   {error}
                 </p>
+                {error.toLowerCase().includes("knowledge") && (
+                  <Link
+                    href={`${prefix}/knowledge`}
+                    className="inline-block mt-2 text-sm px-3 py-1.5 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                  >
+                    {locale === "zh" ? "前往添加知識庫" : "Add Knowledge Source"}
+                  </Link>
+                )}
               </div>
             )}
 
@@ -1193,7 +1201,7 @@ export default function RecurringPage() {
                 <p className="mt-0.5">
                   {t("subscribeReminderBody")}{" "}
                   <Link
-                    href={`${prefix}/settings`}
+                    href={`${prefix}/settings?tab=billing`}
                     className="underline underline-offset-2"
                   >
                     {t("subscribeNow")}
@@ -1317,9 +1325,19 @@ export default function RecurringPage() {
                       </div>
                     )}
                     {scheduleTestResults[schedule.id]?.error && (
-                      <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-                        {scheduleTestResults[schedule.id].error}
-                      </p>
+                      <div className="mt-2">
+                        <p className="text-sm text-red-600 dark:text-red-400">
+                          {scheduleTestResults[schedule.id].error}
+                        </p>
+                        {scheduleTestResults[schedule.id].error?.toLowerCase().includes("knowledge") && (
+                          <Link
+                            href={`${prefix}/knowledge`}
+                            className="inline-block mt-1.5 text-xs px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                          >
+                            {locale === "zh" ? "前往添加知識庫" : "Add Knowledge Source"}
+                          </Link>
+                        )}
+                      </div>
                     )}
 
                     {editingScheduleId === schedule.id && (
