@@ -30,19 +30,15 @@ export async function POST(
 
   const membership = await prisma.user.findUnique({
     where: { id: user.id },
-    select: { subscriptionTier: true, subscriptionStatus: true },
+    select: { subscriptionTier: true, subscriptionStatus: true, creditBalanceCents: true },
   });
-  if (
-    !isVerifiedMember(
-      membership?.subscriptionTier,
-      membership?.subscriptionStatus,
-    )
-  ) {
-    await prisma.recurringSchedule.updateMany({
-      where: { userId: user.id, isActive: true },
-      data: { isActive: false },
-    });
-    return NextResponse.json({ error: "MEMBERSHIP_REQUIRED" }, { status: 403 });
+  const membershipActive = isVerifiedMember(
+    membership?.subscriptionTier,
+    membership?.subscriptionStatus,
+  );
+  // Allow non-members if they have credits (pay-per-use)
+  if (!membershipActive && (!membership || membership.creditBalanceCents <= 0)) {
+    return NextResponse.json({ error: "CREDITS_OR_MEMBERSHIP_REQUIRED" }, { status: 403 });
   }
 
   const { id } = await params;
