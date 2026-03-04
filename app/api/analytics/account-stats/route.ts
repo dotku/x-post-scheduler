@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   const since = new Date();
   since.setDate(since.getDate() - period);
 
-  const [accounts, posts, siteViews] = await Promise.all([
+  const [accounts, posts] = await Promise.all([
     prisma.xAccount.findMany({
       where: { userId: user.id },
       select: {
@@ -37,9 +37,6 @@ export async function GET(request: NextRequest) {
         createdAt: { gte: since },
       },
       select: { xAccountId: true, status: true, impressions: true },
-    }),
-    prisma.webVisit.count({
-      where: { createdAt: { gte: since } },
     }),
   ]);
 
@@ -92,7 +89,6 @@ export async function GET(request: NextRequest) {
     failed: posts.filter((p) => p.status === "failed").length,
     total: posts.length,
     impressions: posts.reduce((sum, p) => sum + (p.impressions ?? 0), 0),
-    views: siteViews,
   };
 
   return NextResponse.json({

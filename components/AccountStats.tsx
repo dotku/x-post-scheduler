@@ -34,7 +34,6 @@ interface StatsData {
     scheduled: number;
     failed: number;
     total: number;
-    views: number;
     impressions: number;
   };
   accounts: AccountStat[];
@@ -216,21 +215,13 @@ export default function AccountStats() {
       ) : (
         <div className="p-4 sm:p-6 space-y-4">
           {/* Totals row */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
               <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">
                 {(data.totals.impressions ?? 0).toLocaleString()}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                 {t("statsImpressions")}
-              </p>
-            </div>
-            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-purple-700 dark:text-purple-400">
-                {(data.totals.views ?? 0).toLocaleString()}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                {t("statsViews")}
               </p>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 text-center">
