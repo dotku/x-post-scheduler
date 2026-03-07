@@ -7,6 +7,56 @@ import { IMAGE_MODELS, VIDEO_MODELS } from "@/lib/wavespeed";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import LandingEditor from "./landing/LandingEditor";
 
+function NewsletterForm({ lang }: { lang: string }) {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) return;
+    setStatus("loading");
+    try {
+      const res = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) {
+        setStatus("success");
+        setEmail("");
+      } else {
+        setStatus("error");
+      }
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  if (status === "success") {
+    return <p className="text-green-600 dark:text-green-400 text-sm">{lang === "zh" ? "订阅成功！" : "Subscribed!"}</p>;
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex gap-2 max-w-md mx-auto">
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+        placeholder={lang === "zh" ? "输入邮箱" : "your@email.com"}
+        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:border-blue-500"
+      />
+      <button
+        type="submit"
+        disabled={status === "loading"}
+        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white text-sm rounded-lg font-medium transition-colors"
+      >
+        {status === "loading" ? "..." : lang === "zh" ? "订阅" : "Subscribe"}
+      </button>
+    </form>
+  );
+}
+
 function detectInAppBrowser(userAgent: string) {
   const ua = userAgent.toLowerCase();
   const isWeChat = ua.includes("micromessenger");
@@ -982,6 +1032,17 @@ export default function LandingContent({
           </Link>
         </section>
       )}
+
+      {/* Newsletter Signup */}
+      <section className="max-w-xl mx-auto px-4 py-12 text-center">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+          {lang === "zh" ? "订阅产品更新" : "Stay updated"}
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          {lang === "zh" ? "获取最新功能和 AI 营销技巧" : "Get the latest features and AI marketing tips"}
+        </p>
+        <NewsletterForm lang={lang} />
+      </section>
 
       {/* Footer */}
       <footer className="border-t border-gray-200 dark:border-gray-700 py-8 px-4">
