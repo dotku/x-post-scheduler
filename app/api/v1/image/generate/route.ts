@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiAuth, apiError } from "@/lib/api-auth";
-import { submitImageTask, IMAGE_MODELS, getVideoTask } from "@/lib/wavespeed";
+import { submitImageTask, IMAGE_MODELS } from "@/lib/wavespeed";
 import {
   deductWavespeedCredits,
   getCreditBalance,

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "/Users/wlin/dev/x-post-scheduler/app/api/toolbox/image"
+    ],
+    "allow": [
+      "Bash(kill 1285 49950)"
+    ]
+  }
+}

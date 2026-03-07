@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { isVerifiedMember } from "@/lib/subscription";
 
 type Lang = "en" | "zh";
 
@@ -19,7 +20,13 @@ type GalleryItem = {
   mimeType: string;
   isPublic: boolean;
   createdAt: string;
-  user?: { name: string | null; picture: string | null };
+  user?: {
+    id?: string;
+    name: string | null;
+    picture: string | null;
+    subscriptionTier?: string | null;
+    subscriptionStatus?: string | null;
+  };
 };
 
 const TEXT = {
@@ -48,6 +55,8 @@ const TEXT = {
     stepModel: "Model",
     stepOutput: "Output",
     noOriginal: "No original image input",
+    author: "Author",
+    anonymous: "Anonymous",
   },
   zh: {
     title: "作品详情",
@@ -74,6 +83,8 @@ const TEXT = {
     stepModel: "模型处理",
     stepOutput: "输出",
     noOriginal: "没有原始图片输入",
+    author: "作者",
+    anonymous: "匿名用户",
   },
 } as const;
 
@@ -174,6 +185,48 @@ export default function GalleryDetailClient({ id }: { id: string }) {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={item.blobUrl} alt={item.prompt} className="w-full rounded-lg" />
                 )}
+              </div>
+            </section>
+
+            {/* Author */}
+            <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+              <div className="flex items-center gap-3">
+                {item.user?.picture ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={item.user.picture}
+                    alt={item.user.name ?? ""}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-gray-500 dark:text-gray-400 text-sm font-bold">
+                    {(item.user?.name ?? "?")[0]?.toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1">
+                    {item.user?.name ?? t.anonymous}
+                    {isVerifiedMember(
+                      item.user?.subscriptionTier,
+                      item.user?.subscriptionStatus,
+                    ) && (
+                      <span
+                        className="text-blue-500 font-bold"
+                        title={item.user?.subscriptionTier ?? ""}
+                      >
+                        ✓
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {t.author}
+                    {item.user?.id && (
+                      <span className="ml-1 font-mono text-gray-400 dark:text-gray-500">
+                        · {item.user.id}
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
             </section>
 

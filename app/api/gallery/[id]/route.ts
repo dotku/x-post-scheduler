@@ -10,7 +10,7 @@ export async function GET(
   const { id } = await params;
   const item = await prisma.galleryItem.findUnique({
     where: { id },
-    include: { user: { select: { name: true, picture: true } } },
+    include: { user: { select: { id: true, name: true, picture: true, subscriptionTier: true, subscriptionStatus: true } } },
   });
   if (!item) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

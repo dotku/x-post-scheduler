@@ -329,11 +329,12 @@ export default function LandingEditor({
       for (let i = 0; i < 60; i++) {
         await new Promise((r) => setTimeout(r, 2000));
         const endpoint = pollUrl
-          ? `/api/toolbox/video/${taskId}?pollUrl=${encodeURIComponent(pollUrl)}`
-          : `/api/toolbox/video/${taskId}`;
+          ? `/api/toolbox/image/${taskId}?pollUrl=${encodeURIComponent(pollUrl)}`
+          : `/api/toolbox/image/${taskId}`;
         const pollRes = await fetch(endpoint);
-        const pollData = await pollRes.json();
-        const task = pollData.task;
+        if (!pollRes.ok) continue;
+        const pollData = await pollRes.json().catch(() => null);
+        const task = pollData?.task;
         if (task?.status === "completed") {
           output = task.outputs?.[0] ?? null;
           if (output) setImgOutput(output);
