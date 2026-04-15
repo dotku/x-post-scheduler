@@ -3,6 +3,16 @@ primary_region = "sin"
 
 [build]
 
+[experimental]
+  enable_tun = true
+
+[[services]]
+  protocol = "udp"
+  internal_port = 41641
+
+  [[services.ports]]
+    port = 41641
+
 [http_service]
   internal_port = 8080
   force_https = true
