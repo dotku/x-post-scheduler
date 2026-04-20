@@ -51,9 +51,9 @@ async function callWeChatApi<T>(params: {
   pathWithQuery: string;
   body?: Record<string, unknown>;
 }) {
-  const mchId = getRequiredEnv("WECHAT_MCH_ID");
-  const serialNo = getRequiredEnv("WECHAT_SERIAL_NO");
-  const privateKey = getRequiredEnv("WECHAT_PRIVATE_KEY");
+  const mchId = getRequiredEnv("WECHAT_PAY_MCH_ID");
+  const serialNo = getRequiredEnv("WECHAT_PAY_CERT_SERIAL");
+  const privateKey = getRequiredEnv("WECHAT_PAY_PRIVATE_KEY");
 
   const body = params.body ? JSON.stringify(params.body) : "";
   const authorization = buildAuthorization({
@@ -88,10 +88,10 @@ async function callWeChatApi<T>(params: {
 }
 
 export function assertWeChatConfigReady() {
-  getRequiredEnv("WECHAT_MCH_ID");
-  getRequiredEnv("WECHAT_APP_ID");
-  getRequiredEnv("WECHAT_SERIAL_NO");
-  getRequiredEnv("WECHAT_PRIVATE_KEY");
+  getRequiredEnv("WECHAT_PAY_MCH_ID");
+  getRequiredEnv("WECHAT_PAY_APP_ID");
+  getRequiredEnv("WECHAT_PAY_CERT_SERIAL");
+  getRequiredEnv("WECHAT_PAY_PRIVATE_KEY");
 }
 
 export function createWechatOutTradeNo(userId: string) {
@@ -101,27 +101,47 @@ export function createWechatOutTradeNo(userId: string) {
   return `wx${userSuffix}${timestamp}${random}`.slice(0, 32);
 }
 
+/**
+ * FX conversion — USD cents → CNY fen.
+ * WeChat Pay only accepts CNY. The user picks a USD-denominated top-up amount
+ * ($5/$10/$25), which we convert to CNY for the actual charge while keeping
+ * the original USD amount in `attach` so the fulfill handler credits the
+ * correct dollar value.
+ */
+export function getUsdToCnyRate(): number {
+  const raw = process.env.WECHAT_PAY_USD_TO_CNY_RATE;
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 7.2;
+}
+
+export function convertUsdCentsToCnyFen(amountCents: number): number {
+  return Math.ceil(amountCents * getUsdToCnyRate());
+}
+
 export async function createWeChatNativeOrder(params: {
   userId: string;
+  /** USD cents (matches TOPUP_OPTIONS). Converted to CNY fen internally. */
   amountCents: number;
 }) {
-  const appId = getRequiredEnv("WECHAT_APP_ID");
-  const mchId = getRequiredEnv("WECHAT_MCH_ID");
+  const appId = getRequiredEnv("WECHAT_PAY_APP_ID");
+  const mchId = getRequiredEnv("WECHAT_PAY_MCH_ID");
   const outTradeNo = createWechatOutTradeNo(params.userId);
+  const cnyFen = convertUsdCentsToCnyFen(params.amountCents);
 
   const payload = {
     appid: appId,
     mchid: mchId,
-    description: `Credit top-up ${(params.amountCents / 100).toFixed(2)}`,
+    description: `xPilot credits $${(params.amountCents / 100).toFixed(2)}`,
     out_trade_no: outTradeNo,
     notify_url:
-      process.env.WECHAT_NOTIFY_URL || `${getAppBaseUrl()}/api/wechat/webhook`,
+      process.env.WECHAT_PAY_NOTIFY_URL || `${getAppBaseUrl()}/api/wechat/webhook`,
     amount: {
-      total: params.amountCents,
+      total: cnyFen,
       currency: "CNY",
     },
     attach: JSON.stringify({
       userId: params.userId,
+      // USD cents — what the user paid for in dollars, used to credit balance
       amountCents: params.amountCents,
       source: "xpilot_credit_topup",
     }),
@@ -140,6 +160,7 @@ export async function createWeChatNativeOrder(params: {
   return {
     outTradeNo,
     codeUrl: data.code_url,
+    cnyFen,
   };
 }
 
@@ -153,7 +174,7 @@ export type WeChatOrderResult = {
 export async function queryWeChatOrderByOutTradeNo(
   outTradeNo: string,
 ): Promise<WeChatOrderResult> {
-  const mchId = getRequiredEnv("WECHAT_MCH_ID");
+  const mchId = getRequiredEnv("WECHAT_PAY_MCH_ID");
   const encodedOutTradeNo = encodeURIComponent(outTradeNo);
   const pathWithQuery = `/v3/pay/transactions/out-trade-no/${encodedOutTradeNo}?mchid=${encodeURIComponent(mchId)}`;
 

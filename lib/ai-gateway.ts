@@ -11,7 +11,12 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { resolveTextModel } from "./ai-models";
 import type { TokenUsage } from "./usage-tracking";
 
-function getModel(modelId: string) {
+/**
+ * Resolve a model ID to an AI SDK LanguageModel.
+ * IDs prefixed with "openrouter/" are routed through OpenRouter (free models);
+ * everything else goes through the Vercel AI Gateway.
+ */
+export function getModel(modelId: string) {
   if (modelId.startsWith("openrouter/")) {
     const openrouter = createOpenRouter({
       apiKey: process.env.OPENROUTER_API_KEY,

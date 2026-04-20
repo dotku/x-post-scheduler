@@ -3,18 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
-import { IMAGE_MODELS, VIDEO_MODELS } from "@/lib/wavespeed";
-import { TEXT_MODELS } from "@/lib/ai-models";
-
-const FREE_IMAGE_MODELS = [
-  { id: "openrouter/black-forest-labs/flux-2-pro", label: "FLUX.2 Pro (Free)", provider: "Black Forest Labs" },
-  { id: "openrouter/black-forest-labs/flux-2-max", label: "FLUX.2 Max (Free)", provider: "Black Forest Labs" },
-  { id: "openrouter/black-forest-labs/flux-2-flex", label: "FLUX.2 Flex (Free)", provider: "Black Forest Labs" },
-  { id: "openrouter/black-forest-labs/flux-2-klein-4b", label: "FLUX.2 Klein 4B (Free)", provider: "Black Forest Labs" },
-  { id: "openrouter/bytedance-seed/seedream-v4.5", label: "Seedream 4.5 (Free)", provider: "ByteDance" },
-];
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import LandingEditor from "./landing/LandingEditor";
+import FeaturedModels from "./FeaturedModels";
 
 function NewsletterForm({ lang }: { lang: string }) {
   const [email, setEmail] = useState("");
@@ -111,12 +102,6 @@ interface PublicStatsResponse {
   };
   updatedAt: string;
 }
-
-type ProviderInfo = {
-  name: string;
-  badge: string;
-  models: { id: string; label: string; mode: "image" | "video" | "text" }[];
-};
 
 function detectProvider(modelId: string): string {
   if (modelId.startsWith("bytedance/")) return "ByteDance";
@@ -231,55 +216,6 @@ export default function LandingContent({
     ],
     [t],
   );
-
-  const providerInfo = useMemo<ProviderInfo[]>(() => {
-    const map = new Map<string, ProviderInfo>();
-    const ensure = (provider: string, badge: string) => {
-      const existing = map.get(provider);
-      if (existing) return existing;
-      const created: ProviderInfo = { name: provider, badge, models: [] };
-      map.set(provider, created);
-      return created;
-    };
-    for (const model of IMAGE_MODELS) {
-      ensure(detectProvider(model.id), "Image/Video").models.push({
-        id: model.id,
-        label: model.label,
-        mode: "image",
-      });
-    }
-    for (const model of VIDEO_MODELS) {
-      ensure(detectProvider(model.id), "Image/Video").models.push({
-        id: model.id,
-        label: model.label,
-        mode: "video",
-      });
-    }
-    // Seedance 2.0 (separate provider, not in VIDEO_MODELS)
-    ensure("ByteDance", "Image/Video").models.push(
-      { id: "seedance-2.0/text-to-video", label: "Seedance 2.0", mode: "video" },
-      { id: "seedance-2.0/image-to-video", label: "Seedance 2.0 i2v", mode: "video" },
-    );
-    // Free image models via OpenRouter
-    for (const model of FREE_IMAGE_MODELS) {
-      ensure(model.provider, "Image/Video").models.push({
-        id: model.id,
-        label: model.label,
-        mode: "image",
-      });
-    }
-    // Text/LLM models
-    for (const model of TEXT_MODELS) {
-      ensure(model.provider, "Text").models.push({
-        id: model.id,
-        label: model.label,
-        mode: "text",
-      });
-    }
-    return Array.from(map.values()).sort((a, b) =>
-      a.name.localeCompare(b.name),
-    );
-  }, []);
 
   // Aggregate top-models data by actual model vendor instead of API provider
   const byModelVendor = useMemo(() => {
@@ -724,49 +660,8 @@ export default function LandingContent({
         )}
       </section>
 
-      {/* Providers & Models */}
-      <section className="bg-white dark:bg-gray-800 py-16 sm:py-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3">
-            {t("modelsTitle")}
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
-            {t("modelsSubtitle")}
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {providerInfo.map((provider) => (
-              <div
-                key={provider.name}
-                className="rounded-xl border border-gray-200 dark:border-gray-700 p-4"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {provider.name}
-                  </h4>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                    {provider.badge}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {provider.models.map((model) => (
-                    <div
-                      key={model.id}
-                      className="flex items-center justify-between gap-2 rounded-md border border-gray-100 dark:border-gray-700 px-3 py-2 text-sm"
-                    >
-                      <span className="text-gray-700 dark:text-gray-300 truncate">
-                        {model.label}
-                      </span>
-                      <span className="shrink-0 text-xs text-gray-400 uppercase">
-                        {model.mode}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Featured AI Models */}
+      <FeaturedModels />
 
       {/* How it works */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
@@ -1125,29 +1020,6 @@ export default function LandingContent({
             )}
           </div>
 
-          {/* Africa region support */}
-          <div className="text-center space-y-2 sm:space-y-1">
-            <p className="text-sm sm:text-base font-medium text-gray-700 dark:text-gray-300">
-              {lang === "zh" ? "非洲地区客服" : "Africa Region Support"} —
-              Mohamadou Laminou:
-            </p>
-            <div className="flex flex-col sm:flex-row sm:gap-4 gap-2 text-sm sm:text-base">
-              <a
-                href="mailto:mohamadou439@gmail.com"
-                className="px-3 py-2 sm:py-1.5 rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-all break-all sm:break-normal"
-              >
-                mohamadou439@gmail.com
-              </a>
-              <a
-                href="https://wa.me/8613162726136"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-2 sm:py-1.5 rounded-md bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/40 text-green-700 dark:text-green-300 transition-all break-all sm:break-normal"
-              >
-                WhatsApp: +86 131 6272 6136
-              </a>
-            </div>
-          </div>
           <Link
             href={`${prefix}/invest`}
             className="text-sm hover:underline underline-offset-4 text-gray-500 dark:text-gray-400"

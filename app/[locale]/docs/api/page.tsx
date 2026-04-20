@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { useState } from "react";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -163,11 +164,12 @@ export default function ApiDocsPage() {
               >
                 {tr(locale, "Get API Key", "获取 API Key")}
               </Link>
+              <LanguageSwitcher className="text-sm text-gray-700 dark:text-gray-200 hover:underline underline-offset-4 font-medium" />
               <Link
-                href={`/${locale}`}
-                className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                href={`/${locale}/docs`}
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
               >
-                {tr(locale, "Home", "首页")}
+                ← {tr(locale, "All Docs", "所有文档")}
               </Link>
             </div>
           </div>

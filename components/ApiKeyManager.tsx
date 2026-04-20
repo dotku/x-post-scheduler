@@ -159,9 +159,6 @@ export default function ApiKeyManager({ locale }: { locale: string }) {
           </button>
         </div>
         {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          {isZh ? "每个账号最多 5 个密钥" : "Maximum 5 keys per account"}
-        </p>
       </div>
 
       {/* Key list */}

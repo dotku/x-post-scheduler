@@ -55,6 +55,20 @@ export const OPENROUTER_IMAGE_MODELS: {
     tier: "standard",
     openrouterId: "bytedance-seed/seedream-v4.5",
   },
+  {
+    id: "openrouter/google/gemini-2.5-flash-image",
+    label: "Gemini 2.5 Flash Image",
+    description: "Google · fast · low cost",
+    tier: "fast",
+    openrouterId: "google/gemini-2.5-flash-image",
+  },
+  {
+    id: "openrouter/google/gemini-3.1-flash-image-preview",
+    label: "Gemini 3.1 Flash Image",
+    description: "Google · latest · fast",
+    tier: "standard",
+    openrouterId: "google/gemini-3.1-flash-image-preview",
+  },
 ];
 
 /**

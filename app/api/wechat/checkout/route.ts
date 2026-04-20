@@ -48,6 +48,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       outTradeNo: order.outTradeNo,
       codeUrl: order.codeUrl,
+      cnyFen: order.cnyFen,
+      amountCents: option.amountCents,
     });
   } catch (error) {
     console.error("WeChat checkout failed:", error);

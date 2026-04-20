@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useLocale } from "next-intl";
 import { useState } from "react";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 function tr(locale: string, en: string, zh: string) {
   return locale === "zh" ? zh : en;
@@ -45,7 +46,8 @@ export default function MCPDocsPage() {
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
               {tr(locale, "MCP Integration Guide", "MCP 接入指南")}
             </h1>
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-center">
+              <LanguageSwitcher className="text-sm text-gray-700 dark:text-gray-200 hover:underline underline-offset-4 font-medium" />
               <Link
                 href={locale === "zh" ? "/zh/docs" : "/docs"}
                 className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"

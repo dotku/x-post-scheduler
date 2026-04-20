@@ -16,6 +16,7 @@ import type { TierKey } from "@/lib/subscription";
 import TeamSection from "@/components/TeamSection";
 import ReferralSection from "@/components/ReferralSection";
 import DashboardShell from "@/components/DashboardShell";
+import WeChatPayModal from "@/components/WeChatPayModal";
 
 interface XAccount {
   id: string;
@@ -102,6 +103,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [topupLoading, setTopupLoading] = useState<number | null>(null);
+  const [wechatAmountCents, setWechatAmountCents] = useState<number | null>(null);
+  const [topupMethod, setTopupMethod] = useState<"stripe" | "wechat">("stripe");
   const [verifyStatus, setVerifyStatus] = useState<
     Record<string, VerifyStatus>
   >({});
@@ -2323,22 +2326,60 @@ export default function SettingsPage() {
                     </p>
                   )}
               </div>
-              <div className="flex flex-wrap gap-2">
-                {([500, 1000, 2500] as const).map((amount) => (
-                  <button
-                    key={amount}
-                    onClick={() => handleTopup(amount)}
-                    disabled={topupLoading !== null}
-                    className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                  >
-                    {topupLoading === amount
-                      ? tr("Loading...", "加载中...")
-                      : tr(
-                          `Add Credits $${(amount / 100).toFixed(2)}`,
-                          `充值积分 $${(amount / 100).toFixed(2)}`,
-                        )}
-                  </button>
-                ))}
+              <div className="flex flex-col gap-3">
+                <div
+                  className="inline-flex p-0.5 bg-gray-100 dark:bg-gray-700 rounded-lg self-start"
+                  role="tablist"
+                >
+                  {(
+                    [
+                      { key: "stripe", label: tr("Card", "信用卡") },
+                      { key: "wechat", label: tr("WeChat Pay", "微信") },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={topupMethod === opt.key}
+                      onClick={() => setTopupMethod(opt.key)}
+                      disabled={topupLoading !== null || wechatAmountCents !== null}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                        topupMethod === opt.key
+                          ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-white shadow-sm"
+                          : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                      } disabled:opacity-50`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {([500, 1000, 2500] as const).map((amount) => {
+                    const isStripe = topupMethod === "stripe";
+                    const loading = isStripe && topupLoading === amount;
+                    return (
+                      <button
+                        key={amount}
+                        onClick={() =>
+                          isStripe
+                            ? handleTopup(amount)
+                            : setWechatAmountCents(amount)
+                        }
+                        disabled={topupLoading !== null || wechatAmountCents !== null}
+                        className={`px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-colors ${
+                          isStripe
+                            ? "bg-blue-600 hover:bg-blue-700"
+                            : "bg-green-600 hover:bg-green-700"
+                        }`}
+                      >
+                        {loading
+                          ? tr("Loading...", "加载中...")
+                          : `$${(amount / 100).toFixed(2)}`}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             {credits.transactions.length > 0 && (
@@ -2505,6 +2546,27 @@ export default function SettingsPage() {
         </div>
       </main>
     </div>
+    {wechatAmountCents !== null && (
+      <WeChatPayModal
+        amountCents={wechatAmountCents}
+        language={appLanguage === "zh" ? "zh" : "en"}
+        onClose={() => setWechatAmountCents(null)}
+        onSuccess={async () => {
+          setWechatAmountCents(null);
+          setMessage({
+            type: "success",
+            text: tr(
+              "Credits added successfully!",
+              "积分已充值成功！",
+            ),
+          });
+          try {
+            const res = await fetch("/api/credits");
+            if (res.ok) setCredits(await res.json());
+          } catch {}
+        }}
+      />
+    )}
     </DashboardShell>
   );
 }

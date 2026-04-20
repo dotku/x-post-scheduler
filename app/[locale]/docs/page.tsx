@@ -1,435 +1,184 @@
-import Link from "next/link";
+"use client";
 
-export default function DocsPage() {
+import Link from "next/link";
+import { useLocale } from "next-intl";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+
+interface DocCard {
+  href: string;
+  titleEn: string;
+  titleZh: string;
+  descEn: string;
+  descZh: string;
+  icon: React.ReactNode;
+  accent: string; // tailwind color pair for icon bg
+}
+
+const DOC_CARDS: DocCard[] = [
+  {
+    href: "/docs/models",
+    titleEn: "AI Models",
+    titleZh: "AI 模型",
+    descEn:
+      "Complete catalog of 49+ AI models for images, video, text, voice, music, and post-production — with pricing at cost.",
+    descZh:
+      "49+ AI 模型完整目录，涵盖图像、视频、文本、语音、音乐、后期制作——价格透明，0% 加价。",
+    accent: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400",
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/docs/api",
+    titleEn: "REST API",
+    titleZh: "REST API",
+    descEn:
+      "Programmatic access to post scheduling, content generation, and analytics — authenticate with API keys.",
+    descZh:
+      "通过 API 密钥调用发帖、内容生成、数据分析等功能。",
+    accent: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
+      </svg>
+    ),
+  },
+  {
+    href: "/docs/ide",
+    titleEn: "Use xPilot in Your IDE",
+    titleZh: "在 IDE 中使用 xPilot",
+    descEn:
+      "Configure Cline, Cursor, Continue, Zed to use xPilot as their LLM via the OpenAI-compatible chat completions API.",
+    descZh:
+      "通过 OpenAI 兼容的 chat completions 接口，将 Cline、Cursor、Continue、Zed 的大模型切换为 xPilot。",
+    accent: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400",
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+      </svg>
+    ),
+  },
+  {
+    href: "/docs/mcp",
+    titleEn: "MCP Integration",
+    titleZh: "MCP 集成",
+    descEn:
+      "Model Context Protocol — connect your AI agents (Claude, ChatGPT) directly to xPilot for automated workflows.",
+    descZh:
+      "Model Context Protocol — 让你的 AI 助手（Claude、ChatGPT）直接调用 xPilot 能力。",
+    accent: "bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400",
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+      </svg>
+    ),
+  },
+  {
+    href: "/docs/cline",
+    titleEn: "Cline (VS Code)",
+    titleZh: "Cline（VS Code）",
+    descEn:
+      "Use xPilot directly from the Cline coding agent in VS Code — schedule posts and generate media from your editor.",
+    descZh:
+      "在 VS Code 的 Cline 编码助手中直接使用 xPilot — 编辑器内发帖、生成媒体。",
+    accent: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400",
+    icon: (
+      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25M14.25 3l-4.5 18" />
+      </svg>
+    ),
+  },
+  {
+    href: "/docs/x-api",
+    titleEn: "X API Setup",
+    titleZh: "X API 设置",
+    descEn:
+      "Step-by-step guide to obtain X (Twitter) Developer credentials and connect your account to xPilot.",
+    descZh:
+      "获取 X (Twitter) 开发者密钥并接入 xPilot 的分步指南。",
+    accent: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
+    icon: (
+      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+      </svg>
+    ),
+  },
+];
+
+export default function DocsIndexPage() {
+  const locale = useLocale();
+  const isZh = locale === "zh";
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-              Documentation
-            </h1>
-            <div className="flex gap-3">
-              <Link
-                href="/docs/mcp"
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                MCP →
-              </Link>
-              <Link
-                href="/docs/api"
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                REST API →
-              </Link>
-              <Link
-                href="/docs/models"
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                AI Models →
-              </Link>
-              <Link
-                href="/"
-                className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              >
-                Back to Home
-              </Link>
-            </div>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+            Documentation
+          </h1>
+          <div className="flex items-center gap-4">
+            <LanguageSwitcher className="text-sm text-gray-700 dark:text-gray-200 hover:underline underline-offset-4 font-medium" />
+            <Link
+              href="/"
+              className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            >
+              ← {isZh ? "返回首页" : "Back to Home"}
+            </Link>
           </div>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
-        {/* Intro */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-            How to Get X API Keys
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        <div className="mb-10">
+          <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+            {isZh ? "文档中心" : "xPilot Docs"}
           </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            如何获取 X (Twitter) API 密钥
-          </p>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">
-            To post to X through this app, you need 4 API credentials from the X
-            Developer Portal. Follow the steps below to obtain them.
-          </p>
-          <p className="mt-1 text-gray-600 dark:text-gray-400">
-            要通过本应用发布推文，你需要从 X 开发者平台获取 4 个 API
-            密钥。请按以下步骤操作。
+          <p className="mt-3 text-gray-600 dark:text-gray-400 max-w-2xl">
+            {isZh
+              ? "浏览完整的 xPilot 使用指南：AI 模型目录、API 参考、MCP 集成与平台设置。"
+              : "Explore everything you need to get the most out of xPilot — AI model catalog, API reference, MCP integration, and platform setup."}
           </p>
         </div>
 
-        {/* Step 1 */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-start gap-4">
-            <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 text-white font-bold text-sm">
-              1
-            </span>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Create an X Developer Account
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                注册 X 开发者账号
-              </p>
-              <ol className="list-decimal list-inside space-y-2 text-gray-600 dark:text-gray-400 text-sm">
-                <li>
-                  Visit{" "}
-                  <a
-                    href="https://developer.x.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 dark:text-blue-400 underline"
-                  >
-                    developer.x.com
-                  </a>{" "}
-                  and sign in with your X account.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    访问 developer.x.com 并用你的 X 账号登录。
-                  </span>
-                </li>
-                <li>
-                  If you haven&apos;t already, apply for a Developer account.
-                  The free tier is sufficient.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    如果还没有开发者账号，申请一个即可。免费套餐就够用了。
-                  </span>
-                </li>
-                <li>
-                  Complete the application form describing your use case (e.g.,
-                  &ldquo;scheduling and posting tweets for my personal
-                  account&rdquo;).
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    填写申请表，描述你的用途（如"为个人账号定时发推"）。
-                  </span>
-                </li>
-              </ol>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 2 */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-start gap-4">
-            <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 text-white font-bold text-sm">
-              2
-            </span>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Create a Project & App
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                创建项目和应用
-              </p>
-              <ol className="list-decimal list-inside space-y-2 text-gray-600 dark:text-gray-400 text-sm">
-                <li>
-                  In the Developer Portal, go to{" "}
-                  <strong>Projects & Apps</strong>.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    在开发者面板中，进入 Projects & Apps 页面。
-                  </span>
-                </li>
-                <li>
-                  Click <strong>+ Create Project</strong>. Give it a name (e.g.,
-                  &ldquo;Post Scheduler&rdquo;).
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    点击 + Create Project，取个名字（如"Post Scheduler"）。
-                  </span>
-                </li>
-                <li>
-                  Under the project, create an <strong>App</strong>. Name it
-                  anything you like.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    在项目下创建一个 App，名称随意。
-                  </span>
-                </li>
-              </ol>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 3 */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-start gap-4">
-            <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 text-white font-bold text-sm">
-              3
-            </span>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Set App Permissions
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                设置应用权限
-              </p>
-              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-3 text-sm text-amber-800 dark:text-amber-200">
-                Important: You must set permissions <strong>before</strong>{" "}
-                generating tokens. If you change permissions later, you need to
-                regenerate all tokens.
-                <br />
-                重要：必须在生成 Token
-                之前设置权限。如果之后更改权限，需要重新生成所有 Token。
+        <div className="grid gap-4 sm:gap-5 sm:grid-cols-2">
+          {DOC_CARDS.map((card) => (
+            <Link
+              key={card.href}
+              href={card.href}
+              className="group rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all"
+            >
+              <div className={`inline-flex w-12 h-12 items-center justify-center rounded-lg ${card.accent}`}>
+                {card.icon}
               </div>
-              <ol className="list-decimal list-inside space-y-2 text-gray-600 dark:text-gray-400 text-sm">
-                <li>
-                  Go to your App&apos;s <strong>Settings</strong> tab.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    进入 App 的 Settings 选项卡。
-                  </span>
-                </li>
-                <li>
-                  Under <strong>User authentication settings</strong>, click{" "}
-                  <strong>Set up</strong>.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    在 User authentication settings 下点击 Set up。
-                  </span>
-                </li>
-                <li>
-                  Set <strong>App permissions</strong> to{" "}
-                  <strong>Read and Write</strong>.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    将 App permissions 设为 Read and Write。
-                  </span>
-                </li>
-                <li>
-                  Set type to <strong>Web App</strong>, fill in a callback URL
-                  (any valid URL is fine, e.g., your app URL).
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    类型选 Web App，回调 URL 填任意有效 URL（如你的应用地址）。
-                  </span>
-                </li>
-                <li>
-                  Save the settings.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    保存设置。
-                  </span>
-                </li>
-              </ol>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 4 */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-start gap-4">
-            <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 text-white font-bold text-sm">
-              4
-            </span>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Generate API Key & Secret
+              <h3 className="mt-4 text-lg font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                {isZh ? card.titleZh : card.titleEn}
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                生成 API Key 和 Secret
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                {isZh ? card.descZh : card.descEn}
               </p>
-              <ol className="list-decimal list-inside space-y-2 text-gray-600 dark:text-gray-400 text-sm">
-                <li>
-                  Go to your App&apos;s <strong>Keys and tokens</strong> tab.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    进入 App 的 Keys and tokens 选项卡。
-                  </span>
-                </li>
-                <li>
-                  Under <strong>Consumer Keys</strong>, click{" "}
-                  <strong>Regenerate</strong> (or view if already generated).
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    在 Consumer Keys 下点击 Regenerate（或 View）。
-                  </span>
-                </li>
-                <li>
-                  Copy the <strong>API Key</strong> and{" "}
-                  <strong>API Key Secret</strong>. Save them securely.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    复制 API Key 和 API Key Secret，妥善保存。
-                  </span>
-                </li>
-              </ol>
-              <div className="mt-3 bg-gray-50 dark:bg-gray-900 rounded-lg p-3 text-sm font-mono">
-                <p className="text-gray-500 dark:text-gray-500 mb-1">
-                  Example format:
-                </p>
-                <p className="text-gray-700 dark:text-gray-300">
-                  API Key: <code>aB1cD2eF3gH4iJ5kL6</code>
-                </p>
-                <p className="text-gray-700 dark:text-gray-300">
-                  API Secret: <code>mN7oP8qR9sT0uV1wX2yZ3...</code>
-                </p>
-              </div>
-            </div>
-          </div>
+              <span className="mt-3 inline-flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 group-hover:gap-2 gap-1 transition-all">
+                {isZh ? "阅读文档" : "Read docs"}
+                <span aria-hidden>→</span>
+              </span>
+            </Link>
+          ))}
         </div>
 
-        {/* Step 5 */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-start gap-4">
-            <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-blue-600 text-white font-bold text-sm">
-              5
-            </span>
+        <div className="mt-10 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20 p-5">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Generate Access Token & Secret
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                生成 Access Token 和 Secret
+              <p className="font-semibold text-emerald-900 dark:text-emerald-200">
+                {isZh ? "AI 模型定价：0% 加价" : "AI Pricing: 0% Markup"}
               </p>
-              <ol className="list-decimal list-inside space-y-2 text-gray-600 dark:text-gray-400 text-sm">
-                <li>
-                  On the same <strong>Keys and tokens</strong> page, scroll to{" "}
-                  <strong>Authentication Tokens</strong>.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    在同一个 Keys and tokens 页面，向下滚动到 Authentication
-                    Tokens 部分。
-                  </span>
-                </li>
-                <li>
-                  Click <strong>Generate</strong> under Access Token and Secret.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    点击 Access Token and Secret 下的 Generate。
-                  </span>
-                </li>
-                <li>
-                  Make sure it says{" "}
-                  <strong>
-                    &ldquo;Created with Read and Write permissions&rdquo;
-                  </strong>
-                  .
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    确认显示"Created with Read and Write permissions"。
-                  </span>
-                </li>
-                <li>
-                  Copy the <strong>Access Token</strong> and{" "}
-                  <strong>Access Token Secret</strong>. Save them securely.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    复制 Access Token 和 Access Token Secret，妥善保存。
-                  </span>
-                </li>
-              </ol>
-            </div>
-          </div>
-        </div>
-
-        {/* Step 6 */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <div className="flex items-start gap-4">
-            <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-green-600 text-white font-bold text-sm">
-              6
-            </span>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Add Credentials to xPilot
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                将密钥添加到 X 推创
-              </p>
-              <ol className="list-decimal list-inside space-y-2 text-gray-600 dark:text-gray-400 text-sm">
-                <li>
-                  Sign in to xPilot and go to the{" "}
-                  <Link
-                    href="/settings"
-                    className="text-blue-600 dark:text-blue-400 underline"
-                  >
-                    Settings
-                  </Link>{" "}
-                  page.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    登录 X 推创 并进入设置页面。
-                  </span>
-                </li>
-                <li>
-                  In the <strong>Add X Account</strong> section, fill in:
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    在"Add X Account"部分填写：
-                  </span>
-                  <ul className="list-disc list-inside ml-4 mt-1 space-y-1">
-                    <li>
-                      <strong>API Key</strong> → Consumer API Key
-                    </li>
-                    <li>
-                      <strong>API Secret</strong> → Consumer API Key Secret
-                    </li>
-                    <li>
-                      <strong>Access Token</strong> → Access Token
-                    </li>
-                    <li>
-                      <strong>Access Token Secret</strong> → Access Token Secret
-                    </li>
-                  </ul>
-                </li>
-                <li>
-                  Click <strong>Add Account</strong>. The app will verify your
-                  credentials and show your X username.
-                  <br />
-                  <span className="text-gray-500 dark:text-gray-500">
-                    点击 Add Account。应用会验证凭证并显示你的 X 用户名。
-                  </span>
-                </li>
-              </ol>
-            </div>
-          </div>
-        </div>
-
-        {/* Troubleshooting */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Troubleshooting / 常见问题
-          </h2>
-          <div className="space-y-4 text-sm text-gray-600 dark:text-gray-400">
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">
-                &ldquo;403 Forbidden&rdquo; when posting
-              </p>
-              <p>
-                Your app permissions are likely set to &ldquo;Read only&rdquo;.
-                Change to <strong>Read and Write</strong> in app settings, then{" "}
-                <strong>regenerate</strong> both your Access Token and Secret.
-              </p>
-              <p className="text-gray-500 dark:text-gray-500">
-                你的应用权限可能是"只读"。请改为"读写"，然后重新生成 Access
-                Token 和 Secret。
-              </p>
-            </div>
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">
-                &ldquo;401 Unauthorized&rdquo;
-              </p>
-              <p>
-                Double-check that all 4 keys are correct and haven&apos;t been
-                regenerated since you copied them.
-              </p>
-              <p className="text-gray-500 dark:text-gray-500">
-                请确认 4 个密钥都正确，且复制后没有被重新生成过。
-              </p>
-            </div>
-            <div>
-              <p className="font-medium text-gray-900 dark:text-white">
-                &ldquo;429 Too Many Requests&rdquo;
-              </p>
-              <p>
-                You&apos;ve hit the X API rate limit. The free tier allows ~17
-                tweets per 24 hours. Wait and try again later.
-              </p>
-              <p className="text-gray-500 dark:text-gray-500">
-                触发了 X API 速率限制。免费套餐每 24 小时约可发 17
-                条推文，稍后再试。
+              <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-300">
+                {isZh
+                  ? "所有 AI 模型按上游服务商成本价计费，xPilot 不在 AI 调用上加价。"
+                  : "All AI model calls are billed at upstream provider cost — xPilot adds 0% margin on AI inference."}
               </p>
             </div>
           </div>

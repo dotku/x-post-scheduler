@@ -3,8 +3,6 @@ import { requireAuth, unauthorizedResponse } from "@/lib/auth0";
 import { generateApiKey } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 
-const MAX_KEYS_PER_USER = 5;
-
 /** GET — list user's active API keys */
 export async function GET() {
   let user;
@@ -44,17 +42,6 @@ export async function POST(request: Request) {
   if (!name) {
     return NextResponse.json(
       { error: "Key name is required" },
-      { status: 400 },
-    );
-  }
-
-  // Enforce max keys limit
-  const count = await prisma.apiKey.count({
-    where: { userId: user.id, isRevoked: false },
-  });
-  if (count >= MAX_KEYS_PER_USER) {
-    return NextResponse.json(
-      { error: `Maximum ${MAX_KEYS_PER_USER} API keys per account` },
       { status: 400 },
     );
   }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useLocale } from "next-intl";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 /* ------------------------------------------------------------------ */
 /*  Model data — developer info only, no API supplier names           */
@@ -402,17 +403,12 @@ export default function ModelsDocsPage() {
               <span className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
                 13 {locale === "zh" ? "个免费" : "Free"}
               </span>
+              <LanguageSwitcher className="text-sm text-gray-700 dark:text-gray-200 hover:underline underline-offset-4 font-medium" />
               <Link
                 href={`/${locale}/docs`}
-                className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
               >
-                {locale === "zh" ? "API 文档" : "API Docs"}
-              </Link>
-              <Link
-                href={`/${locale}`}
-                className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              >
-                {locale === "zh" ? "返回首页" : "Back to Home"}
+                ← {locale === "zh" ? "所有文档" : "All Docs"}
               </Link>
             </div>
           </div>
