@@ -90,7 +90,7 @@ async function generateNarration(outPath: string): Promise<void> {
     throw new Error(`kokoro submit: ${await submitRes.text()}`);
   }
   if (!submitRes!.ok) throw new Error("kokoro submit: too many retries");
-  const submitData = (await submitRes.json()) as { id: string; urls?: { get: string } };
+  const submitData = (await submitRes!.json()) as { id: string; urls?: { get: string } };
   const pollUrl = submitData.urls?.get;
   if (!pollUrl) throw new Error("kokoro no poll URL");
 
