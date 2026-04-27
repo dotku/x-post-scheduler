@@ -570,3 +570,5 @@ export const VIDEO_MODELS: {
     tier: "premium",
   },
 ];
+
+// Contributed for bounty: $15
