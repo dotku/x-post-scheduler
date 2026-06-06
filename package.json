@@ -2,6 +2,8 @@
   "name": "xpilot",
   "version": "0.1.0",
   "private": true,
+  "description": "xPilot — your social marketing copilot AI",
+  "author": "jytech",
   "main": "electron/main.js",
   "scripts": {
     "dev": "next dev",
@@ -16,8 +18,8 @@
     "electron": "electron .",
     "electron:dev": "cross-env XPILOT_DESKTOP_URL=http://localhost:3000 electron .",
     "electron:icon": "node electron/make-icon.js",
-    "electron:build:win": "electron-builder --win",
-    "electron:build": "electron-builder"
+    "electron:build:win": "electron-builder --win --publish never",
+    "electron:build": "electron-builder --publish never"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^3.0.54",
