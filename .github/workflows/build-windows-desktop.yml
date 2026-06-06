@@ -1,0 +1,49 @@
+name: Build Windows Desktop
+
+# Builds the xPilot Electron desktop installer (.exe) on a Windows runner and
+# uploads it as a downloadable artifact. Trigger manually, or it runs when the
+# desktop-related files change on any branch.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["**"]
+    paths:
+      - "electron/**"
+      - "electron-resources/**"
+      - "electron-builder.yml"
+      - ".github/workflows/build-windows-desktop.yml"
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    env:
+      # prisma generate (postinstall) requires this to be set; it is not used to connect.
+      DATABASE_URL: "postgres://user:pass@localhost:5432/db"
+      # Skip electron-builder code signing (no cert configured yet).
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build Windows installer
+        run: npm run electron:build:win
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: xPilot-Windows
+          path: |
+            dist-electron/*.exe
+            dist-electron/*.blockmap
+          if-no-files-found: error
+          retention-days: 30
