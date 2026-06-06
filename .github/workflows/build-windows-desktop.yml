@@ -13,6 +13,10 @@ on:
       - "electron-builder.yml"
       - ".github/workflows/build-windows-desktop.yml"
 
+# Needed for the release step to create/update a GitHub Release.
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -47,3 +51,26 @@ jobs:
             dist-electron/*.blockmap
           if-no-files-found: error
           retention-days: 30
+
+      # Read the app version so the release can be tagged with it.
+      - name: Read app version
+        id: pkg
+        shell: bash
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+
+      # Publish the .exe to a GitHub Release so it can be downloaded straight
+      # from the repo's Releases section — no login, no 30-day expiry.
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-v${{ steps.pkg.outputs.version }}
+          name: xPilot Desktop v${{ steps.pkg.outputs.version }} (Windows)
+          body: |
+            xPilot Windows 桌面版（自动构建）。
+
+            - **xPilot-${{ steps.pkg.outputs.version }}-Portable.exe** — 免安装，双击即用
+            - **xPilot-${{ steps.pkg.outputs.version }}-Setup.exe** — 安装版
+
+            未做代码签名，首次运行 SmartScreen 拦截时点「更多信息 → 仍要运行」。
+          files: dist-electron/*.exe
+          make_latest: true
