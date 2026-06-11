@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useTranslations, useLocale } from "next-intl";
 import { format } from "date-fns";
 import DashboardShell from "@/components/DashboardShell";
+import { notifyUser } from "@/lib/desktop-notify";
 
 /* ------------------------------------------------------------------ */
 /*  Single Post Form (with A/B Score + Hashtag Optimizer)             */
@@ -84,10 +85,16 @@ function SinglePostForm({
         const data = await res.json();
         throw new Error(data.error || "Failed to create post");
       }
+      void notifyUser({
+        title: scheduleType === "now" ? t("notifyPostedTitle") : t("notifyScheduledTitle"),
+        body: content.slice(0, 120),
+      });
       router.push(`${prefix}/dashboard`);
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      const message = err instanceof Error ? err.message : "An error occurred";
+      setError(message);
+      void notifyUser({ title: t("notifyFailedTitle"), body: message });
     } finally {
       setIsSubmitting(false);
     }

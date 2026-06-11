@@ -1,8 +1,21 @@
 // xPilot desktop shell (Electron).
 // The desktop app is a thin native client for the hosted xPilot web app, so it
 // loads the production URL in a BrowserWindow. No Next.js bundle is shipped.
-const { app, BrowserWindow, Menu, Tray, shell, nativeImage } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  Menu,
+  Tray,
+  shell,
+  nativeImage,
+} = require("electron");
 const path = require("path");
+const { registerNotificationIpc } = require("./notify");
+
+// App identity. On Windows this MUST be set (and match the installer's appId)
+// before any Notification is shown, otherwise notifications render without the
+// app name/icon — or silently fail. Safe no-op on macOS/Linux.
+const APP_ID = "us.jytech.xpilot";
 
 // Target web app URL. Override with XPILOT_DESKTOP_URL for staging/local dev.
 const APP_URL = process.env.XPILOT_DESKTOP_URL || "https://xpilot.jytech.us";
@@ -124,20 +137,33 @@ function createTray() {
   }
 }
 
+// Native OS notifications. The web app calls window.xpilotDesktop.notify(...)
+// (see preload.js), which routes here so we can use the OS-integrated Electron
+// Notification (correct app name/icon on Windows) and focus the window on click.
+function showMainWindow() {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  } else {
+    createWindow();
+  }
+}
+
 // Single-instance lock: focus the existing window instead of opening a second.
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.show();
-      mainWindow.focus();
-    }
+    showMainWindow();
   });
 
   app.whenReady().then(() => {
+    // Must be set before any notification is shown (Windows requirement).
+    app.setAppUserModelId(APP_ID);
+    // Clicking a notification brings the app to the foreground.
+    registerNotificationIpc({ iconPath, onClick: showMainWindow });
     buildMenu();
     createWindow();
     createTray();
