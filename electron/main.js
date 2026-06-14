@@ -31,6 +31,25 @@ const isDev = !app.isPackaged;
 let mainWindow = null;
 let tray = null;
 
+// USB / portable build: keep all app state (login session, cookies, cache) in a
+// folder next to the .exe instead of the host's %APPDATA%. This makes it a true
+// "U 盘版": plug the drive into any Windows machine, stay logged in, and leave no
+// trace on the host once it's unplugged. electron-builder injects
+// PORTABLE_EXECUTABLE_DIR only for the `portable` target, so installed builds are
+// unaffected and keep using the standard per-user location.
+function configurePortableDataDir() {
+  const portableDir = process.env.PORTABLE_EXECUTABLE_DIR;
+  if (!portableDir) return;
+  const dataDir = path.join(portableDir, "xPilot-Data");
+  try {
+    // Must run before app `ready`; pins session + cache under the drive folder.
+    app.setPath("userData", dataDir);
+    app.setPath("sessionData", dataDir);
+  } catch {
+    // Read-only drive or locked path — fall back to the default location.
+  }
+}
+
 function iconPath() {
   return path.join(__dirname, "..", "electron-resources", "icon.png");
 }
@@ -149,6 +168,9 @@ function showMainWindow() {
     createWindow();
   }
 }
+
+// Redirect app state to the drive for portable builds. Must run before `ready`.
+configurePortableDataDir();
 
 // Single-instance lock: focus the existing window instead of opening a second.
 const gotLock = app.requestSingleInstanceLock();
