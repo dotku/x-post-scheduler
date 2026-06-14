@@ -68,7 +68,7 @@ jobs:
           body: |
             xPilot Windows 桌面版（自动构建）。
 
-            - **xPilot-${{ steps.pkg.outputs.version }}-Portable.exe** — U 盘版 / 免安装，双击即用。登录会话与缓存保存在 .exe 同级的 `xPilot-Data/` 文件夹里，拷到 U 盘即可随身携带，换机器免重登、不在宿主机留痕。
+            - **xPilot-${{ steps.pkg.outputs.version }}-Portable.exe** — U 盘版 / 免安装，双击即用（32 位，兼容所有 32/64 位 Windows）。登录会话与缓存保存在 .exe 同级的 `xPilot-Data/` 文件夹里，拷到 U 盘即可随身携带，换机器免重登、不在宿主机留痕。
             - **xPilot-${{ steps.pkg.outputs.version }}-Setup.exe** — 安装版（写入本机 %APPDATA%）。
 
             未做代码签名，首次运行 SmartScreen 拦截时点「更多信息 → 仍要运行」。

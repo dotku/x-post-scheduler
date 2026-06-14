@@ -22,8 +22,11 @@ win:
   target:
     - target: nsis
       arch: [x64]
+    # Portable ("U 盘版") is built ia32 on purpose: a 32-bit exe runs on every
+    # Windows (32- and 64-bit), so one file works on any machine you plug the
+    # drive into. The app is a thin remote shell, so 32-bit costs nothing here.
     - target: portable
-      arch: [x64]
+      arch: [ia32]
 
 nsis:
   oneClick: false
