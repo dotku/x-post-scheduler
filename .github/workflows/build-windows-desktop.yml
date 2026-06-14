@@ -66,11 +66,29 @@ jobs:
           tag_name: desktop-v${{ steps.pkg.outputs.version }}
           name: xPilot Desktop v${{ steps.pkg.outputs.version }} (Windows)
           body: |
-            xPilot Windows 桌面版（自动构建）。
+            xPilot Desktop for Windows · auto-built.
 
+            **Portable.exe** = U-disk build · **Setup.exe** = installer. Unsigned: on the first run, if SmartScreen blocks it, click **More info → Run anyway**.
+
+            ---
+            ### 🇨🇳 中文
             - **xPilot-${{ steps.pkg.outputs.version }}-Portable.exe** — U 盘版 / 免安装，双击即用（32 位，兼容所有 32/64 位 Windows）。登录会话与缓存保存在 .exe 同级的 `xPilot-Data/` 文件夹里，拷到 U 盘即可随身携带，换机器免重登、不在宿主机留痕。
             - **xPilot-${{ steps.pkg.outputs.version }}-Setup.exe** — 安装版（写入本机 %APPDATA%）。
 
-            未做代码签名，首次运行 SmartScreen 拦截时点「更多信息 → 仍要运行」。
+            ### 🇺🇸 English
+            - **xPilot-${{ steps.pkg.outputs.version }}-Portable.exe** — USB / portable build. No install, just double-click (32-bit, runs on any 32/64-bit Windows). Login session and cache live in an `xPilot-Data/` folder next to the .exe, so copy it onto a USB stick and carry it anywhere — no re-login across machines, no trace left on the host.
+            - **xPilot-${{ steps.pkg.outputs.version }}-Setup.exe** — Installer (writes to this PC's %APPDATA%).
+
+            ### 🇯🇵 日本語
+            - **xPilot-${{ steps.pkg.outputs.version }}-Portable.exe** — USB 版 / インストール不要、ダブルクリックで起動（32 ビット、すべての 32/64 ビット Windows に対応）。ログイン情報とキャッシュは .exe と同じ階層の `xPilot-Data/` フォルダーに保存されるため、USB メモリーに入れて持ち運べます。別の PC でも再ログイン不要、ホストに痕跡を残しません。
+            - **xPilot-${{ steps.pkg.outputs.version }}-Setup.exe** — インストーラー版（本機の %APPDATA% に書き込み）。
+
+            ### 🇰🇷 한국어
+            - **xPilot-${{ steps.pkg.outputs.version }}-Portable.exe** — USB / 무설치 버전. 더블클릭으로 실행 (32비트, 모든 32/64비트 Windows 호환). 로그인 세션과 캐시가 .exe 옆 `xPilot-Data/` 폴더에 저장되어 USB에 담아 어디서나 사용 — 다른 기기에서도 재로그인 불필요, 호스트에 흔적을 남기지 않습니다.
+            - **xPilot-${{ steps.pkg.outputs.version }}-Setup.exe** — 설치 버전 (이 PC의 %APPDATA%에 기록).
+
+            ### 🇪🇸 Español
+            - **xPilot-${{ steps.pkg.outputs.version }}-Portable.exe** — Versión USB / portátil. Sin instalación, solo doble clic (32 bits, funciona en cualquier Windows de 32/64 bits). La sesión y la caché se guardan en la carpeta `xPilot-Data/` junto al .exe; cópialo a una memoria USB y llévalo a cualquier parte: sin volver a iniciar sesión en otros equipos y sin dejar rastro en el host.
+            - **xPilot-${{ steps.pkg.outputs.version }}-Setup.exe** — Instalador (escribe en %APPDATA% de este PC).
           files: dist-electron/*.exe
           make_latest: true
